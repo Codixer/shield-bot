@@ -1,5 +1,5 @@
 import { Discord, Slash, SlashOption, SlashChoice } from "discordx";
-import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, ActionRowBuilder, ButtonBuilder, ButtonStyle, Message, MessageFlags } from "discord.js";
+import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, ActionRowBuilder, ButtonBuilder, ButtonStyle, Message, MessageFlags, InteractionContextType } from "discord.js";
 
 @Discord()
 export default class BackupRequestCommand {
@@ -7,6 +7,7 @@ export default class BackupRequestCommand {
         name: "backup-request",
         description: "Request a backup for SHIELD.",
         integrationTypes: [ApplicationIntegrationType.UserInstall],
+        contexts: [InteractionContextType.BotDM, InteractionContextType.Guild, InteractionContextType.PrivateChannel],
     })
     async backupRequest(
         @SlashChoice({ name: "Standby Deputies", value: "999860674404569242" })
@@ -75,21 +76,20 @@ export default class BackupRequestCommand {
                 : roleId === "999860876062498827"
                 ? "TRU"
                 : "Backup";
-        const worldText = world ? world : "-";
-        const situationText = situation ? situation : "-";
-        const squadText = squadChannelMention ? squadChannelMention : "-";
+        const worldText = world ? world : "[WORLD NOT FOUND]";
+        const situationText = situation ? situation : "[SITUATION NOT PROVIDED]";
+        const squadText = squadChannelMention ? squadChannelMention : "[SQUAD NOT PROVIDED]";
         const statusText = status === "active"
             ? "Active 🔴"
             : "Resolved 🟢";
 
-        const replyMsg = `
-\`\`\`        
+        const replyMsg = `\`\`\`        
 ${roleMention}
-**Request:** ${requestType}
-**World:** ${worldText}
-**Situation:** ${situationText}
-**Squad:** ${squadText}
-**Status:** ${statusText}
+**Request**: ${requestType}
+**World**: ${worldText}
+**Situation**: ${situationText}
+**Squad**: ${squadText}
+**Status**: ${statusText}
 \`\`\`
         `.trim();
 
@@ -104,7 +104,7 @@ ${roleMention}
         await interaction.reply({
             content: replyMsg,
             // components: [row],
-            flags: MessageFlags.Ephemeral
+           // flags: MessageFlags.Ephemeral
         });
     }
 

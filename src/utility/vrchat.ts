@@ -4,9 +4,9 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { authenticator } from "otplib";
+import fetch from "node-fetch";
 
-const USER_AGENT = process.env.VRCHAT_USER_AGENT || "CodixerBot/0.0.1 contact@stefanocoding.me";
-const options = { headers: { "User-Agent": USER_AGENT }};
+const USER_AGENT = process.env.VRCHAT_USER_AGENT || "SomethingBrokeWithMyEnvFileSorry/0.0.1 contact@stefanocoding.me";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const COOKIE_DIR = path.resolve(__dirname, "../../.vrchat_cookies");
@@ -42,85 +42,79 @@ export async function loginAndGetCurrentUser(username: string, password: string)
     let cookie = loadCookie();
     let headers: any = { "User-Agent": USER_AGENT };
     if (cookie) headers["Cookie"] = cookie;
+
     // Try with cookie first
-    let response;
     try {
-        response = await axios.get("https://api.vrchat.cloud/api/1/auth/user", { headers });
-        // If successful, update cookie (in case it changed)
+        const response = await axios.get("https://api.vrchat.cloud/api/1/auth/user", { headers });
         const setCookie = response.headers["set-cookie"];
         if (setCookie && setCookie.length > 0) saveCookie(setCookie.join("; "));
         return response.data;
     } catch (err: any) {
-        // If unauthorized, try login with credentials
-        if (err.response && err.response.status === 401) {
-            const encode = (str: string) => encodeURIComponent(str);
-            const credentials = Buffer.from(`${encode(username)}:${encode(password)}`).toString("base64");
-            headers["Authorization"] = `Basic ${credentials}`;
-            response = await axios.get("https://api.vrchat.cloud/api/1/auth/user", { headers });
-            // Check for 2FA requirement
-            if (response.data.requiresTwoFactorAuth) {
-                const methods = response.data.requiresTwoFactorAuth;
-                if (methods.includes("emailOtp") && !methods.includes("otp") && !methods.includes("totp")) {
-                    throw new Error("Login refused: Only emailOtp is supported for this account, shutting down.");
-                }
-                if (methods.includes("otp") || methods.includes("totp")) {
-                    // Generate TOTP code
-                    const otpToken = process.env.VRCHAT_OTP_TOKEN;
-                    if (!otpToken) throw new Error("VRCHAT_OTP_TOKEN env variable not set");
-                    const code = authenticator.generate(otpToken);
-                    // Get all cookies from set-cookie header
-                    let allCookiesArr: string[] = [];
-                    const setCookie = response.headers["set-cookie"];
-                    if (setCookie && setCookie.length > 0) {
-                        allCookiesArr = setCookie.map((c: string) => c.split(';')[0]);
-                    }
-                    // Always keep the auth cookie for session reuse
-                    let authCookie = allCookiesArr.find((c: string) => c.startsWith("auth="));
-                    if (!authCookie) throw new Error("No auth cookie found for 2FA verification");
-                    // Use only the auth cookie for 2FA verification (per VRChat API docs)
-                    const cookieHeader = authCookie;
-                    const verifyRes = await axios.post(
-                        "https://api.vrchat.cloud/api/1/auth/twofactorauth/totp/verify",
-                        { code },
-                        {
-                            headers: {
-                                ...headers,
-                                "Content-Type": "application/json",
-                                "Cookie": cookieHeader,
-                                "User-Agent": USER_AGENT
-                            },
-                            withCredentials: true
-                        }
-                    );
-                    // Save both cookies for future use
-                    const verifySetCookie = verifyRes.headers["set-cookie"];
-                    let finalCookies = allCookiesArr;
-                    if (verifySetCookie && verifySetCookie.length > 0) {
-                        const twoFactorCookie = verifySetCookie.find((c: string) => c.startsWith("twoFactorAuth="));
-                        if (twoFactorCookie) finalCookies.push(twoFactorCookie.split(";")[0]);
-                    }
-                    // Always save the auth cookie (and twoFactorAuth if present)
-                    saveCookie(finalCookies.join("; "));
-                    if (verifyRes.data.verified) {
-                        return verifyRes.data;
-                    } else {
-                        throw new Error("2FA verification failed");
-                    }
-                }
-            }
-            // Save new cookie (auth only) for future reuse
-            const setCookie = response.headers["set-cookie"];
-            if (setCookie && setCookie.length > 0) {
-                // Only keep the auth cookie for session reuse
-                const authCookie = setCookie.find((c: string) => c.startsWith("auth="));
-                if (authCookie) saveCookie(authCookie.split(";")[0]);
-                else saveCookie(setCookie.join("; "));
-            }
-            return response.data;
-        } else {
+        if (!err.response || err.response.status !== 401) {
             throw err;
         }
     }
+
+    // If unauthorized, try login with credentials
+    const encode = (str: string) => encodeURIComponent(str);
+    const credentials = Buffer.from(`${encode(username)}:${encode(password)}`).toString("base64");
+    headers["Authorization"] = `Basic ${credentials}`;
+    let response = await axios.get("https://api.vrchat.cloud/api/1/auth/user", { headers });
+
+    // If no 2FA required, save cookie and return
+    if (!response.data.requiresTwoFactorAuth) {
+        const setCookie = response.headers["set-cookie"];
+        if (setCookie && setCookie.length > 0) {
+            const authCookie = setCookie.find((c: string) => c.startsWith("auth="));
+            if (authCookie) saveCookie(authCookie.split(";")[0]);
+            else saveCookie(setCookie.join("; "));
+        }
+        return response.data;
+    }
+
+    // 2FA required
+    const methods = response.data.requiresTwoFactorAuth;
+    if (methods.includes("emailOtp") && !methods.includes("otp") && !methods.includes("totp")) {
+        throw new Error("Login refused: Only emailOtp is supported for this account, shutting down.");
+    }
+    if (!(methods.includes("otp") || methods.includes("totp"))) {
+        throw new Error("2FA required but no supported method (otp/totp) available");
+    }
+    const otpToken = process.env.VRCHAT_OTP_TOKEN;
+    if (!otpToken) throw new Error("VRCHAT_OTP_TOKEN env variable not set");
+    const code = authenticator.generate(otpToken);
+    let allCookiesArr: string[] = [];
+    const setCookie = response.headers["set-cookie"];
+    if (setCookie && setCookie.length > 0) {
+        allCookiesArr = setCookie.map((c: string) => c.split(';')[0]);
+    }
+    let authCookie = allCookiesArr.find((c: string) => c.startsWith("auth="));
+    if (!authCookie) throw new Error("No auth cookie found for 2FA verification");
+    const cookieHeader = authCookie;
+    const verifyRes = await axios.post(
+        "https://api.vrchat.cloud/api/1/auth/twofactorauth/totp/verify",
+        { code },
+        {
+            headers: {
+                ...headers,
+                "Content-Type": "application/json",
+                "Cookie": cookieHeader,
+                "User-Agent": USER_AGENT
+            },
+            withCredentials: true
+        }
+    );
+    const verifySetCookie = verifyRes.headers["set-cookie"];
+    let finalCookies = allCookiesArr;
+    if (verifySetCookie && verifySetCookie.length > 0) {
+        const twoFactorCookie = verifySetCookie.find((c: string) => c.startsWith("twoFactorAuth="));
+        if (twoFactorCookie) finalCookies.push(twoFactorCookie.split(";")[0]);
+    }
+    saveCookie(finalCookies.join("; "));
+    if (!verifyRes.data.verified) {
+        throw new Error("2FA verification failed");
+    }
+    return verifyRes.data;
 }
 
 /**
@@ -176,3 +170,29 @@ export async function searchUsers({
     const response = await axios.get(url, { headers });
     return response.data;
 }
+
+/**
+ * Accept a friend request by notification ID using the VRChat API.
+ * @param notificationId The notification ID (frq_...)
+ * @param authToken The VRChat auth token (cookie value)
+ */
+export async function acceptFriendRequest(notificationId: string) {
+    const cookie = loadCookie();
+    if (!cookie) throw new Error("Not authenticated. Please log in first.");
+    
+    const url = `https://api.vrchat.cloud/api/1/auth/user/notifications/${notificationId}/accept`;
+    const response = await fetch(url, {
+        method: "PUT",
+        headers: {
+            "Content-Type": "application/json",
+            "User-Agent": USER_AGENT,
+            "Cookie": cookie,
+        },
+
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to accept friend request: ${response.status} ${response.statusText}`);
+    }
+    return await response.json();
+}
+
