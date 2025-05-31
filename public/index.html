@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image:src" content="https://i.imgur.com/IQRpIMp.png" />
+    <meta property="og:image" content="https://i.imgur.com/IQRpIMp.png" />
+    <meta name="twitter:title" content="SHIELD" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, minimum-scale=1"
+    />
+    <meta
+      name="description"
+      content="SHIELD: Secure, monitor, and protect your community with advanced Discord tools."
+    />
+
+    <title>SHIELD</title>
+    <link rel="preload"
+    href="https://fonts.googleapis.com/css?family=Montserrat:100,100i,200,200i,300,300i,400,400i,500,500i,600,600i,700,700i,800,800i,900,900i&display=swap"
+    as="style" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css?family=Montserrat:100,100i,200,200i,300,300i,400,400i,500,500i,600,600i,700,700i,800,800i,900,900i&display=swap"
+    />
+  </noscript>
+
+    <meta property="og:image" content="https://i.imgur.com/IQRpIMp.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      property="og:description"
+      content="SHIELD: Secure, monitor, and protect your community with advanced Discord tools."
+    />
+
+    <style>
+      @import url(https://fonts.googleapis.com/css?family=Nobile:400,700);
+
+      body {
+        font-family: "Nobile", sans-serif;
+        color: #473623;
+        padding: 0 2em;
+        background-color: #000000;
+        background-image: none;
+      }
+
+      #main {
+        margin: 15em auto 2em auto;
+        text-align: center;
+      }
+
+      h1 {
+        font-weight: 700;
+        font-size: 60px;
+        color: #dfbd6b;
+      }
+
+      #copy {
+        position: fixed;
+        bottom: 10px;
+        left: 10px;
+        text-align: left;
+        padding: 1em;
+        font-size: 0.65em;
+      }
+
+      #copy a {
+        color: #ccc;
+      }
+
+      @media (max-width: 700px) {
+        #main {
+          margin-top: 5em;
+        }
+      }
+    </style>
+  </head>
+  <script>
+    function init() {
+      var h1 = document.getElementById("js"),
+        delay = 4800;
+
+      setTimeout(function () {
+        h1.innerHTML = "You are in the wrong place. Be gone!";
+
+        setTimeout(function () {
+          window.location.href = "https://shield.stefanocoding.me";
+        }, delay);
+      }, delay);
+    }
+  </script>
+  <body onload="init()">
+    <div id="main">
+      <h1 id="js">Huh... how did you get here?</h1>
+      <img src="https://i.imgur.com/IQRpIMp.png" alt="SHIELD Logo" style="margin-top:2em;width:180px;height:auto;" />
+    </div>
+  </body>
+</html>

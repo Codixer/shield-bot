@@ -1,0 +1,13 @@
+node_modules/
+build/
+.env
+bun.lockb
+
+# Exclude CPU Json File
+cpu_data.json
+
+# Sentry Config File
+.sentryclirc
+
+src/generated
+.vrchat_cookies/

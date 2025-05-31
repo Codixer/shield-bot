@@ -1,0 +1,7 @@
+{
+    "compilerOptions": {
+      "module": "NodeNext",
+      "moduleResolution": "NodeNext", // <- Necessary to get imports with .js
+    },
+    "exclude": ["node_modules"]
+  }
