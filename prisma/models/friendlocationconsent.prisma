@@ -1,0 +1,9 @@
+// Model to store consent for friend location tracking
+model FriendLocationConsent {
+  id           Int      @id @default(autoincrement())
+  ownerVrcUserId String // The VRChat user ID of the person being tracked
+  allowedVrcUserId String // The VRChat user ID of the person allowed to track
+  grantedAt    DateTime @default(now()) // When consent was granted
+
+  @@unique([ownerVrcUserId, allowedVrcUserId])
+}

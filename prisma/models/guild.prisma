@@ -2,9 +2,6 @@ model GuildSettings {
   id            Int      @id @default(autoincrement())
   guildId       String   @unique
 
-  patrolCategoryId String
-  maxLinkedAccounts Int @default(1)
-
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }

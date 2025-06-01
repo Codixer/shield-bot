@@ -1,6 +1,6 @@
 import { Discord, Slash, SlashOption, SlashChoice } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, ActionRowBuilder, ButtonBuilder, ButtonStyle, Message, MessageFlags, InteractionContextType } from "discord.js";
-import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName } from "../../../utility/vrchat.js";
+import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName } from "../utility/vrchat.js";
 
 @Discord()
 export default class BackupRequestCommand {

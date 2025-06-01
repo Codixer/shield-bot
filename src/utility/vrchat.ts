@@ -7,6 +7,63 @@ import { authenticator } from "otplib";
 import fetch from "node-fetch";
 import { prisma } from "../main.js";
 
+/**
+ * Send a friend request to a VRChat user by userId.
+ * If already friends (400 error), unfriend and try again.
+ * @param {string} userId - The VRChat user ID to friend.
+ * @returns {Promise<object>} The friend request response.
+ */
+export async function sendFriendRequest(userId: string): Promise<object> {
+    const cookie = loadCookie();
+    if (!cookie) throw new Error("Not authenticated. Please log in first.");
+    const url = `https://api.vrchat.cloud/api/1/user/${userId}/friendRequest`;
+    const headers = {
+        "Cookie": cookie,
+        "User-Agent": USER_AGENT,
+        "Content-Type": "application/json"
+    };
+    let res = await fetch(url, {
+        method: "POST",
+        headers
+    });
+    if (res.status === 400) {
+        // Already friends, unfriend and try again
+        await unfriendUser(userId);
+        res = await fetch(url, {
+            method: "POST",
+            headers
+        });
+    }
+    if (!res.ok) {
+        throw new Error(`Failed to send friend request: ${res.status} ${await res.text()}`);
+    }
+    return await res.json();
+}
+
+/**
+ * Unfriend a VRChat user by userId.
+ * @param {string} userId - The VRChat user ID to unfriend.
+ * @returns {Promise<object>} The unfriend response.
+ */
+export async function unfriendUser(userId: string): Promise<object> {
+    const cookie = loadCookie();
+    if (!cookie) throw new Error("Not authenticated. Please log in first.");
+    const url = `https://api.vrchat.cloud/api/1/auth/user/friends/${userId}`;
+    const headers = {
+        "Cookie": cookie,
+        "User-Agent": USER_AGENT,
+        "Content-Type": "application/json"
+    };
+    const res = await fetch(url, {
+        method: "DELETE",
+        headers
+    });
+    if (!res.ok) {
+        throw new Error(`Failed to unfriend user: ${res.status} ${await res.text()}`);
+    }
+    return await res.json();
+}
+
 const USER_AGENT = process.env.VRCHAT_USER_AGENT || "SomethingBrokeWithMyEnvFileSorry/0.0.1 contact@stefanocoding.me";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -328,6 +385,48 @@ export async function getInstanceInfoByShortName(shortName: string) {
         return null;
     }
     return data;
+}
+
+/**
+ * Get public user information about a specific VRChat user by their ID.
+ * @param userId The VRChat user ID (e.g., usr_xxx)
+ * @returns The user object from the VRChat API, or null if not found
+ */
+export async function getUserById(userId: string) {
+    if (!userId) throw new Error("User ID is required");
+    const cookie = loadCookie();
+    if (!cookie) throw new Error("Not authenticated. Please log in first.");
+    const headers = {
+        "User-Agent": USER_AGENT,
+        "Cookie": cookie,
+        "Content-Type": "application/json"
+    };
+    const url = `https://api.vrchat.cloud/api/1/users/${encodeURIComponent(userId)}`;
+    try {
+        const response = await axios.get(url, { headers });
+        return response.data;
+    } catch (e: any) {
+        if (e.response && e.response.status === 404) return null;
+        throw e;
+    }
+}
+
+/**
+ * Checks if a user (allowedVrcUserId) has consent to track another user's (ownerVrcUserId) location.
+ * @param ownerVrcUserId The VRChat user ID of the person being tracked
+ * @param allowedVrcUserId The VRChat user ID of the person requesting tracking
+ * @returns true if consent exists, false otherwise
+ */
+export async function hasFriendLocationConsent(ownerVrcUserId: string, allowedVrcUserId: string): Promise<boolean> {
+    const consent = await prisma.friendLocationConsent.findUnique({
+        where: {
+            ownerVrcUserId_allowedVrcUserId: {
+                ownerVrcUserId,
+                allowedVrcUserId
+            }
+        }
+    });
+    return !!consent;
 }
 
 
