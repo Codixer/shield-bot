@@ -6,4 +6,5 @@ model FriendLocation {
   worldId      String? // The worldId if available
   travelingTo  String? // The travelingToLocation if present
   eventTime    DateTime @default(now()) // When the event was received
+  senderUserId String? // The VRChat user ID of the sender (for invites)
 }

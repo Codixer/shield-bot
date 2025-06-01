@@ -45,125 +45,148 @@ export function startVRChatWebSocketListener() {
         return;
     }
     const wsUrl = `wss://pipeline.vrchat.cloud/?authToken=${authToken}`;
-    const ws = new WebSocket(wsUrl, {
-        headers: {
-            "User-Agent": process.env.VRCHAT_USER_AGENT
-        }
-    });
+    let ws: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let shouldReconnect = true;
+    const reconnectDelay = 5000; // 5 seconds
 
-    ws.on("open", () => {
-        console.log("Connected to VRChat WebSocket");
-    });
+    function connect() {
+        ws = new WebSocket(wsUrl, {
+            headers: {
+                "User-Agent": process.env.VRCHAT_USER_AGENT
+            }
+        });
 
-    ws.on("message", async (data) => {
-        try {
-            const msg = JSON.parse(data.toString());
-            let content = msg.content;
-            // Double-encoded: content is a stringified JSON for some events
-            if (typeof content === "string") {
-                try {
-                    content = JSON.parse(content);
-                } catch {
-                    // If parsing fails, keep as string
+        ws.on("open", () => {
+            console.log("Connected to VRChat WebSocket");
+        });
+
+        ws.on("message", async (data) => {
+            try {
+                const msg = JSON.parse(data.toString());
+                let content = msg.content;
+                // Double-encoded: content is a stringified JSON for some events
+                if (typeof content === "string") {
+                    try {
+                        content = JSON.parse(content);
+                    } catch {
+                        // If parsing fails, keep as string
+                    }
                 }
+                switch (msg.type) {
+                    // Notification Events
+                    case "notification":
+                        handleNotification(content);
+                        break;
+                    // case "response-notification":
+                    //     handleResponseNotification(content);
+                    //     break;
+                    // case "see-notification":
+                    //     handleSeeNotification(content);
+                    //     break;
+                    // case "hide-notification":
+                    //     handleHideNotification(content);
+                    //     break;
+                    // case "clear-notification":
+                    //     handleClearNotification(content);
+                    //     break;
+                    // case "notification-v2":
+                    //     handleNotificationV2(content);
+                    //     break;
+                    // case "notification-v2-update":
+                    //     handleNotificationV2Update(content);
+                    //     break;
+                    // case "notification-v2-delete":
+                    //     handleNotificationV2Delete(content);
+                    //     break;
+                    // Friend Events
+                    case "friend-add":
+                        await handleFriendAdd(content);
+                        break;
+                    case "friend-delete":
+                        await handleFriendDelete(content);
+                        break;
+                    case "friend-online":
+                        await handleFriendOnline(content);
+                        break;
+                    case "friend-active":
+                        await handleFriendActive(content);
+                        break;
+                    case "friend-offline":
+                        await handleFriendOffline(content);
+                        break;
+                    // case "friend-update":
+                    //     await handleFriendUpdate(content);
+                    //     break;
+                    case "friend-location":
+                        await handleFriendLocation(content);
+                        break;
+                    // // User Events
+                    // case "user-update":
+                    //     await handleUserUpdate(content);
+                    //     break;
+                    // case "user-location":
+                    //     await handleUserLocation(content);
+                    //     break;
+                    // case "user-badge-assigned":
+                    //     await handleUserBadgeAssigned(content);
+                    //     break;
+                    // case "user-badge-unassigned":
+                    //     await handleUserBadgeUnassigned(content);
+                    //     break;
+                    // case "content-refresh":
+                    //     await handleContentRefresh(content);
+                    //     break;
+                    // case "instance-queue-joined":
+                    //     await handleInstanceQueueJoined(content);
+                    //     break;
+                    // case "instance-queue-ready":
+                    //     // TODO: Implement handler for instance-queue-ready
+                    //     console.log("[Instance Queue Ready]", content);
+                    //     break;
+                    // // Group Events
+                    // case "group-joined":
+                    //     await handleGroupJoined(content);
+                    //     break;
+                    // case "group-left":
+                    //     await handleGroupLeft(content);
+                    //     break;
+                    // case "group-member-updated":
+                    //     await handleGroupMemberUpdated(content);
+                    //     break;
+                    // case "group-role-updated":
+                    //     await handleGroupRoleUpdated(content);
+                    //     break;
+                    default:
+                        console.debug("[VRChat WS]", msg);
+                }
+            } catch (err) {
+                console.error("Failed to parse VRChat WS message:", err, data.toString());
             }
-            switch (msg.type) {
-                // Notification Events
-                case "notification":
-                    handleNotification(content);
-                    break;
-                case "response-notification":
-                    handleResponseNotification(content);
-                    break;
-                case "see-notification":
-                    handleSeeNotification(content);
-                    break;
-                case "hide-notification":
-                    handleHideNotification(content);
-                    break;
-                case "clear-notification":
-                    handleClearNotification(content);
-                    break;
-                case "notification-v2":
-                    handleNotificationV2(content);
-                    break;
-                case "notification-v2-update":
-                    handleNotificationV2Update(content);
-                    break;
-                case "notification-v2-delete":
-                    handleNotificationV2Delete(content);
-                    break;
-                // Friend Events
-                case "friend-add":
-                    await handleFriendAdd(content);
-                    break;
-                case "friend-delete":
-                    await handleFriendDelete(content);
-                    break;
-                case "friend-online":
-                    await handleFriendOnline(content);
-                    break;
-                case "friend-active":
-                    await handleFriendActive(content);
-                    break;
-                case "friend-offline":
-                    await handleFriendOffline(content);
-                    break;
-                case "friend-update":
-                    await handleFriendUpdate(content);
-                    break;
-                case "friend-location":
-                    await handleFriendLocation(content);
-                    break;
-                // User Events
-                case "user-update":
-                    await handleUserUpdate(content);
-                    break;
-                case "user-location":
-                    await handleUserLocation(content);
-                    break;
-                case "user-badge-assigned":
-                    await handleUserBadgeAssigned(content);
-                    break;
-                case "user-badge-unassigned":
-                    await handleUserBadgeUnassigned(content);
-                    break;
-                case "content-refresh":
-                    await handleContentRefresh(content);
-                    break;
-                case "instance-queue-joined":
-                    await handleInstanceQueueJoined(content);
-                    break;
-                case "instance-queue-ready":
-                    // TODO: Implement handler for instance-queue-ready
-                    console.log("[Instance Queue Ready]", content);
-                    break;
-                // Group Events
-                case "group-joined":
-                    await handleGroupJoined(content);
-                    break;
-                case "group-left":
-                    await handleGroupLeft(content);
-                    break;
-                case "group-member-updated":
-                    await handleGroupMemberUpdated(content);
-                    break;
-                case "group-role-updated":
-                    await handleGroupRoleUpdated(content);
-                    break;
-                default:
-                    console.log("[VRChat WS]", msg);
+        });
+
+        ws.on("close", (code, reason) => {
+            console.warn(`VRChat WebSocket closed: ${code} ${reason}`);
+            if (shouldReconnect && !reconnectTimeout) {
+                reconnectTimeout = setTimeout(() => {
+                    reconnectTimeout = null;
+                    console.log("Reconnecting to VRChat WebSocket...");
+                    connect();
+                }, reconnectDelay);
             }
-        } catch (err) {
-            console.error("Failed to parse VRChat WS message:", err, data.toString());
-        }
-    });
+        });
 
-    ws.on("close", (code, reason) => {
-        console.warn(`VRChat WebSocket closed: ${code} ${reason}`);
-    });
+        ws.on("error", (err) => {
+            console.error("VRChat WebSocket error:", err);
+            if (shouldReconnect && !reconnectTimeout) {
+                reconnectTimeout = setTimeout(() => {
+                    reconnectTimeout = null;
+                    console.log("Reconnecting to VRChat WebSocket after error...");
+                    connect();
+                }, reconnectDelay);
+            }
+        });
+    }
 
-    ws.on("error", (err) => {
-        console.error("VRChat WebSocket error:", err);
-    });
+    connect();
 }

@@ -1,5 +1,6 @@
 import { Discord, Slash, SlashOption, SlashChoice } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, ActionRowBuilder, ButtonBuilder, ButtonStyle, Message, MessageFlags, InteractionContextType } from "discord.js";
+import { getFriendInstanceInfo, getInstanceInfoByShortName } from "../../../utility/vrchat.js";
 
 @Discord()
 export default class BackupRequestCommand {
@@ -7,7 +8,7 @@ export default class BackupRequestCommand {
         name: "backup-request",
         description: "Request a backup for SHIELD.",
         integrationTypes: [ApplicationIntegrationType.UserInstall],
-        contexts: [InteractionContextType.BotDM, InteractionContextType.Guild, InteractionContextType.PrivateChannel],
+        contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
     })
     async backupRequest(
         @SlashChoice({ name: "Standby Deputies", value: "999860674404569242" })
@@ -66,6 +67,51 @@ export default class BackupRequestCommand {
             squadChannelMention = `<#${squad}>`;
         }
 
+        // World detection logic
+        let worldText = "[WORLD NOT FOUND]";
+        let instanceIdText = "";
+        let worldNameText = "";
+        let worldJoinUrl = "";
+        let instanceInfo = null;
+        if (world && (world.startsWith("https://vrc.group/") || world.startsWith("https://vrch.at/"))) {
+            // Extract shortName from the URL (supports both vrc.group and vrch.at)
+            const match = world.match(/(?:vrc\.group|vrch\.at)\/([^/?#]+)/);
+            const shortName = match ? match[1] : null;
+            if (shortName) {
+                instanceInfo = await getInstanceInfoByShortName(shortName);
+            }
+        } else if (!world) {
+            // Try to get the user's current instance (assume interaction.user.id is VRChat userId)
+            // You may need to map Discord user to VRChat userId in your actual implementation
+            const vrcUserId = "usr_6fefe5c1-6612-4e60-9b50-aa5f66b2460e"; // Placeholder: replace with actual mapping
+            instanceInfo = await getFriendInstanceInfo(vrcUserId);
+        }
+        if (instanceInfo) {
+            worldNameText = instanceInfo.world?.name || "[WORLD NAME NOT FOUND]";
+            instanceIdText = instanceInfo.instanceId || instanceInfo.id || "[INSTANCE ID NOT FOUND]";
+            // Try to build a joinable link
+            if (instanceInfo.shortName) {
+                worldJoinUrl = `https://vrch.at/${instanceInfo.shortName}`;
+            } else if (instanceInfo.secureName) {
+                worldJoinUrl = `https://vrch.at/${instanceInfo.secureName}`;
+            } else if (instanceInfo.instanceId || instanceInfo.id) {
+                // If instanceId/id contains a nonce, it's joinable
+                const idToUse = instanceInfo.instanceId || instanceInfo.id;
+                if (idToUse.includes("nonce")) {
+                    worldJoinUrl = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${idToUse}`;
+                } else if (instanceInfo.location && instanceInfo.location.includes("nonce")) {
+                    worldJoinUrl = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${instanceInfo.location}`;
+                }
+            }
+            // If no joinable link, show NOT FOUND
+            if (!worldJoinUrl) {
+                worldJoinUrl = "[NO UNLOCKED LINK FOUND]";
+            }
+            worldText = `${worldNameText} (${instanceIdText})\n${worldJoinUrl}`;
+        } else if (world && !(world.startsWith("https://vrc.group/") || world.startsWith("https://vrch.at/"))) {
+            worldText = world;
+        }
+
         // Build the reply message in the requested format
         const roleMention = `<@&${roleId}>`;
         const requestType =
@@ -76,35 +122,24 @@ export default class BackupRequestCommand {
                 : roleId === "999860876062498827"
                 ? "TRU"
                 : "Backup";
-        const worldText = world ? world : "[WORLD NOT FOUND]";
         const situationText = situation ? situation : "[SITUATION NOT PROVIDED]";
         const squadText = squadChannelMention ? squadChannelMention : "[SQUAD NOT PROVIDED]";
         const statusText = status === "active"
             ? "Active 🔴"
             : "Resolved 🟢";
 
-        const replyMsg = `\`\`\`        
+        const replyMsg = `\
 ${roleMention}
 **Request**: ${requestType}
 **World**: ${worldText}
 **Situation**: ${situationText}
 **Squad**: ${squadText}
 **Status**: ${statusText}
-\`\`\`
+\
         `.trim();
-
-        // // Add a button for "Situation Resolved." with the emoji
-        // const resolvedButton = new ButtonBuilder()
-        //     .setCustomId('situation_resolved')
-        //     .setLabel('Situation Resolved')
-        //     .setEmoji('🟢')
-        //     .setStyle(ButtonStyle.Success);
-        // const row = new ActionRowBuilder<ButtonBuilder>().addComponents(resolvedButton);
 
         await interaction.reply({
             content: replyMsg,
-            // components: [row],
-           // flags: MessageFlags.Ephemeral
         });
     }
 

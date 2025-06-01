@@ -10,14 +10,14 @@ export function handleNotification(content: any) {
         case "invite":
             handleInviteNotification(content);
             break;
-        case "inviteResponse":
-        case "message":
-        case "requestInvite":
-        case "requestInviteResponse":
-        case "votetokick":
-            handleResponseNotification(content); // Placeholder, update to specific handler if needed
-            break;
+        // case "inviteResponse":
+        // case "message":
+        // case "requestInvite":
+        // case "requestInviteResponse":
+        // case "votetokick":
+        //     handleResponseNotification(content); // Placeholder, update to specific handler if needed
+        //     break;
         default:
-            console.log("[VRChat Notification][Unknown]", content);
+            console.debug("[VRChat Notification][Unknown]", content);
     }
 }

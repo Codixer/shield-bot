@@ -17,30 +17,6 @@ export default class VRChatCommands {
         description: "Start the verification process.",
     })
     async verify(interaction: CommandInteraction) {
-        const components = 
-            new ContainerBuilder()
-            .setAccentColor(5763719)
-            .addTextDisplayComponents(
-                new TextDisplayBuilder().setContent("### Verify your VRChat account"),
-            )
-            .addSectionComponents(
-                new SectionBuilder()
-                    .setButtonAccessory(
-                        new ButtonBuilder()
-                            .setStyle(ButtonStyle.Primary)
-                            .setLabel("Verify")
-                            .setEmoji("✅")
-                            .setCustomId("vrchat-verify")
-                    )
-                    .addTextDisplayComponents(
-                        new TextDisplayBuilder().setContent("Press the button to start the verification process:"),
-                    ),
-            )
-
-        interaction.reply({
-            flags: MessageFlags.IsComponentsV2,
-            components: [components]
-        })
 
     }
 
