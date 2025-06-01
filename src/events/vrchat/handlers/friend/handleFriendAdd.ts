@@ -9,7 +9,7 @@ export async function handleFriendAdd(content: any) {
     }
     // Find the VRChatAccount in the database (pending verification)
     const vrcAccount = await prisma.vRChatAccount.findFirst({
-        where: { vrcUserId },
+        where: { vrcUserId, verified: false },
     });
     if (!vrcAccount) {
         console.log('[Friend Add] No VRChatAccount found for VRChat user:', vrcUserId);

@@ -1,7 +1,16 @@
 import { prisma } from "../../../../main.js";
+import { hasFriendLocationConsent } from "../../../../utility/vrchat.js";
 
 export async function handleFriendActive(content: any) {
     // Upsert friend location event in the database as offline (per instructions)
+
+    // Check if user has given consent for location tracking using utility method
+    const consent = await hasFriendLocationConsent(content.userId);
+    if (!consent) {
+        console.log(`[VRChat Friend Online] No consent for user: ${content.userId}`);
+        return;
+    }
+
     await prisma.friendLocation.upsert({
         where: { vrcUserId: content.userId },
         update: {

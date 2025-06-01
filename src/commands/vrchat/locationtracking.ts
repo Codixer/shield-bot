@@ -1,4 +1,4 @@
-import { CommandInteraction, MessageFlags, EmbedBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder } from "discord.js";
+import { CommandInteraction, MessageFlags, EmbedBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize } from "discord.js";
 import { Discord, Guard, Slash, SlashGroup } from "discordx";
 import { prisma } from "../../main.js";
 import { VRChatLoginGuard } from "../../utility/guards.js";
@@ -36,38 +36,66 @@ export class VRChatLocationTrackingCommand {
             return;
         }
 
-        // Build new component-based UI
-        const components = [];
+        // Fetch consents, usernames, and isFriends simply, one at a time
+        const consents: Record<string, boolean> = {};
+        const usernames: Record<string, string> = {};
+        const friendsMap: Record<string, boolean> = {};
         for (const acc of verifiedAccounts) {
-            const consent = await prisma.friendLocationConsent.findFirst({
+            consents[acc.vrcUserId] = !!(await prisma.friendLocationConsent.findFirst({
                 where: { ownerVrcUserId: acc.vrcUserId }
-            });
-            const isTracking = !!consent;
+            }));
+            try {
+                const userInfo = await getUserById(acc.vrcUserId);
+                usernames[acc.vrcUserId] = userInfo?.displayName || acc.vrcUserId;
+                friendsMap[acc.vrcUserId] = userInfo?.isFriend ?? true; // default to true if not present
+            } catch (e) {
+                console.error(`Failed to fetch user info for ${acc.vrcUserId}:`, e);
+                usernames[acc.vrcUserId] = acc.vrcUserId;
+                friendsMap[acc.vrcUserId] = true;
+            }
+        }
+        // Build the container with the fetched data
+        const container = new ContainerBuilder();
+        container.addSectionComponents(
+            new SectionBuilder()
+                .setButtonAccessory(
+                    new ButtonBuilder()
+                        .setLabel("Info")
+                        .setStyle(ButtonStyle.Secondary)
+                        .setCustomId("locationtracking:info")
+                        .setEmoji("ℹ️")
+                        .setDisabled(true)
+                )
+                .addTextDisplayComponents(
+                    new TextDisplayBuilder().setContent(
+                        `**Location Tracking System**\n\n` +
+                        `This system helps you keep track of your verified VRChat accounts, but only under certain conditions:\n` +
+                        `• Only accounts that are fully verified with the bot will appear in the list below.\n` +
+                        `• The bot uses VRChat's websockets to receive updates about your location when you are friends.\n` +
+                        `• For public tracking, you must be in a public, friend+, or friends instance for the bot to keep tracking your location.\n` +
+                        `• If you are in an invite+ or invite-only instance, you will need to manually invite the bot so it can determine your world.\n`
+                    )
+                )
+        );
+        container.addSeparatorComponents(
+            new SeparatorBuilder()
+                .setSpacing(SeparatorSpacingSize.Small)
+                .setDivider(true)
+        );
+        for (const acc of verifiedAccounts) {
+            const isTracking = consents[acc.vrcUserId] || false;
+            const isFriends = friendsMap[acc.vrcUserId] !== false;
             const button = new ButtonBuilder()
                 .setStyle(isTracking ? ButtonStyle.Success : ButtonStyle.Danger)
                 .setLabel(isTracking ? "Tracking" : "Not tracking")
-                .setCustomId(isTracking ? `tracking_${acc.vrcUserId}` : `nottracking_${acc.vrcUserId}`);
-            // Use getUserById from vrchat.ts to fetch username
-            let username = acc.vrcUserId;
-            try {
-                const userInfo = await getUserById(acc.vrcUserId);
-                if (userInfo && userInfo.displayName) {
-                    username = userInfo.displayName;
-                }
-            } catch (e) {
-                // fallback to vrcUserId
-                console.error(`Failed to fetch user info for ${acc.vrcUserId}:`, e);
-                username = acc.vrcUserId;
-            }
+                .setCustomId(isTracking ? `tracking:${acc.vrcUserId}` : `nottracking:${acc.vrcUserId}`)
+                .setDisabled(!isFriends);
+            const username = usernames[acc.vrcUserId] || acc.vrcUserId;
             const section = new SectionBuilder()
                 .setButtonAccessory(button)
                 .addTextDisplayComponents(
                     new TextDisplayBuilder().setContent(username)
                 );
-            components.push(section);
-        }
-        const container = new ContainerBuilder();
-        for (const section of components) {
             container.addSectionComponents(section);
         }
         await interaction.reply({

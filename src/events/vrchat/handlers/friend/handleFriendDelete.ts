@@ -10,11 +10,21 @@ export async function handleFriendDelete(content: any) {
         return;
     }
     try {
-        await prisma.friendLocation.delete({
-            where: { vrcUserId: content.userId }
-        });
-        console.log(`[VRChat Friend Delete] Deleted friend location for userId: ${content.userId}`);
+        // Revoke all location tracking consents for this user
+        try {
+            await prisma.friendLocationConsent.deleteMany({ where: { ownerVrcUserId: content.userId } });
+            console.log(`[VRChat Friend Delete] Revoked consent for userId: ${content.userId}`);
+        } catch (consentError) {
+            console.error(`[VRChat Friend Delete] Error revoking consent for userId: ${content.userId}`, consentError);
+        }
+        // Delete all friend location records for this user
+        try {
+            await prisma.friendLocation.deleteMany({ where: { vrcUserId: content.userId } });
+            console.log(`[VRChat Friend Delete] Deleted friend location(s) for userId: ${content.userId}`);
+        } catch (locationError) {
+            console.error(`[VRChat Friend Delete] Error deleting friend location(s) for userId: ${content.userId}`, locationError);
+        }
     } catch (error) {
-        console.error(`[VRChat Friend Delete] Error deleting friend location for userId: ${content.userId}`, error);
+        console.error(`[VRChat Friend Delete] Unexpected error for userId: ${content.userId}`, error);
     }
 }
