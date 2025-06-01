@@ -73,6 +73,15 @@ export function startVRChatWebSocketListener() {
                         // If parsing fails, keep as string
                     }
                 }
+                // Ignore events from the bot user
+                const botUserId = "usr_c3c58aa6-c4dc-4de7-80a6-6826be9327ff";
+                if (
+                    (content && (content.userId === botUserId || content.senderUserId === botUserId)) ||
+                    (Array.isArray(content) && content.some(e => e.userId === botUserId || e.senderUserId === botUserId))
+                ) {
+                    console.debug("[VRChat WS] Ignoring event from bot user:", content);
+                    return;
+                }
                 switch (msg.type) {
                     // Notification Events
                     case "notification":

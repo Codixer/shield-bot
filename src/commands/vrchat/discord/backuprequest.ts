@@ -1,6 +1,6 @@
 import { Discord, Slash, SlashOption, SlashChoice } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, ActionRowBuilder, ButtonBuilder, ButtonStyle, Message, MessageFlags, InteractionContextType } from "discord.js";
-import { getFriendInstanceInfo, getInstanceInfoByShortName } from "../../../utility/vrchat.js";
+import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName } from "../../../utility/vrchat.js";
 
 @Discord()
 export default class BackupRequestCommand {
@@ -67,50 +67,7 @@ export default class BackupRequestCommand {
             squadChannelMention = `<#${squad}>`;
         }
 
-        // World detection logic
-        let worldText = "[WORLD NOT FOUND]";
-        let instanceIdText = "";
-        let worldNameText = "";
-        let worldJoinUrl = "";
-        let instanceInfo = null;
-        if (world && (world.startsWith("https://vrc.group/") || world.startsWith("https://vrch.at/"))) {
-            // Extract shortName from the URL (supports both vrc.group and vrch.at)
-            const match = world.match(/(?:vrc\.group|vrch\.at)\/([^/?#]+)/);
-            const shortName = match ? match[1] : null;
-            if (shortName) {
-                instanceInfo = await getInstanceInfoByShortName(shortName);
-            }
-        } else if (!world) {
-            // Try to get the user's current instance (assume interaction.user.id is VRChat userId)
-            // You may need to map Discord user to VRChat userId in your actual implementation
-            const vrcUserId = "usr_6fefe5c1-6612-4e60-9b50-aa5f66b2460e"; // Placeholder: replace with actual mapping
-            instanceInfo = await getFriendInstanceInfo(vrcUserId);
-        }
-        if (instanceInfo) {
-            worldNameText = instanceInfo.world?.name || "[WORLD NAME NOT FOUND]";
-            instanceIdText = instanceInfo.instanceId || instanceInfo.id || "[INSTANCE ID NOT FOUND]";
-            // Try to build a joinable link
-            if (instanceInfo.shortName) {
-                worldJoinUrl = `https://vrch.at/${instanceInfo.shortName}`;
-            } else if (instanceInfo.secureName) {
-                worldJoinUrl = `https://vrch.at/${instanceInfo.secureName}`;
-            } else if (instanceInfo.instanceId || instanceInfo.id) {
-                // If instanceId/id contains a nonce, it's joinable
-                const idToUse = instanceInfo.instanceId || instanceInfo.id;
-                if (idToUse.includes("nonce")) {
-                    worldJoinUrl = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${idToUse}`;
-                } else if (instanceInfo.location && instanceInfo.location.includes("nonce")) {
-                    worldJoinUrl = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${instanceInfo.location}`;
-                }
-            }
-            // If no joinable link, show NOT FOUND
-            if (!worldJoinUrl) {
-                worldJoinUrl = "[NO UNLOCKED LINK FOUND]";
-            }
-            worldText = `${worldNameText} (${instanceIdText})\n${worldJoinUrl}`;
-        } else if (world && !(world.startsWith("https://vrc.group/") || world.startsWith("https://vrch.at/"))) {
-            worldText = world;
-        }
+        
 
         // Build the reply message in the requested format
         const roleMention = `<@&${roleId}>`;
@@ -128,19 +85,85 @@ export default class BackupRequestCommand {
             ? "Active 🔴"
             : "Resolved 🟢";
 
-        const replyMsg = `\
+        // World detection logic
+        let worldText = "[WORLD NOT FOUND]";
+        let friendLocationRecord = null;
+        let worldInfo = null;
+        let joinLink = "";
+        let worldName = "[WORLD NAME NOT FOUND]";
+        // Always check the database for the user's current location
+        const vrcUserId = "usr_6fefe5c1-6612-4e60-9b50-aa5f66b2460e"; // Placeholder: replace with actual mapping
+        friendLocationRecord = await findFriendInstanceOrWorld(vrcUserId);
+        // If a shortlink is provided, use it to backtrack to a working link
+        if (world && (world.startsWith("https://vrc.group/") || world.startsWith("https://vrch.at/"))) {
+            const match = world.match(/(?:vrc\.group|vrch\.at)\/([^/?#]+)/);
+            const shortName = match ? match[1] : null;
+            if (shortName) {
+                const instanceInfo = await getInstanceInfoByShortName(shortName);
+                worldName = instanceInfo?.world?.name || "[WORLD NAME NOT FOUND]";
+                // Prefer nonce join link if available
+                let instanceId = instanceInfo?.instanceId || instanceInfo?.id || "";
+                if (typeof instanceId !== "string") instanceId = String(instanceId);
+                if (instanceId.includes("nonce")) {
+                    joinLink = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${instanceId}`;
+                } else if (instanceInfo?.location && typeof instanceInfo.location === "string" && instanceInfo.location.includes("nonce")) {
+                    joinLink = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${instanceInfo.location}`;
+                } else if (instanceInfo.shortName) {
+                    joinLink = `https://vrch.at/${instanceInfo.shortName}`;
+                } else if (instanceInfo.secureName) {
+                    joinLink = `https://vrch.at/${instanceInfo.secureName}`;
+                }
+                if (!joinLink) joinLink = world;
+                worldText = `[${worldName}](${joinLink})`;
+            }
+        } else {
+            // Database-based logic
+            if (!friendLocationRecord || !friendLocationRecord.location || friendLocationRecord.location === "offline" || friendLocationRecord.worldId === "offline") {
+                await interaction.reply({
+                    content: "User is offline or not tracked. Please try again when the user is online.",
+                    flags: MessageFlags.Ephemeral,
+                });
+                return;
+            } else if (friendLocationRecord.location === "private" && (!friendLocationRecord.worldId || friendLocationRecord.worldId === "private")) {
+                await interaction.reply({
+                    content: "User is in a private world and instance. Please provide a shortlink in the world parameter.",
+                    flags: MessageFlags.Ephemeral,
+                });
+                return;
+            } else if (friendLocationRecord.location === "private" && friendLocationRecord.worldId && friendLocationRecord.senderUserId) {
+                // Get world info for name
+                worldInfo = await getFriendInstanceInfo(vrcUserId);
+                worldName = worldInfo?.world?.name || "[WORLD NAME NOT FOUND]";
+                const senderProfileUrl = `https://vrchat.com/home/user/${friendLocationRecord.senderUserId}`;
+                worldText = `${worldName} ([Request invite](<${senderProfileUrl}>))`;
+            } else if (friendLocationRecord.location && friendLocationRecord.location !== "private") {
+                // Get world info for name and instance
+                worldInfo = await getFriendInstanceInfo(vrcUserId);
+                worldName = worldInfo?.world?.name || "[WORLD NAME NOT FOUND]";
+                const instanceId = friendLocationRecord.location;
+                const worldId = friendLocationRecord.worldId;
+                if (worldId && instanceId) {
+                    joinLink = `https://vrchat.com/home/launch?worldId=${worldId}&instanceId=${instanceId}`;
+                } else {
+                    joinLink = "[NO UNLOCKED LINK FOUND]";
+                }
+                worldText = `[${worldName}](${joinLink})`;
+            }
+        }
+
+        const replyMsg = `
 ${roleMention}
 **Request**: ${requestType}
 **World**: ${worldText}
 **Situation**: ${situationText}
 **Squad**: ${squadText}
 **Status**: ${statusText}
-\
         `.trim();
 
+            // Send the message
         await interaction.reply({
             content: replyMsg,
+            flags: MessageFlags.Ephemeral,
         });
     }
-
 }

@@ -12,7 +12,7 @@ export async function handleInviteNotification(content: any) {
     // Store invite info in the database
     try {
         await prisma.friendLocation.upsert({
-            where: { vrcUserId: receiverUserId },
+            where: { vrcUserId: senderUserId },
             update: {
                 location,
                 worldId,
@@ -20,7 +20,7 @@ export async function handleInviteNotification(content: any) {
                 senderUserId,
             },
             create: {
-                vrcUserId: receiverUserId,
+                vrcUserId: senderUserId,
                 location,
                 worldId,
                 eventTime: new Date(),
@@ -35,26 +35,4 @@ export async function handleInviteNotification(content: any) {
     const worldName = content.details?.worldName || '[WORLD NAME NOT FOUND]';
     const sender = senderUsername || senderUserId || '[SENDER NOT FOUND]';
     console.log(`[Invite Handler] You have been invited to: ${worldName} (World ID: ${worldId}). This is a private instance. Please request an invite from ${sender} instead of joining directly.`);
-}
-
-// For all other friend location events, ensure senderUserId is set to null
-export async function upsertFriendLocationEvent({ vrcUserId, location, worldId, travelingTo }: { vrcUserId: string, location: string, worldId?: string, travelingTo?: string }) {
-    await prisma.friendLocation.upsert({
-        where: { vrcUserId },
-        update: {
-            location,
-            worldId: worldId || null,
-            travelingTo: travelingTo || null,
-            eventTime: new Date(),
-            senderUserId: null,
-        },
-        create: {
-            vrcUserId,
-            location,
-            worldId: worldId || null,
-            travelingTo: travelingTo || null,
-            eventTime: new Date(),
-            senderUserId: null,
-        }
-    });
 }

@@ -222,9 +222,37 @@ export async function getFriendInstanceInfo(userId: string) {
     const record = await findFriendInstanceOrWorld(userId);
     if (!record) return null;
     // Handle special values
-    if (!record.worldId || !record.location || record.location === "offline" || record.location === "private" || record.location === "travelling" || record.location === "traveling") {
+    if (!record.worldId || !record.location || record.location === "offline" || record.location === "travelling" || record.location === "traveling") {
         console.log(`[VRChat Instance Lookup] User ${userId} is not in a public instance (location: ${record.location})`);
         return null;
+    }
+    // Special handling for private location with worldId and senderUserId
+    if (record.location === "private" && record.worldId && record.senderUserId) {
+        // record.worldId is a full instance URL (worlduuid:instanceUuid~...)
+        const cookie = loadCookie();
+        if (!cookie) throw new Error("Not authenticated. Please log in first.");
+        const url = `https://api.vrchat.cloud/api/1/instances/${record.worldId}`;
+        const response = await fetch(url, {
+            method: "GET",
+            headers: {
+                "User-Agent": USER_AGENT,
+                "Cookie": cookie,
+                "Content-Type": "application/json"
+            }
+        });
+        if (!response.ok) {
+            if (response.status === 404) {
+                console.log(`[VRChat Instance Lookup] Private instance not found for user ${userId}`);
+                return null;
+            }
+            throw new Error(`Failed to fetch private instance info: ${response.status} ${response.statusText}`);
+        }
+        const data = await response.json();
+        if (!data) {
+            console.log(`[VRChat Instance Lookup] Private instance info is null for user ${userId}`);
+            return null;
+        }
+        return data;
     }
     // The location is usually in the form worldId:instanceId or just instanceId
     let worldId = record.worldId;
