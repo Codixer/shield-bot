@@ -1,6 +1,6 @@
 import { Discord, Slash, SlashOption, SlashChoice } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, ActionRowBuilder, ButtonBuilder, ButtonStyle, Message, MessageFlags, InteractionContextType } from "discord.js";
-import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName } from "../utility/vrchat.js";
+import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName, getUserById, hasFriendLocationConsent } from "../utility/vrchat.js";
 
 @Discord()
 export default class BackupRequestCommand {
@@ -117,7 +117,27 @@ export default class BackupRequestCommand {
                 worldText = `[${worldName}](${joinLink})`;
             }
         } else {
+
+            
+
             // Database-based logic
+            // Check if user is friended and has given consent
+            const vrcUser = await getUserById(vrcUserId);
+            if (!vrcUser || !vrcUser.isFriend) {
+                await interaction.reply({
+                    content: "You must be friended with CodixerBot to use location tracking.",
+                    flags: MessageFlags.Ephemeral,
+                });
+                return;
+            }
+            const consent = await hasFriendLocationConsent(vrcUserId); // Replace with CodixerBot's VRChat user ID
+            if (!consent) {
+                await interaction.reply({
+                    content: "You must give consent to be tracked. Use `/vrchat locationtracking` to toggle tracking.",
+                    flags: MessageFlags.Ephemeral,
+                });
+                return;
+            }
             if (!friendLocationRecord || !friendLocationRecord.location || friendLocationRecord.location === "offline" || friendLocationRecord.worldId === "offline") {
                 await interaction.reply({
                     content: "User is offline or not tracked. Please try again when the user is online.",
@@ -126,7 +146,7 @@ export default class BackupRequestCommand {
                 return;
             } else if (friendLocationRecord.location === "private" && (!friendLocationRecord.worldId || friendLocationRecord.worldId === "private")) {
                 await interaction.reply({
-                    content: "User is in a private world and instance. Please provide a shortlink in the world parameter.",
+                    content: "User is in a private world or instance. Please provide a shortlink in the world parameter or send an invite to CodixerBot.",
                     flags: MessageFlags.Ephemeral,
                 });
                 return;

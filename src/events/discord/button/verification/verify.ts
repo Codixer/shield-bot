@@ -66,18 +66,16 @@ export class VRChatVerifyButtonHandler {
             .setCustomId(`vrchat-status:${discordId}:${vrcUserId}`)
             .setLabel("Change status")
             .setStyle(ButtonStyle.Secondary);
-        await interaction.reply({
+        await interaction.update({
             embeds: [verifyEmbed],
-            components: [{ type: 1, components: [friendBtn, statusBtn] }],
-            flags: MessageFlags.Ephemeral
+            components: [{ type: 1, components: [friendBtn, statusBtn] }]
         });
     }
 
     @ButtonComponent({ id: "vrchat-verify-try-again" })
     async handleTryAgain(interaction: ButtonInteraction) {
-        await interaction.reply({
-            content: "❌ Verification cancelled. Please use `/vrchat verify` again to restart the process.",
-            flags: MessageFlags.Ephemeral
+        await interaction.update({
+            content: "❌ Verification cancelled. Please use `/vrchat verify` again to restart the process."
         });
     }
     

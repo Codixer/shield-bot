@@ -7,10 +7,10 @@ export async function handleFriendLocation(content: any) {
         return;
     }
     // Check consent: only track if the user has allowed the sender to track them
-    if (content.senderUserId && content.userId) {
-        const consent = await hasFriendLocationConsent(content.userId, content.senderUserId);
+    if (content.userId) {
+        const consent = await hasFriendLocationConsent(content.userId);
         if (!consent) {
-            console.log(`[Friend Location] No consent: ${content.senderUserId} is not allowed to track ${content.userId}`);
+            console.log(`[Friend Location] No consent: Not allowed to track ${content.userId}`);
             return;
         }
     }

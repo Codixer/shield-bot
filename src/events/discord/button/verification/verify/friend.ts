@@ -47,10 +47,9 @@ export class VRChatFriendVerifyButtonHandler {
             .setCustomId(`vrchat-friend-verify:${discordId}:${vrcUserId}`)
             .setLabel("Verify status")
             .setStyle(ButtonStyle.Success);
-        await interaction.reply({
+        await interaction.update({
             embeds: [embed],
-            components: [{ type: 1, components: [verifyBtn] }],
-            flags: MessageFlags.Ephemeral
+            components: [{ type: 1, components: [verifyBtn] }]
         });
     }
 
@@ -73,9 +72,8 @@ export class VRChatFriendVerifyButtonHandler {
                 .setTitle("Verification Successful")
                 .setDescription(`Your VRChat account (**${vrcUserId}**) has been successfully verified via friend request!`)
                 .setColor(0x57F287);
-            await interaction.reply({
-                embeds: [embed],
-                flags: MessageFlags.Ephemeral
+            await interaction.update({
+                embeds: [embed]
             });
         } else {
             const embed = new EmbedBuilder()
@@ -86,10 +84,9 @@ export class VRChatFriendVerifyButtonHandler {
                 .setCustomId(`vrchat-friend-verify:${discordId}:${vrcUserId}`)
                 .setLabel("Verify status")
                 .setStyle(ButtonStyle.Success);
-            await interaction.reply({
+            await interaction.update({
                 embeds: [embed],
-                components: [{ type: 1, components: [verifyBtn] }],
-                flags: MessageFlags.Ephemeral
+                components: [{ type: 1, components: [verifyBtn] }]
             });
         }
     }

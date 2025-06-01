@@ -26,10 +26,9 @@ export class VRChatStatusVerifyButtonHandler {
             .setLabel("Verify status")
             .setStyle(ButtonStyle.Success);
             
-        await interaction.reply({
+        await interaction.update({
             embeds: [embed],
-            components: [{ type: 1, components: [verifyBtn] }],
-            flags: MessageFlags.Ephemeral
+            components: [{ type: 1, components: [verifyBtn] }]
         });
     }
 
@@ -41,9 +40,8 @@ export class VRChatStatusVerifyButtonHandler {
         // Fetch the VRChatAccount to get the verification code
         const vrcAccount = await prisma.vRChatAccount.findFirst({ where: { vrcUserId } });
         if (!vrcAccount || !vrcAccount.verificationCode) {
-            await interaction.reply({
-                content: "No verification code found for this account. Please restart the verification process.",
-                flags: MessageFlags.Ephemeral
+            await interaction.update({
+                content: "No verification code found for this account. Please restart the verification process."
             });
             return;
         }
@@ -55,9 +53,8 @@ export class VRChatStatusVerifyButtonHandler {
             userInfo = null;
         }
         if (!userInfo || !userInfo.statusDescription) {
-            await interaction.reply({
-                content: "Could not fetch VRChat user status. Please try again later.",
-                flags: MessageFlags.Ephemeral
+            await interaction.update({
+                content: "Could not fetch VRChat user status. Please try again later."
             });
             return;
         }
@@ -72,14 +69,12 @@ export class VRChatStatusVerifyButtonHandler {
                 .setTitle("Verification Successful")
                 .setDescription(`Your VRChat account (**${vrcUserId}**) has been successfully verified via status change!`)
                 .setColor(0x57F287);
-            await interaction.reply({
+            await interaction.update({
                 embeds: [embed],
-                flags: MessageFlags.Ephemeral
             });
         } else {
-            await interaction.reply({
+            await interaction.update({
                 content: "Verification failed. The code was not found in your VRChat status. Please make sure you have set your status correctly and try again.",
-                flags: MessageFlags.Ephemeral
             });
         }
     }

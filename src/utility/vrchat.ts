@@ -417,14 +417,9 @@ export async function getUserById(userId: string) {
  * @param allowedVrcUserId The VRChat user ID of the person requesting tracking
  * @returns true if consent exists, false otherwise
  */
-export async function hasFriendLocationConsent(ownerVrcUserId: string, allowedVrcUserId: string): Promise<boolean> {
-    const consent = await prisma.friendLocationConsent.findUnique({
-        where: {
-            ownerVrcUserId_allowedVrcUserId: {
-                ownerVrcUserId,
-                allowedVrcUserId
-            }
-        }
+export async function hasFriendLocationConsent(ownerVrcUserId: string): Promise<boolean> {
+    const consent = await prisma.friendLocationConsent.findFirst({
+        where: { ownerVrcUserId },
     });
     return !!consent;
 }
