@@ -14,20 +14,28 @@ export async function handleFriendLocation(content: any) {
             return;
         }
     }
+    // Extract instanceId and worldId
+    let instanceId = content.location;
+    let worldId = content.worldId || null;
+    if (content.location && content.location.includes(":")) {
+        const parts = content.location.split(":");
+        worldId = parts[0];
+        instanceId = parts[1];
+    }
     // Upsert friend location event in the database
     await prisma.friendLocation.upsert({
         where: { vrcUserId: content.userId },
         update: {
-            location: content.location,
-            worldId: content.worldId || null,
+            location: instanceId,
+            worldId: worldId,
             travelingTo: content.travelingToLocation || null,
             eventTime: new Date(),
             senderUserId: null,
         },
         create: {
             vrcUserId: content.userId,
-            location: content.location,
-            worldId: content.worldId || null,
+            location: instanceId,
+            worldId: worldId,
             travelingTo: content.travelingToLocation || null,
             eventTime: new Date(),
             senderUserId: null,

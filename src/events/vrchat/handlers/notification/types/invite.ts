@@ -14,14 +14,14 @@ export async function handleInviteNotification(content: any) {
         await prisma.friendLocation.upsert({
             where: { vrcUserId: senderUserId },
             update: {
-                location,
+                location, // always 'private' for invites
                 worldId,
                 eventTime: new Date(),
                 senderUserId,
             },
             create: {
                 vrcUserId: senderUserId,
-                location,
+                location, // always 'private' for invites
                 worldId,
                 eventTime: new Date(),
                 senderUserId,

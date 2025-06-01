@@ -171,13 +171,14 @@ export default class BackupRequestCommand {
             }
         }
 
-        const replyMsg = `
+        const replyMsg = `\`\`\`
 ${roleMention}
 **Request**: ${requestType}
 **World**: ${worldText}
 **Situation**: ${situationText}
 **Squad**: ${squadText}
 **Status**: ${statusText}
+\`\`\`
         `.trim();
 
             // Send the message

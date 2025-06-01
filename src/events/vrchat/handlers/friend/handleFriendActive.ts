@@ -14,7 +14,7 @@ export async function handleFriendActive(content: any) {
     await prisma.friendLocation.upsert({
         where: { vrcUserId: content.userId },
         update: {
-            location: "offline",
+            location: "offline", // always just the instanceId or special value
             worldId: "offline",
             travelingTo: null,
             eventTime: new Date(),
