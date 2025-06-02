@@ -41,6 +41,14 @@ export class VRChatAccountManagerCommand {
     const container = new ContainerBuilder();
     container.addSectionComponents(
       new SectionBuilder()
+        .setButtonAccessory(
+          new ButtonBuilder()
+            .setLabel("Info")
+            .setStyle(ButtonStyle.Secondary)
+            .setCustomId("accountmanager:info")
+            .setEmoji("ℹ️")
+            .setDisabled(true)
+        )
         .addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
             `**Account Manager**\n\n` +
