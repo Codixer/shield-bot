@@ -45,7 +45,7 @@ export class VRChatAccountManagerCommand {
           new ButtonBuilder()
             .setLabel("Info")
             .setStyle(ButtonStyle.Secondary)
-            .setCustomId("accountmanager:info")
+            .setCustomId(`accountmanager:info:${interaction.id}`)
             .setEmoji("ℹ️")
             .setDisabled(true)
         )
