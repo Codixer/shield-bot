@@ -1,4 +1,4 @@
-import { CommandInteraction, MessageFlags, EmbedBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize } from "discord.js";
+import { CommandInteraction, MessageFlags, EmbedBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder, SectionBuilder, TextDisplayBuilder, SeparatorBuilder, SeparatorSpacingSize, ApplicationIntegrationType, InteractionContextType } from "discord.js";
 import { Discord, Guard, Slash, SlashGroup } from "discordx";
 import { prisma } from "../../main.js";
 import { VRChatLoginGuard } from "../../utility/guards.js";
@@ -13,7 +13,9 @@ export class VRChatLocationTrackingCommand {
     
     @Slash({
         name: "locationtracking",
-        description: "Toggle location tracking consent for your verified VRChat accounts."
+        description: "Toggle location tracking consent for your verified VRChat accounts.",
+        integrationTypes: [ApplicationIntegrationType.UserInstall],
+        contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
     })
     async locationTracking(interaction: CommandInteraction) {
         const discordId = interaction.user.id;

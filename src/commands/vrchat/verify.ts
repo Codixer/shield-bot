@@ -1,5 +1,5 @@
 import { Discord, Slash, SlashOption, SlashGroup, Guild, Guard } from "discordx";
-import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, EmbedBuilder, Colors, AutocompleteInteraction, CategoryChannel, ChannelType, TextDisplayBuilder, ContainerBuilder, SectionBuilder, ButtonBuilder, ButtonStyle, MediaGalleryBuilder } from "discord.js";
+import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, EmbedBuilder, Colors, AutocompleteInteraction, CategoryChannel, ChannelType, TextDisplayBuilder, ContainerBuilder, SectionBuilder, ButtonBuilder, ButtonStyle, MediaGalleryBuilder, ApplicationIntegrationType, InteractionContextType } from "discord.js";
 import { config } from "dotenv";
 import { VRChatLoginGuard } from "../../utility/guards.js";
 import { getUserById, searchUsers } from "../../utility/vrchat.js";
@@ -15,7 +15,9 @@ config();
 export default class VRChatCommands {
     @Slash({
         name: "verify",
-        description: "Start the verification process."
+        description: "Start the verification process.",
+        integrationTypes: [ApplicationIntegrationType.UserInstall],
+        contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
     })
     async verify(
         @SlashOption({
@@ -24,7 +26,7 @@ export default class VRChatCommands {
             type: ApplicationCommandOptionType.String,
             required: true,
             autocomplete: true
-        }) vrchatUser: string,
+        }) userIdOpt: string,
         interaction: CommandInteraction | AutocompleteInteraction
     ) {
 
@@ -36,9 +38,7 @@ export default class VRChatCommands {
             return;
         }
 
-
-        const userIdOpt = interaction.options.get("vrc_user", true);
-        const userId = typeof userIdOpt === "string" ? userIdOpt : userIdOpt?.value;
+        const userId = userIdOpt;
         if (!userId || typeof userId !== "string") {
             await interaction.reply({
                 content: `No VRChat user ID provided. Please try again.`,
