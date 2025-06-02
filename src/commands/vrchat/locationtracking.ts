@@ -11,10 +11,10 @@ import { getUserById } from "../../utility/vrchat.js";
   contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
   integrationTypes: [ApplicationIntegrationType.UserInstall]
 })
+@SlashGroup("vrchat")
 @Guard(VRChatLoginGuard)
 export class VRChatLocationTrackingCommand {
 
-    
     @Slash({
         name: "locationtracking",
         description: "Toggle location tracking consent for your verified VRChat accounts.",
