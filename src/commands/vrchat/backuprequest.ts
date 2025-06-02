@@ -1,10 +1,15 @@
 import { Discord, Slash, SlashOption, SlashChoice, Guard, SlashGroup } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, ActionRowBuilder, ButtonBuilder, ButtonStyle, Message, MessageFlags, InteractionContextType } from "discord.js";
-import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName, getUserById, hasFriendLocationConsent } from "../utility/vrchat.js";
-import { VRChatLoginGuard } from "../utility/guards.js";
+import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName, getUserById, hasFriendLocationConsent } from "../../utility/vrchat.js";
+import { VRChatLoginGuard } from "../../utility/guards.js";
 
 @Discord()
-@SlashGroup({ name: "vrchat", description: "VRChat related commands." })
+@SlashGroup({
+  name: "vrchat",
+  description: "VRChat related commands.",
+  contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
+  integrationTypes: [ApplicationIntegrationType.UserInstall]
+})
 @SlashGroup("vrchat")
 @Guard(VRChatLoginGuard)
 
@@ -12,8 +17,6 @@ export default class BackupRequestCommand {
     @Slash({
         name: "backup-request",
         description: "Request a backup for SHIELD.",
-        integrationTypes: [ApplicationIntegrationType.UserInstall],
-        contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
     })
     async backupRequest(
         @SlashChoice({ name: "Standby Deputies", value: "999860674404569242" })
@@ -61,6 +64,12 @@ export default class BackupRequestCommand {
             type: ApplicationCommandOptionType.String,
             required: false,
         }) world: string,
+        @SlashOption({
+            name: "account",
+            description: "Account to use for this request (if not provided, will use the main verified account)",
+            type: ApplicationCommandOptionType.String,
+            required: false,
+        }) account: string | null,
         interaction: CommandInteraction,
     ) {
         // Use role directly as roleId

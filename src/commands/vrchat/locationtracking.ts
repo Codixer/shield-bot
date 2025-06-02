@@ -5,8 +5,12 @@ import { VRChatLoginGuard } from "../../utility/guards.js";
 import { getUserById } from "../../utility/vrchat.js";
 
 @Discord()
-@SlashGroup({ name: "vrchat", description: "VRChat related commands." })
-@SlashGroup("vrchat")
+@SlashGroup({
+  name: "vrchat",
+  description: "VRChat related commands.",
+  contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
+  integrationTypes: [ApplicationIntegrationType.UserInstall]
+})
 @Guard(VRChatLoginGuard)
 export class VRChatLocationTrackingCommand {
 
@@ -14,8 +18,6 @@ export class VRChatLocationTrackingCommand {
     @Slash({
         name: "locationtracking",
         description: "Toggle location tracking consent for your verified VRChat accounts.",
-        integrationTypes: [ApplicationIntegrationType.UserInstall],
-        contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
     })
     async locationTracking(interaction: CommandInteraction) {
         const discordId = interaction.user.id;
