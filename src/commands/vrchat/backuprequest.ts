@@ -1,7 +1,8 @@
 import { Discord, Slash, SlashOption, SlashChoice, Guard, SlashGroup } from "discordx";
-import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, ActionRowBuilder, ButtonBuilder, ButtonStyle, Message, MessageFlags, InteractionContextType } from "discord.js";
+import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, ActionRowBuilder, ButtonBuilder, ButtonStyle, Message, MessageFlags, InteractionContextType, AutocompleteInteraction } from "discord.js";
 import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName, getUserById, hasFriendLocationConsent } from "../../utility/vrchat.js";
 import { VRChatLoginGuard } from "../../utility/guards.js";
+import { prisma } from "../../main.js";
 
 @Discord()
 @SlashGroup({
@@ -69,9 +70,14 @@ export default class BackupRequestCommand {
             description: "Account to use for this request (if not provided, will use the main verified account)",
             type: ApplicationCommandOptionType.String,
             required: false,
+            autocomplete: true,
         }) account: string | null,
-        interaction: CommandInteraction,
+        interaction: CommandInteraction | AutocompleteInteraction,
     ) {
+        if (interaction.isAutocomplete()) {
+            return this.autocompleteAccount(interaction);
+        }
+
         // Use role directly as roleId
         const roleId = role;
 
@@ -105,8 +111,32 @@ export default class BackupRequestCommand {
         let worldInfo = null;
         let joinLink = "";
         let worldName = "[WORLD NAME NOT FOUND]";
-        // Always check the database for the user's current location
-        const vrcUserId = "usr_6fefe5c1-6612-4e60-9b50-aa5f66b2460e"; // Placeholder: replace with actual mapping
+        // Use selected account or default to MAIN
+        let vrcUserId: string | null = account;
+        let accountUsername: string | null = null;
+        if (!vrcUserId) {
+            const user = await prisma.user.findUnique({
+                where: { discordId: interaction.user.id },
+                include: { vrchatAccounts: true }
+            });
+            const mainAccount = user?.vrchatAccounts.find(acc => acc.verified && acc.accountType === "MAIN");
+            vrcUserId = mainAccount?.vrcUserId ?? (user?.vrchatAccounts.find(acc => acc.verified)?.vrcUserId ?? null);
+            if (mainAccount?.vrcUserId) {
+                const vrcUser = await getUserById(mainAccount.vrcUserId);
+                accountUsername = vrcUser?.displayName ?? null;
+            }
+        } else {
+            // If account is provided, get its username from VRChat API
+            const vrcUser = await getUserById(vrcUserId);
+            accountUsername = vrcUser?.displayName ?? null;
+        }
+        if (!vrcUserId) {
+            await interaction.reply({
+                content: "No verified VRChat account found for this request.",
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
         friendLocationRecord = await findFriendInstanceOrWorld(vrcUserId);
         // If a shortlink is provided, use it to backtrack to a working link
         if (world && (world.startsWith("https://vrc.group/") || world.startsWith("https://vrch.at/"))) {
@@ -169,7 +199,7 @@ export default class BackupRequestCommand {
                 worldInfo = await getFriendInstanceInfo(vrcUserId);
                 worldName = worldInfo?.world?.name || "[WORLD NAME NOT FOUND]";
                 const senderProfileUrl = `https://vrchat.com/home/user/${friendLocationRecord.senderUserId}`;
-                worldText = `${worldName} ([Request invite](<${senderProfileUrl}>))`;
+                worldText = `${worldName} ([Request invite from ${accountUsername}](<${senderProfileUrl}>))`;
             } else if (friendLocationRecord.location && friendLocationRecord.location !== "private") {
                 // Get world info for name and instance
                 worldInfo = await getFriendInstanceInfo(vrcUserId);
@@ -193,12 +223,57 @@ ${roleMention}
 **Squad**: ${squadText}
 **Status**: ${statusText}
 \`\`\`
-        `.trim();
+`.trim();
 
             // Send the message
         await interaction.reply({
             content: replyMsg,
             flags: MessageFlags.Ephemeral,
         });
+    }
+
+    async autocompleteAccount(interaction: AutocompleteInteraction) {
+        const discordId = interaction.user.id;
+        // Get all verified VRChat accounts for this user
+        const user = await prisma.user.findUnique({
+            where: { discordId },
+            include: { vrchatAccounts: true }
+        });
+        if (!user || !user.vrchatAccounts) {
+            return await interaction.respond([]);
+        }
+        // Only show accounts that are verified and have given consent
+        const choices = [];
+        for (const acc of user.vrchatAccounts) {
+            if (!acc.verified) continue;
+            const consent = await prisma.friendLocationConsent.findFirst({
+                where: { ownerVrcUserId: acc.vrcUserId }
+            });
+            if (consent) {
+                // Fetch username from VRChat API
+                let username = acc.vrcUserId;
+                try {
+                    const vrcUser = await getUserById(acc.vrcUserId);
+                    if (vrcUser?.displayName) username = vrcUser.displayName;
+                } catch {}
+                choices.push({
+                    name: `${username} (${acc.accountType || "Account"})`,
+                    value: acc.vrcUserId
+                });
+            }
+        }
+        // If no choices, show MAIN if available
+        if (choices.length === 0) {
+            const main = user.vrchatAccounts.find(acc => acc.verified && acc.accountType === "MAIN");
+            if (main) {
+                let username = main.vrcUserId;
+                try {
+                    const vrcUser = await getUserById(main.vrcUserId);
+                    if (vrcUser?.displayName) username = vrcUser.displayName;
+                } catch {}
+                choices.push({ name: `${username} (MAIN)`, value: main.vrcUserId });
+            }
+        }
+        return await interaction.respond(choices.slice(0, 25));
     }
 }
