@@ -1,8 +1,13 @@
-import { Discord, Slash, SlashOption, SlashChoice } from "discordx";
+import { Discord, Slash, SlashOption, SlashChoice, Guard, SlashGroup } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, ActionRowBuilder, ButtonBuilder, ButtonStyle, Message, MessageFlags, InteractionContextType } from "discord.js";
 import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName, getUserById, hasFriendLocationConsent } from "../utility/vrchat.js";
+import { VRChatLoginGuard } from "../utility/guards.js";
 
 @Discord()
+@SlashGroup({ name: "vrchat", description: "VRChat related commands." })
+@SlashGroup("vrchat")
+@Guard(VRChatLoginGuard)
+
 export default class BackupRequestCommand {
     @Slash({
         name: "backup-request",
