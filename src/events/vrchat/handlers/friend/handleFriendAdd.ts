@@ -25,7 +25,7 @@ export async function handleFriendAdd(content: any) {
         console.log('[Friend Add] Could not update verified field (may not exist):', e);
     }
     // Fetch the Discord user by userId
-    const user = await prisma.user.findUnique({ where: { id: vrcAccount.userId } });
+    const user = await prisma.user.findUnique({ where: { id: vrcAccount.userId, } });
     if (user && user.discordId) {
         console.log(`[Friend Add] Verified VRChat account for Discord user: ${user.discordId}`);
         // Optionally, send a Discord notification here

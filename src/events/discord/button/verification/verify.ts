@@ -27,12 +27,19 @@ export class VRChatVerifyButtonHandler {
             user = await prisma.user.create({ data: { discordId } });
         }
         let vrcAccount = await prisma.vRChatAccount.findFirst({ where: { vrcUserId } });
-        // Determine account type: if user has no other verified accounts, set as MAIN, else ALT
-        const existingVerifiedAccounts = await prisma.vRChatAccount.findMany({
-            where: { userId: user.id, verified: true }
-        });
-        const accountType = existingVerifiedAccounts.length === 0 ? "MAIN" : "ALT";
+        // If the VRChat account exists and is owned by someone else, refuse verification
+        if (vrcAccount && vrcAccount.userId !== user.id) {
+            await interaction.reply({
+                content: "❌ This VRChat account is already linked to another user. Please contact Codixer for assistance.",
+                flags: MessageFlags.Ephemeral
+            });
+            return;
+        }
+        // Determine if user already has a MAIN account
+        const hasMainAccount = await prisma.vRChatAccount.findFirst({ where: { userId: user.id, accountType: "MAIN" } });
         if (!vrcAccount) {
+            // If no account exists, assign MAIN only if user has no MAIN, else ALT
+            const accountType = hasMainAccount ? "ALT" : "MAIN";
             vrcAccount = await prisma.vRChatAccount.create({
                 data: {
                     vrcUserId,
@@ -42,9 +49,10 @@ export class VRChatVerifyButtonHandler {
                 }
             });
         } else {
+            // If account exists, do not change accountType
             await prisma.vRChatAccount.update({
                 where: { id: vrcAccount.id },
-                data: { userId: user.id, accountType, verified: false }
+                data: { userId: user.id, verified: false }
             });
         }
 
