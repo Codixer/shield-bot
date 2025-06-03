@@ -73,7 +73,8 @@ export class VRChatFriendVerifyButtonHandler {
                 .setDescription(`Your VRChat account (**${vrcUserId}**) has been successfully verified via friend request!`)
                 .setColor(0x57F287);
             await interaction.update({
-                embeds: [embed]
+                embeds: [embed],
+                components: []
             });
         } else {
             const embed = new EmbedBuilder()

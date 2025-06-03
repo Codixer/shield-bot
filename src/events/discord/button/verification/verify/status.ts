@@ -37,11 +37,22 @@ export class VRChatStatusVerifyButtonHandler {
         const parts = interaction.customId.split(":");
         const discordId = parts[1];
         const vrcUserId = parts[2];
-        // Fetch the VRChatAccount to get the verification code
-        const vrcAccount = await prisma.vRChatAccount.findFirst({ where: { vrcUserId } });
+        // Fetch the VRChatAccount to get the verification code, ensure it's linked to this Discord user
+        const vrcAccount = await prisma.vRChatAccount.findFirst({
+            where: {
+                vrcUserId,
+                user: { discordId }
+            },
+            include: { user: true }
+        });
         if (!vrcAccount || !vrcAccount.verificationCode) {
+            const embed = new EmbedBuilder()
+                .setTitle("Verification Error")
+                .setDescription("No verification code found for this account, or this account is not linked to your Discord user. Please restart the verification process.")
+                .setColor(0xED4245);
             await interaction.update({
-                content: "No verification code found for this account. Please restart the verification process."
+                embeds: [embed],
+                components: []
             });
             return;
         }
@@ -53,8 +64,13 @@ export class VRChatStatusVerifyButtonHandler {
             userInfo = null;
         }
         if (!userInfo || !userInfo.statusDescription) {
+            const embed = new EmbedBuilder()
+                .setTitle("Status Fetch Error")
+                .setDescription("Could not fetch VRChat user status. Please try again later.")
+                .setColor(0xED4245);
             await interaction.update({
-                content: "Could not fetch VRChat user status. Please try again later."
+                embeds: [embed],
+                components: []
             });
             return;
         }
@@ -71,10 +87,16 @@ export class VRChatStatusVerifyButtonHandler {
                 .setColor(0x57F287);
             await interaction.update({
                 embeds: [embed],
+                components: []
             });
         } else {
+            const embed = new EmbedBuilder()
+                .setTitle("Verification Failed")
+                .setDescription("Verification failed. The code was not found in your VRChat status. Please make sure you have set your status correctly and try again.")
+                .setColor(0xED4245);
             await interaction.update({
-                content: "Verification failed. The code was not found in your VRChat status. Please make sure you have set your status correctly and try again.",
+                embeds: [embed],
+                components: []
             });
         }
     }
