@@ -1,8 +1,8 @@
 import { Discord, Slash, SlashOption, SlashChoice, Guard, SlashGroup } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, MessageFlags, InteractionContextType, AutocompleteInteraction } from "discord.js";
-import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName, getUserById, hasFriendLocationConsent } from "../../utility/vrchat";
-import { VRChatLoginGuard } from "../../utility/guards";
-import { prisma } from "../../main";
+import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName, getUserById, hasFriendLocationConsent } from "../../utility/vrchat.js";
+import { VRChatLoginGuard } from "../../utility/guards.js";
+import { prisma } from "../../main.js";
 
 @Discord()
 @SlashGroup({
