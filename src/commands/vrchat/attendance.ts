@@ -21,7 +21,6 @@ export class VRChatAttendanceCommand {
     name: "add",
     description: "Add user to squad."
   })
-  @SlashGroup("attendance")
   async add(
     @SlashOption({ name: "user", description: "User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     @SlashOption({ name: "squad", description: "Squad name", type: ApplicationCommandOptionType.String, required: true }) squad: string,
@@ -38,7 +37,6 @@ export class VRChatAttendanceCommand {
     name: "remove",
     description: "Remove user from event."
   })
-  @SlashGroup("attendance")
   async remove(
     @SlashOption({ name: "user", description: "User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     interaction: CommandInteraction
@@ -54,7 +52,6 @@ export class VRChatAttendanceCommand {
     name: "move",
     description: "Move user to squad."
   })
-  @SlashGroup("attendance")
   async move(
     @SlashOption({ name: "user", description: "User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     @SlashOption({ name: "squad", description: "Squad name", type: ApplicationCommandOptionType.String, required: true }) squad: string,
@@ -71,7 +68,6 @@ export class VRChatAttendanceCommand {
     name: "split",
     description: "Split user to squad."
   })
-  @SlashGroup("attendance")
   async split(
     @SlashOption({ name: "user", description: "User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     @SlashOption({ name: "squad", description: "Squad name", type: ApplicationCommandOptionType.String, required: true }) squad: string,
@@ -88,7 +84,6 @@ export class VRChatAttendanceCommand {
     name: "lead",
     description: "Mark user as lead."
   })
-  @SlashGroup("attendance")
   async lead(
     @SlashOption({ name: "user", description: "User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     interaction: CommandInteraction
@@ -104,7 +99,6 @@ export class VRChatAttendanceCommand {
     name: "late",
     description: "Mark user as late."
   })
-  @SlashGroup("attendance")
   async late(
     @SlashOption({ name: "user", description: "User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     @SlashOption({ name: "note", description: "Late note", type: ApplicationCommandOptionType.String, required: false }) note: string,
@@ -121,7 +115,6 @@ export class VRChatAttendanceCommand {
     name: "staff",
     description: "Add user as staff."
   })
-  @SlashGroup("attendance")
   async staff(
     @SlashOption({ name: "user", description: "User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     interaction: CommandInteraction
@@ -137,7 +130,6 @@ export class VRChatAttendanceCommand {
     name: "cohost",
     description: "Set user as cohost."
   })
-  @SlashGroup("attendance")
   async cohost(
     @SlashOption({ name: "user", description: "User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     interaction: CommandInteraction
@@ -153,7 +145,6 @@ export class VRChatAttendanceCommand {
     name: "leave",
     description: "Mark user as left."
   })
-  @SlashGroup("attendance")
   async leave(
     @SlashOption({ name: "user", description: "User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     interaction: CommandInteraction
@@ -169,7 +160,6 @@ export class VRChatAttendanceCommand {
     name: "paste",
     description: "Paste the formatted attendance summary."
   })
-  @SlashGroup("attendance")
   async paste(
     interaction: CommandInteraction
   ) {
