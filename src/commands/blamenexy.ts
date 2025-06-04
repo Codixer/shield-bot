@@ -1,6 +1,6 @@
 import { Discord, Slash, SlashOption, SlashChoice, Guard, SlashGroup } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, InteractionContextType } from "discord.js";
-import { VRChatLoginGuard } from "../../utility/guards.js";
+import { VRChatLoginGuard } from "../utility/guards.js";
 
 @Discord()
 export default class BlameNexyCommand {
