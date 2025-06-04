@@ -138,4 +138,19 @@ export class AttendanceManager {
     }
     return { eventId, user };
   }
+
+  // Delete all data related to an event (squads, squad members, staff, etc.)
+  async deleteEventData(eventId: number) {
+    // Delete all squad members for squads in this event
+    const squads = await prisma.squad.findMany({ where: { eventId } });
+    for (const squad of squads) {
+      await prisma.squadMember.deleteMany({ where: { squadId: squad.id } });
+    }
+    // Delete all squads for this event
+    await prisma.squad.deleteMany({ where: { eventId } });
+    // Delete all staff for this event
+    await prisma.attendanceStaff.deleteMany({ where: { eventId } });
+    // Optionally, delete the event itself (uncomment if desired)
+    await prisma.attendanceEvent.delete({ where: { id: eventId } });
+  }
 }

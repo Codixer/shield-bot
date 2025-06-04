@@ -298,6 +298,8 @@ export class VRChatAttendanceCommand {
       return;
     }
     await attendanceManager.clearActiveEventForUser(user.id);
-    await interaction.reply({ content: "Your active attendance event has been ended.", flags: MessageFlags.Ephemeral });
+    // Delete all data related to this event
+    await attendanceManager.deleteEventData(eventId);
+    await interaction.reply({ content: "Your active attendance event has been ended and all event data has been cleared.", flags: MessageFlags.Ephemeral });
   }
 }
