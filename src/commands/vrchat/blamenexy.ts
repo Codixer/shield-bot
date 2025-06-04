@@ -26,8 +26,10 @@ export default class BlameNexyCommand {
     interaction: CommandInteraction
   ) {
     await interaction.reply({
-      content: `<@257140995446013953> caused this issue: **${reason}**`
-      // No flags: normal message, not ephemeral
+      content: `<@257140995446013953> caused this issue: **${reason}**`,
+      allowedMentions: {
+        users: ["257140995446013953"]
+      }
     });
   }
 }
