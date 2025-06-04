@@ -2,6 +2,7 @@ import { CommandInteraction, MessageFlags, ButtonBuilder, ButtonStyle, Container
 import { Discord, Guard, Slash, SlashGroup } from "discordx";
 import { prisma } from "../../main.js";
 import { VRChatLoginGuard } from "../../utility/guards.js";
+import { getUserById } from "../../utility/vrchat/user.js";
 
 @Discord()
 @SlashGroup({
@@ -58,36 +59,57 @@ export class VRChatAccountManagerCommand {
     container.addSeparatorComponents(
       new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
     );
+    // Build a map of usernames for all verified accounts
+    const usernames: Record<string, string> = {};
     for (const acc of verifiedAccounts) {
-      // Build the display name as a link (replace with actual profile link if available)
+      try {
+        const vrcUser = await getUserById(acc.vrcUserId);
+        usernames[acc.vrcUserId] = vrcUser?.displayName || acc.vrcUserId;
+      } catch {
+        usernames[acc.vrcUserId] = acc.vrcUserId;
+      }
+    }
+    for (const acc of verifiedAccounts) {
       const profileLink = `<https://vrchat.com/home/user/${acc.vrcUserId}>`;
-      const displayName = acc.vrcUserId;
-      // Location tracking consent status (check friendLocationConsent table)
+      const displayName = usernames[acc.vrcUserId] || acc.vrcUserId;
       const consent = await prisma.friendLocationConsent.findFirst({ where: { ownerVrcUserId: acc.vrcUserId } });
       const consentStatus = consent ? "Tracking: Enabled" : "Tracking: Disabled";
-      // Discord ping
       const discordPing = `<@${discordId}>`;
-      // Text display for this account
       container.addTextDisplayComponents(
         new TextDisplayBuilder().setContent(
           `[${displayName}](${profileLink}) - ${consentStatus} - Linked to ${discordPing}`
         )
       );
-      // Button logic
       const isMain = acc.accountType === "MAIN";
       const isAlt = acc.accountType === "ALT";
+      // Button color/enable logic
+      let mainBtnStyle = ButtonStyle.Primary;
+      let mainBtnDisabled = false;
+      let altBtnStyle = ButtonStyle.Secondary;
+      let altBtnDisabled = false;
+      if (isMain) {
+        mainBtnStyle = ButtonStyle.Success; // Green
+        mainBtnDisabled = true;
+        altBtnStyle = ButtonStyle.Secondary; // Gray
+        altBtnDisabled = false;
+      } else if (isAlt) {
+        mainBtnStyle = ButtonStyle.Secondary; // Gray
+        mainBtnDisabled = false;
+        altBtnStyle = ButtonStyle.Primary; // Blue
+        altBtnDisabled = true;
+      }
       container.addActionRowComponents(
         new ActionRowBuilder<MessageActionRowComponentBuilder>()
           .addComponents(
             new ButtonBuilder()
-              .setStyle(ButtonStyle.Success)
+              .setStyle(mainBtnStyle)
               .setLabel("Main")
-              .setDisabled(isMain)
+              .setDisabled(mainBtnDisabled)
               .setCustomId(`accountmanager:main:${acc.vrcUserId}`),
             new ButtonBuilder()
-              .setStyle(ButtonStyle.Secondary)
+              .setStyle(altBtnStyle)
               .setLabel("Alt")
-              .setDisabled(isAlt)
+              .setDisabled(altBtnDisabled)
               .setCustomId(`accountmanager:alt:${acc.vrcUserId}`),
             new ButtonBuilder()
               .setStyle(ButtonStyle.Danger)

@@ -1,0 +1,45 @@
+// Model for attendance events
+model AttendanceEvent {
+  id         Int       @id @default(autoincrement())
+  date      DateTime  // Date of the event
+  hostId    Int?      // User ID of the host
+  host      User?     @relation("HostAttendanceEvent", fields: [hostId], references: [id])
+  cohostId  Int?      // User ID of the co-host
+  cohost    User?     @relation("CohostAttendanceEvent", fields: [cohostId], references: [id])
+  squads    Squad[]   // Squads for this event
+  staff     AttendanceStaff[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+// Model for squads within an attendance event
+model Squad {
+  id                Int              @id @default(autoincrement())
+  name              String           // Squad name (e.g., EAGLE, DELTA)
+  event             AttendanceEvent  @relation(fields: [eventId], references: [id])
+  eventId           Int
+  members           SquadMember[]
+}
+
+// Model for members within a squad
+model SquadMember {
+  id         Int      @id @default(autoincrement())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     Int
+  squad      Squad    @relation(fields: [squadId], references: [id])
+  squadId    Int
+  isLead     Boolean  @default(false)
+  isLate     Boolean  @default(false)
+  lateNote   String?  // e.g., "Joined 1 hour into the event"
+  isSplit    Boolean  @default(false)
+  splitFrom  String?  // e.g., "Split from Eagle"
+}
+
+// Model for staff attending the event
+model AttendanceStaff {
+  id         Int             @id @default(autoincrement())
+  user       User            @relation(fields: [userId], references: [id])
+  userId     Int
+  event      AttendanceEvent @relation(fields: [eventId], references: [id])
+  eventId    Int
+}

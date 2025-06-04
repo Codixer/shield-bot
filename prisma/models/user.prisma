@@ -3,6 +3,10 @@ model User {
   discordId                 String                     @unique
   vrchatAccounts            VRChatAccount[]
   friendLocationConsents    FriendLocationConsent[]    // Add relation to FriendLocationConsent
+  hostAttendanceEvents      AttendanceEvent[]         @relation("HostAttendanceEvent")
+  cohostAttendanceEvents    AttendanceEvent[]         @relation("CohostAttendanceEvent")
+  squadMemberships          SquadMember[]
+  attendanceStaff           AttendanceStaff[]
 }
 
 model VRChatAccount {
