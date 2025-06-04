@@ -17,11 +17,6 @@ export default class BlameNexyCommand {
     description: "Blame Nexy for a VRChat issue."
   })
   async blamenexy(
-    @SlashChoice({ name: "Bot crashed", value: "Bot crashed" })
-    @SlashChoice({ name: "World not loading", value: "World not loading" })
-    @SlashChoice({ name: "Lag spike", value: "Lag spike" })
-    @SlashChoice({ name: "Instance bugged", value: "Instance bugged" })
-    @SlashChoice({ name: "Other", value: "Other" })
     @SlashOption({
       name: "reason",
       description: "Reason to blame Nexy",
