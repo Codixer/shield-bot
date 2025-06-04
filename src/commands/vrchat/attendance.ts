@@ -108,8 +108,34 @@ export class VRChatAttendanceCommand {
     if (!active) return;
     const dbUser = await attendanceManager.findOrCreateUserByDiscordId(userId);
     const { eventId } = active;
-    await attendanceManager.markUserAsSplit(eventId, dbUser.id, squad, "Split from previous squad");
-    await interaction.reply({ content: `Split <@${userId}> to ${squad}`, flags: MessageFlags.Ephemeral });
+    // Map channel IDs to names and numbers
+    const squadMap: Record<string, { name: string, number?: string }> = {
+      "814239808675119144": { name: "Adam", number: "02" },
+      "814239954641223760": { name: "Baker", number: "16" },
+      "814240045405569038": { name: "Coffee", number: "24" },
+      "814240176317923391": { name: "Delta", number: "08" },
+      "814240290494742732": { name: "Eagle", number: "10" },
+      "814240677004836925": { name: "Fitness", number: "34" },
+      "814241070110998558": { name: "Gamma", number: "05" },
+      "1012880059415150642": { name: "MAG", number: "30" },
+      "814932938961190953": { name: "EMT" },
+      "814933108658274365": { name: "TRU" }
+    };
+    // Find the user's current squad for this event
+    const summary = await attendanceManager.getEventSummary(eventId);
+    let previousSquadId: string | undefined = undefined;
+    if (summary && summary.squads) {
+      for (const squadObj of summary.squads) {
+        if (squadObj.members.some((m: any) => m.userId === dbUser.id)) {
+          previousSquadId = squadObj.name; // squadObj.name is the ID
+          break;
+        }
+      }
+    }
+    // Convert previousSquadId to readable name
+    const previousSquadName = previousSquadId ? (squadMap[previousSquadId]?.name || previousSquadId) : undefined;
+    await attendanceManager.markUserAsSplit(eventId, dbUser.id, squad, previousSquadName || "Unknown");
+    await interaction.reply({ content: `Split <@${userId}> to ${squad}${previousSquadName ? ` (Split from ${previousSquadName})` : ''}`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -226,7 +252,6 @@ export class VRChatAttendanceCommand {
       const squadInfo = squadMap[squad.name] || { name: squad.name };
       let squadLine = squadInfo.name;
       if (squadInfo.number) squadLine += ` - ${squadInfo.number}`;
-      squadLine += ` - ${squad.members.length.toString().padStart(2, '0')}`;
       text += `${squadLine}\n`;
       for (const member of squad.members) {
         let line = `<@${member.user.discordId}>`;
