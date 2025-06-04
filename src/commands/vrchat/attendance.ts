@@ -37,8 +37,10 @@ export class VRChatAttendanceCommand {
   ) {
     const active = await attendanceManager.getActiveEventForInteraction(interaction);
     if (!active) return;
+    // Ensure the user exists in the DB and get their userId
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
     const { eventId } = active;
-    await attendanceManager.addUserToSquad(eventId, user.id, squad);
+    await attendanceManager.addUserToSquad(eventId, dbUser.id, squad);
     await interaction.reply({ content: `Added <@${user.id}> to ${squad}`, flags: MessageFlags.Ephemeral });
   }
 
@@ -78,8 +80,9 @@ export class VRChatAttendanceCommand {
   ) {
     const active = await attendanceManager.getActiveEventForInteraction(interaction);
     if (!active) return;
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
     const { eventId } = active;
-    await attendanceManager.moveUserToSquad(eventId, user.id, squad);
+    await attendanceManager.moveUserToSquad(eventId, dbUser.id, squad);
     await interaction.reply({ content: `Moved <@${user.id}> to ${squad}`, flags: MessageFlags.Ephemeral });
   }
 
@@ -104,8 +107,9 @@ export class VRChatAttendanceCommand {
   ) {
     const active = await attendanceManager.getActiveEventForInteraction(interaction);
     if (!active) return;
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
     const { eventId } = active;
-    await attendanceManager.markUserAsSplit(eventId, user.id, squad, "Split from previous squad");
+    await attendanceManager.markUserAsSplit(eventId, dbUser.id, squad, "Split from previous squad");
     await interaction.reply({ content: `Split <@${user.id}> to ${squad}`, flags: MessageFlags.Ephemeral });
   }
 

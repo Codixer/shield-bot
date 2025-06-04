@@ -14,7 +14,8 @@ export class AttendanceManager {
     });
   }
 
-  async addUserToSquad(eventId: number, userId: number, squadName: string) {
+  async addUserToSquad(eventId: number, userId: number | undefined, squadName: string) {
+    if (!userId) throw new Error("User ID is undefined. Make sure the user exists in the database.");
     let squad = await prisma.squad.findFirst({ where: { eventId, name: squadName } });
     if (!squad) {
       squad = await prisma.squad.create({ data: { eventId, name: squadName } });
