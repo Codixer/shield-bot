@@ -97,7 +97,8 @@ export class AttendanceManager {
   }
 
   // Find or create a user by Discord ID
-  async findOrCreateUserByDiscordId(discordId: string) {
+  async findOrCreateUserByDiscordId(discordId: string | undefined) {
+    if (!discordId) throw new Error("Discord ID is undefined. Cannot find or create user.");
     let user = await prisma.user.findUnique({ where: { discordId } });
     if (!user) {
       user = await prisma.user.create({ data: { discordId } });
