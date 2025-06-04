@@ -31,7 +31,7 @@ export class VRChatAttendanceCommand {
     const event = await attendanceManager.createEvent(today);
     const eventId = event.id;
     await attendanceManager.addUserToSquad(eventId, user.id, squad);
-    await interaction.reply(`Added <@${user.id}> to ${squad}`);
+    await interaction.reply({ content: `Added <@${user.id}> to ${squad}`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -47,7 +47,7 @@ export class VRChatAttendanceCommand {
     const event = await attendanceManager.createEvent(today);
     const eventId = event.id;
     await attendanceManager.removeUserFromEvent(eventId, user.id);
-    await interaction.reply(`Removed <@${user.id}> from event`);
+    await interaction.reply({ content: `Removed <@${user.id}> from event`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -64,7 +64,7 @@ export class VRChatAttendanceCommand {
     const event = await attendanceManager.createEvent(today);
     const eventId = event.id;
     await attendanceManager.moveUserToSquad(eventId, user.id, squad);
-    await interaction.reply(`Moved <@${user.id}> to ${squad}`);
+    await interaction.reply({ content: `Moved <@${user.id}> to ${squad}`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -81,7 +81,7 @@ export class VRChatAttendanceCommand {
     const event = await attendanceManager.createEvent(today);
     const eventId = event.id;
     await attendanceManager.markUserAsSplit(eventId, user.id, squad, "Split from previous squad");
-    await interaction.reply(`Split <@${user.id}> to ${squad}`);
+    await interaction.reply({ content: `Split <@${user.id}> to ${squad}`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -97,7 +97,7 @@ export class VRChatAttendanceCommand {
     const event = await attendanceManager.createEvent(today);
     const eventId = event.id;
     await attendanceManager.markUserAsLead(eventId, user.id);
-    await interaction.reply(`Marked <@${user.id}> as lead`);
+    await interaction.reply({ content: `Marked <@${user.id}> as lead`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -114,7 +114,7 @@ export class VRChatAttendanceCommand {
     const event = await attendanceManager.createEvent(today);
     const eventId = event.id;
     await attendanceManager.markUserAsLate(eventId, user.id, note);
-    await interaction.reply(`Marked <@${user.id}> as late${note ? ` (${note})` : ''}`);
+    await interaction.reply({ content: `Marked <@${user.id}> as late${note ? ` (${note})` : ''}`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -130,7 +130,7 @@ export class VRChatAttendanceCommand {
     const event = await attendanceManager.createEvent(today);
     const eventId = event.id;
     await attendanceManager.addStaff(eventId, user.id);
-    await interaction.reply(`Added <@${user.id}> as staff`);
+    await interaction.reply({ content: `Added <@${user.id}> as staff`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -146,7 +146,7 @@ export class VRChatAttendanceCommand {
     const event = await attendanceManager.createEvent(today);
     const eventId = event.id;
     await attendanceManager.setCohost(eventId, user.id);
-    await interaction.reply(`Set <@${user.id}> as cohost`);
+    await interaction.reply({ content: `Set <@${user.id}> as cohost`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -162,6 +162,37 @@ export class VRChatAttendanceCommand {
     const event = await attendanceManager.createEvent(today);
     const eventId = event.id;
     await attendanceManager.removeUserFromEvent(eventId, user.id);
-    await interaction.reply(`Marked <@${user.id}> as left`);
+    await interaction.reply({ content: `Marked <@${user.id}> as left`, flags: MessageFlags.Ephemeral });
+  }
+
+  @Slash({
+    name: "paste",
+    description: "Paste the formatted attendance summary."
+  })
+  @SlashGroup("attendance")
+  async paste(
+    interaction: CommandInteraction
+  ) {
+    const today = new Date();
+    const event = await attendanceManager.createEvent(today);
+    const eventId = event.id;
+    const summary = await attendanceManager.getEventSummary(eventId);
+    // Format the summary for output
+    let text = `Attendance for ${today.toLocaleString('en-US', { month: 'long', day: 'numeric' })}\n\n`;
+    text += `Host: ${summary?.host ? `<@${summary.host.discordId}>` : 'None'}\n`;
+    text += `Co-Host: ${summary?.cohost ? `<@${summary.cohost.discordId}>` : 'None'}\n`;
+    text += `Attending Staff: ${summary?.staff?.map(s => `<@${s.user.discordId}>`).join(' ') || 'None'} \n\n`;
+    for (const squad of summary?.squads || []) {
+      text += `${squad.name.toUpperCase()} - ${squad.members.length.toString().padStart(2, '0')}\n`;
+      for (const member of squad.members) {
+        let line = `<@${member.user.discordId}>`;
+        if (member.isLead) line += ' (Lead)';
+        if (member.isSplit && member.splitFrom) line += ` (Split from ${member.splitFrom})`;
+        if (member.isLate && member.lateNote) line += ` (Joined ${member.lateNote})`;
+        text += line + '\n';
+      }
+      text += '\n';
+    }
+    await interaction.reply({ content: text, flags: MessageFlags.Ephemeral });
   }
 }
