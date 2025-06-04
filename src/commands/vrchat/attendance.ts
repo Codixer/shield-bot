@@ -204,14 +204,30 @@ export class VRChatAttendanceCommand {
     if (!active) return;
     const { eventId } = active;
     const summary = await attendanceManager.getEventSummary(eventId);
-    // Format the summary for output
+    // Map channel IDs to names and numbers
+    const squadMap: Record<string, { name: string, number?: string }> = {
+      "814239808675119144": { name: "Adam", number: "02" },
+      "814239954641223760": { name: "Baker", number: "16" },
+      "814240045405569038": { name: "Coffee", number: "24" },
+      "814240176317923391": { name: "Delta", number: "08" },
+      "814240290494742732": { name: "Eagle", number: "10" },
+      "814240677004836925": { name: "Fitness", number: "34" },
+      "814241070110998558": { name: "Gamma", number: "05" },
+      "1012880059415150642": { name: "MAG", number: "30" },
+      "814932938961190953": { name: "EMT" },
+      "814933108658274365": { name: "TRU" }
+    };
     const today = new Date();
     let text = `Attendance for ${today.toLocaleString('en-US', { month: 'long', day: 'numeric' })}\n\n`;
     text += `Host: ${summary?.host ? `<@${summary.host.discordId}>` : 'None'}\n`;
     text += `Co-Host: ${summary?.cohost ? `<@${summary.cohost.discordId}>` : 'None'}\n`;
     text += `Attending Staff: ${summary?.staff?.map(s => `<@${s.user.discordId}>`).join(' ') || 'None'} \n\n`;
     for (const squad of summary?.squads || []) {
-      text += `${squad.name.toUpperCase()} - ${squad.members.length.toString().padStart(2, '0')}\n`;
+      const squadInfo = squadMap[squad.name] || { name: squad.name };
+      let squadLine = squadInfo.name;
+      if (squadInfo.number) squadLine += ` - ${squadInfo.number}`;
+      squadLine += ` - ${squad.members.length.toString().padStart(2, '0')}`;
+      text += `${squadLine}\n`;
       for (const member of squad.members) {
         let line = `<@${member.user.discordId}>`;
         if (member.isLead) line += ' (Lead)';
