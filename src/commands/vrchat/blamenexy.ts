@@ -3,18 +3,12 @@ import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegratio
 import { VRChatLoginGuard } from "../../utility/guards.js";
 
 @Discord()
-@SlashGroup({
-  name: "vrchat",
-  description: "VRChat related commands.",
-  contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
-  integrationTypes: [ApplicationIntegrationType.UserInstall]
-})
-@SlashGroup("vrchat")
-@Guard(VRChatLoginGuard)
 export default class BlameNexyCommand {
   @Slash({
     name: "blamenexy",
-    description: "Blame Nexy for a VRChat issue."
+    description: "Blame Nexy for a VRChat issue.",
+    contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel, InteractionContextType.BotDM],
+    integrationTypes: [ApplicationIntegrationType.UserInstall]
   })
   async blamenexy(
     @SlashOption({
