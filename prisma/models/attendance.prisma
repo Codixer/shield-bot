@@ -10,6 +10,7 @@ model AttendanceEvent {
   staff     AttendanceStaff[]
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  activeAttendanceEvents ActiveAttendanceEvent[]
 }
 
 // Model for squads within an attendance event
@@ -42,4 +43,13 @@ model AttendanceStaff {
   userId     Int
   event      AttendanceEvent @relation(fields: [eventId], references: [id])
   eventId    Int
+}
+
+// Model to track the active attendance event for each user
+model ActiveAttendanceEvent {
+  id      Int   @id @default(autoincrement())
+  user    User  @relation("UserActiveAttendanceEvent", fields: [userId], references: [id])
+  userId  Int   @unique
+  event   AttendanceEvent @relation(fields: [eventId], references: [id])
+  eventId Int
 }

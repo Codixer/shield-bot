@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import type { CommandInteraction } from "discord.js";
 
 const prisma = new PrismaClient();
 
@@ -92,5 +93,47 @@ export class AttendanceManager {
         },
       },
     });
+  }
+
+  // Find or create a user by Discord ID
+  async findOrCreateUserByDiscordId(discordId: string) {
+    let user = await prisma.user.findUnique({ where: { discordId } });
+    if (!user) {
+      user = await prisma.user.create({ data: { discordId } });
+    }
+    return user;
+  }
+
+  // Set the active event for a user (by userId)
+  async setActiveEventForUser(userId: number, eventId: number) {
+    // Store in a simple table: ActiveAttendanceEvent { id, userId, eventId }
+    await prisma.activeAttendanceEvent.upsert({
+      where: { userId },
+      update: { eventId },
+      create: { userId, eventId },
+    });
+  }
+
+  // Get the active event for a user (by userId)
+  async getActiveEventIdForUser(userId: number) {
+    const active = await prisma.activeAttendanceEvent.findUnique({ where: { userId } });
+    return active?.eventId;
+  }
+
+  // Clear the active event for a user (by userId)
+  async clearActiveEventForUser(userId: number) {
+    await prisma.activeAttendanceEvent.deleteMany({ where: { userId } });
+  }
+
+  // Helper to get the active event for the current user
+  async getActiveEventForInteraction(interaction: CommandInteraction) {
+    const discordId = interaction.user.id;
+    const user = await this.findOrCreateUserByDiscordId(discordId);
+    const eventId = await this.getActiveEventIdForUser(user.id);
+    if (!eventId) {
+      await interaction.reply({ content: "You do not have an active event. Use /vrchat attendance createevent first.", flags: 64 });
+      return null;
+    }
+    return { eventId, user };
   }
 }
