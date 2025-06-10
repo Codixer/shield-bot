@@ -262,6 +262,8 @@ export class VRChatAttendanceCommand {
       }
       text += '\n';
     }
+    // Wrap in code block for Discord
+    text = '```' + text + '```';
     await interaction.reply({ content: text, flags: MessageFlags.Ephemeral });
   }
 
