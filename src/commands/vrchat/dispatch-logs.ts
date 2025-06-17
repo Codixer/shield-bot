@@ -3,6 +3,7 @@ import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegratio
 import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName, getUserById, hasFriendLocationConsent } from "../../utility/vrchat.js";
 import { VRChatLoginGuard } from "../../utility/guards.js";
 import { prisma } from "../../main.js";
+import { extractInstanceNumber, resolveWorldDisplay } from "../../utility/vrchat/tracking.js";
 
 @Discord()
 @SlashGroup({
@@ -99,10 +100,9 @@ export default class DispatchLogsCommand {
 
         // World detection logic (same as backuprequest)
         let worldText = "[WORLD NOT FOUND]";
-        let friendLocationRecord = null;
-        let worldInfo = null;
-        let joinLink = "";
         let worldName = "[WORLD NAME NOT FOUND]";
+        let joinLink = "";
+        let instanceNumber: string | undefined = undefined;
         let vrcUserId: string | null = account;
         let accountUsername: string | null = null;
         if (!vrcUserId) {
@@ -127,74 +127,20 @@ export default class DispatchLogsCommand {
             });
             return;
         }
-        friendLocationRecord = await findFriendInstanceOrWorld(vrcUserId);
-        if (world && (world.startsWith("https://vrc.group/") || world.startsWith("https://vrch.at/"))) {
-            const match = world.match(/(?:vrc\.group|vrch\.at)\/([^/?#]+)/);
-            const shortName = match ? match[1] : null;
-            if (shortName) {
-                const instanceInfo = await getInstanceInfoByShortName(shortName);
-                worldName = instanceInfo?.world?.name || "[WORLD NAME NOT FOUND]";
-                let instanceId = instanceInfo?.instanceId || instanceInfo?.id || "";
-                if (typeof instanceId !== "string") instanceId = String(instanceId);
-                if (instanceId.includes("nonce")) {
-                    joinLink = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${instanceId}`;
-                } else if (instanceInfo?.location && typeof instanceInfo.location === "string" && instanceInfo.location.includes("nonce")) {
-                    joinLink = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${instanceInfo.location}`;
-                } else if (instanceInfo.shortName) {
-                    joinLink = `https://vrch.at/${instanceInfo.shortName}`;
-                } else if (instanceInfo.secureName) {
-                    joinLink = `https://vrch.at/${instanceInfo.secureName}`;
-                }
-                if (!joinLink) joinLink = world;
-                worldText = `[${worldName}](${joinLink})`;
-            }
-        } else {
-            const vrcUser = await getUserById(vrcUserId);
-            if (!vrcUser || !vrcUser.isFriend) {
-                await interaction.reply({
-                    content: "You must be friended with CodixerBot to use location tracking.",
-                    flags: MessageFlags.Ephemeral,
-                });
-                return;
-            }
-            const consent = await hasFriendLocationConsent(vrcUserId);
-            if (!consent) {
-                await interaction.reply({
-                    content: "You must give consent to be tracked. Use `/vrchat locationtracking` to toggle tracking.",
-                    flags: MessageFlags.Ephemeral,
-                });
-                return;
-            }
-            if (!friendLocationRecord || !friendLocationRecord.location || friendLocationRecord.location === "offline" || friendLocationRecord.worldId === "offline") {
-                await interaction.reply({
-                    content: "User is offline or not tracked. Please try again when the user is online.",
-                    flags: MessageFlags.Ephemeral,
-                });
-                return;
-            } else if (friendLocationRecord.location === "private" && (!friendLocationRecord.worldId || friendLocationRecord.worldId === "private")) {
-                await interaction.reply({
-                    content: "User is in a private world or instance. Please provide a shortlink in the world parameter or send an invite to CodixerBot.",
-                    flags: MessageFlags.Ephemeral,
-                });
-                return;
-            } else if (friendLocationRecord.location === "private" && friendLocationRecord.worldId && friendLocationRecord.senderUserId) {
-                worldInfo = await getFriendInstanceInfo(vrcUserId);
-                worldName = worldInfo?.world?.name || "[WORLD NAME NOT FOUND]";
-                const senderProfileUrl = `https://vrchat.com/home/user/${friendLocationRecord.senderUserId}`;
-                worldText = `${worldName} ([Request invite from ${accountUsername}](<${senderProfileUrl}>))`;
-            } else if (friendLocationRecord.location && friendLocationRecord.location !== "private") {
-                worldInfo = await getFriendInstanceInfo(vrcUserId);
-                worldName = worldInfo?.world?.name || "[WORLD NAME NOT FOUND]";
-                const instanceId = friendLocationRecord.location;
-                const worldId = friendLocationRecord.worldId;
-                if (worldId && instanceId) {
-                    joinLink = `https://vrchat.com/home/launch?worldId=${worldId}&instanceId=${instanceId}`;
-                } else {
-                    joinLink = "[NO UNLOCKED LINK FOUND]";
-                }
-                worldText = `[${worldName}](${joinLink})`;
-            }
-        }
+        const worldResult = await resolveWorldDisplay({
+            world,
+            vrcUserId,
+            accountUsername,
+            findFriendInstanceOrWorld,
+            getFriendInstanceInfo,
+            getInstanceInfoByShortName,
+            getUserById,
+            hasFriendLocationConsent
+        });
+        worldText = worldResult.worldText;
+        worldName = worldResult.worldName;
+        joinLink = worldResult.joinLink;
+        instanceNumber = worldResult.instanceNumber;
 
         const replyMsg = `\u0060\u0060\u0060\nWorld: ${worldText}\nRequest: ${requestType}\nSituation: ${situationText}\nSquad: ${squadText}\nStatus: ${statusText}\n\u0060\u0060\u0060`;
         await interaction.reply({

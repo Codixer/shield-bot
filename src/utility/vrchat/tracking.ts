@@ -61,3 +61,110 @@ export function buildLocationTrackingContainer(
     }
     return container;
 }
+
+/**
+ * Extracts the instance number from a public VRChat instance ID string.
+ * For example, '14077~region(us)' yields '14077'.
+ * Returns undefined if not present or not public.
+ */
+export function extractInstanceNumber(instanceId: string): string | undefined {
+  const match = instanceId.match(/^([0-9]+)~/);
+  return match ? match[1] : undefined;
+}
+
+/**
+ * Resolves world display info for a VRChat user or world shortlink.
+ * Returns { worldText, worldName, joinLink, instanceNumber }
+ */
+export async function resolveWorldDisplay({
+  world,
+  vrcUserId,
+  accountUsername,
+  findFriendInstanceOrWorld,
+  getFriendInstanceInfo,
+  getInstanceInfoByShortName,
+  getUserById,
+  hasFriendLocationConsent
+}: {
+  world?: string,
+  vrcUserId: string,
+  accountUsername?: string | null,
+  findFriendInstanceOrWorld: any,
+  getFriendInstanceInfo: any,
+  getInstanceInfoByShortName: any,
+  getUserById: any,
+  hasFriendLocationConsent: any
+}): Promise<{ worldText: string, worldName: string, joinLink: string, instanceNumber?: string }> {
+  let worldText = "[WORLD NOT FOUND]";
+  let worldName = "[WORLD NAME NOT FOUND]";
+  let joinLink = "";
+  let instanceNumber: string | undefined = undefined;
+  if (world && (world.startsWith("https://vrc.group/") || world.startsWith("https://vrch.at/"))) {
+    const match = world.match(/(?:vrc\.group|vrch\.at)\/([^/?#]+)/);
+    const shortName = match ? match[1] : null;
+    if (shortName) {
+      const instanceInfo = await getInstanceInfoByShortName(shortName);
+      worldName = instanceInfo?.world?.name || "[WORLD NAME NOT FOUND]";
+      let instanceId = instanceInfo?.instanceId || instanceInfo?.id || "";
+      if (typeof instanceId !== "string") instanceId = String(instanceId);
+      instanceNumber = extractInstanceNumber(instanceId);
+      if (instanceNumber) {
+        worldName += ` (Instance #${instanceNumber})`;
+      }
+      if (instanceId.includes("nonce")) {
+        joinLink = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${instanceId}`;
+      } else if (instanceInfo?.location && typeof instanceInfo.location === "string" && instanceInfo.location.includes("nonce")) {
+        joinLink = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${instanceInfo.location}`;
+      } else if (instanceInfo.shortName) {
+        joinLink = `https://vrch.at/${instanceInfo.shortName}`;
+      } else if (instanceInfo.secureName) {
+        joinLink = `https://vrch.at/${instanceInfo.secureName}`;
+      }
+      if (!joinLink) joinLink = world;
+      worldText = `[${worldName}](${joinLink})`;
+      return { worldText, worldName, joinLink, instanceNumber };
+    }
+  }
+  // Fallback to friend location logic
+  const vrcUser = await getUserById(vrcUserId);
+  if (!vrcUser || !vrcUser.isFriend) {
+    worldText = "You must be friended with CodixerBot to use location tracking.";
+    return { worldText, worldName, joinLink, instanceNumber };
+  }
+  const consent = await hasFriendLocationConsent(vrcUserId);
+  if (!consent) {
+    worldText = "You must give consent to be tracked. Use `/vrchat locationtracking` to toggle tracking.";
+    return { worldText, worldName, joinLink, instanceNumber };
+  }
+  const friendLocationRecord = await findFriendInstanceOrWorld(vrcUserId);
+  if (!friendLocationRecord || !friendLocationRecord.location || friendLocationRecord.location === "offline" || friendLocationRecord.worldId === "offline") {
+    worldText = "User is offline or not tracked. Please try again when the user is online.";
+    return { worldText, worldName, joinLink, instanceNumber };
+  } else if (friendLocationRecord.location === "private" && (!friendLocationRecord.worldId || friendLocationRecord.worldId === "private")) {
+    worldText = "User is in a private world or instance. Please provide a shortlink in the world parameter or send an invite to CodixerBot.";
+    return { worldText, worldName, joinLink, instanceNumber };
+  } else if (friendLocationRecord.location === "private" && friendLocationRecord.worldId && friendLocationRecord.senderUserId) {
+    const worldInfo = await getFriendInstanceInfo(vrcUserId);
+    worldName = worldInfo?.world?.name || "[WORLD NAME NOT FOUND]";
+    const senderProfileUrl = `https://vrchat.com/home/user/${friendLocationRecord.senderUserId}`;
+    worldText = `${worldName} ([Request invite from ${accountUsername}](<${senderProfileUrl}>))`;
+    return { worldText, worldName, joinLink, instanceNumber };
+  } else if (friendLocationRecord.location && friendLocationRecord.location !== "private") {
+    const worldInfo = await getFriendInstanceInfo(vrcUserId);
+    worldName = worldInfo?.world?.name || "[WORLD NAME NOT FOUND]";
+    const instanceId = friendLocationRecord.location;
+    const worldId = friendLocationRecord.worldId;
+    if (worldId && instanceId) {
+      joinLink = `https://vrchat.com/home/launch?worldId=${worldId}&instanceId=${instanceId}`;
+      instanceNumber = extractInstanceNumber(instanceId);
+      if (instanceNumber) {
+        worldName += ` (Instance #${instanceNumber})`;
+      }
+    } else {
+      joinLink = "[NO UNLOCKED LINK FOUND]";
+    }
+    worldText = `[${worldName}](${joinLink})`;
+    return { worldText, worldName, joinLink, instanceNumber };
+  }
+  return { worldText, worldName, joinLink, instanceNumber };
+}
