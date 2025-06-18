@@ -9,7 +9,6 @@ import { PrismaClient } from "@prisma/client";
 import { isLoggedInAndVerified, loginAndGetCurrentUser } from "./utility/vrchat.js";
 import { startVRChatWebSocketListener } from "./events/vrchat/vrchat-websocket.js";
 import { syncAllInviteMessages, syncInviteMessageIfDifferent } from './managers/messages/InviteMessageManager.js';
-import { startAlertScheduler } from "./utility/alertScheduler.js";
 import { initializeSchedules } from "./schedules/schedules.js";
 
 export const prisma = new PrismaClient();
@@ -68,8 +67,6 @@ bot.once("ready", async () => {
 	} else {
 		console.log("[VRChat] VRChat is not running");
 	}
-	
-
 });
 
 
