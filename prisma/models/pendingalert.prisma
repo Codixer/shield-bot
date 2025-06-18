@@ -6,7 +6,7 @@ model PendingAlert {
   status        String   // 'pending', 'acknowledged', 'resolved', 'expired'
   squad         String?
   situation     String?
-  world         String?
+  world         String? @db.Text
   userId        String   // Discord user ID who created the request
   lastAlert     DateTime? // Last time a warning was sent
   acknowledgedAt DateTime?
