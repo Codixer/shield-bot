@@ -1,21 +1,23 @@
 model User {
-  id                        Int                        @id @default(autoincrement())
-  discordId                 String                     @unique
-  vrchatAccounts            VRChatAccount[]
-  friendLocationConsents    FriendLocationConsent[]    // Add relation to FriendLocationConsent
-  hostAttendanceEvents      AttendanceEvent[]         @relation("HostAttendanceEvent")
-  cohostAttendanceEvents    AttendanceEvent[]         @relation("CohostAttendanceEvent")
-  squadMemberships          SquadMember[]
-  attendanceStaff           AttendanceStaff[]
-  activeAttendanceEvent     ActiveAttendanceEvent?     @relation("UserActiveAttendanceEvent")
+  id                     Int                     @id @default(autoincrement())
+  discordId              String                  @unique
+  activeAttendanceEvent  ActiveAttendanceEvent?  @relation("UserActiveAttendanceEvent")
+  cohostAttendanceEvents AttendanceEvent[]       @relation("CohostAttendanceEvent")
+  hostAttendanceEvents   AttendanceEvent[]       @relation("HostAttendanceEvent")
+  attendanceStaff        AttendanceStaff[]
+  friendLocationConsents FriendLocationConsent[]
+  squadMemberships       SquadMember[]
+  vrchatAccounts         VRChatAccount[]
 }
 
 model VRChatAccount {
-  id              Int                @id @default(autoincrement())
-  user            User               @relation(fields: [userId], references: [id])
-  userId          Int
-  vrcUserId       String
-  accountType     VRChatAccountType
+  id               Int               @id @default(autoincrement())
+  userId           Int
+  vrcUserId        String
+  accountType      VRChatAccountType
   verificationCode String?
-  verified         Boolean            @default(false)
+  verified         Boolean           @default(false)
+  user             User              @relation(fields: [userId], references: [id])
+
+  @@index([userId], map: "VRChatAccount_userId_fkey")
 }

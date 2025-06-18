@@ -9,7 +9,8 @@ import { PrismaClient } from "@prisma/client";
 import { isLoggedInAndVerified, loginAndGetCurrentUser } from "./utility/vrchat.js";
 import { startVRChatWebSocketListener } from "./events/vrchat/vrchat-websocket.js";
 import { syncAllInviteMessages, syncInviteMessageIfDifferent } from './managers/messages/InviteMessageManager.js';
-//import { initializeSchedules } from "./schedules/schedules.js";
+import { startAlertScheduler } from "./utility/alertScheduler.js";
+import { initializeSchedules } from "./schedules/schedules.js";
 
 export const prisma = new PrismaClient();
 
@@ -42,33 +43,37 @@ bot.once("ready", async () => {
 		const vrcUsername = process.env.VRCHAT_USERNAME;
 		const vrcPassword = process.env.VRCHAT_PASSWORD;
 		if (!vrcUsername || !vrcPassword) {
-			console.warn("VRChat credentials not set in environment variables. Skipping VRChat login.");
+			console.warn("[VRChat] VRChat credentials not set in environment variables. Skipping VRChat login.");
 		} else {
 			try {
 				const user = await loginAndGetCurrentUser(vrcUsername, vrcPassword);
-				console.log(`VRChat login successful:  ${user.displayName} | ${user.username} | ${user.id}`);
+				console.log(`[VRChat] VRChat login successful:  ${user.displayName} | ${user.username} | ${user.id}`);
 			} catch (err) {
-				console.error("VRChat login failed:", err);
+				console.error("[VRChat] VRChat login failed:", err);
 			}
 		}
 	} catch (error) {
-		console.error("Failed to initialize application commands:", error);
+		console.error("[VRChat] Failed to initialize application commands:", error);
 	}
+
+	console.log("[Schedules] Initializing schedules...");
+	initializeSchedules();
+	console.log("[Schedules] Schedules initialized.");
 
 	const vrchatIsRunning = await isLoggedInAndVerified();
 	if (vrchatIsRunning) {
-		console.log("VRChat is running");
+		console.log("[VRChat] VRChat is running");
 		startVRChatWebSocketListener();
 		syncAllInviteMessages();
 	} else {
-		console.log("VRChat is not running");
+		console.log("[VRChat] VRChat is not running");
 	}
 	
-	//initializeSchedules()
+
 });
 
 
-bot.on("interactionCreate", (interaction: Interaction) => {
+bot.on("interactionCreate", async (interaction: Interaction) => {
 	bot.executeInteraction(interaction);
 });
 

@@ -1,8 +1,9 @@
-// Model to store consent for friend location tracking
 model FriendLocationConsent {
   id             Int      @id @default(autoincrement())
-  ownerVrcUserId String   // The VRChat user ID of the person being tracked
-  ownerUser      User?    @relation(fields: [ownerUserId], references: [id])
+  ownerVrcUserId String
   ownerUserId    Int?
-  grantedAt      DateTime @default(now()) // When consent was granted
+  grantedAt      DateTime @default(now())
+  ownerUser      User?    @relation(fields: [ownerUserId], references: [id])
+
+  @@index([ownerUserId], map: "FriendLocationConsent_ownerUserId_fkey")
 }

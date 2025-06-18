@@ -1,10 +1,9 @@
-// Model to store friend location events from VRChat
 model FriendLocation {
   id           Int      @id @default(autoincrement())
-  vrcUserId    String @unique  // VRChat user ID of the friend
-  location     String  // The location string (can be worldId:instanceId, or special values)
-  worldId      String? // The worldId if available
-  travelingTo  String? // The travelingToLocation if present
-  eventTime    DateTime @default(now()) // When the event was received
-  senderUserId String? // The VRChat user ID of the sender (for invites)
+  vrcUserId    String   @unique
+  location     String
+  worldId      String?
+  travelingTo  String?
+  eventTime    DateTime @default(now())
+  senderUserId String?
 }

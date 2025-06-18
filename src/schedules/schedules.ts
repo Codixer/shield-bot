@@ -1,3 +1,5 @@
+import { alertScheduler } from "./alertScheduler.js";
+
 export function initializeSchedules() {
-    // Pending schedules
+    alertScheduler();
 }

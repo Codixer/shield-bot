@@ -1,0 +1,13 @@
+model PendingAlert {
+  id            String   @id @default(uuid())
+  type          String   // 'backup-request' or 'dispatch-log'
+  discordMsgId  String   // The Discord message ID for the alert
+  createdAt     DateTime @default(now())
+  status        String   // 'pending', 'acknowledged', 'resolved', 'expired'
+  squad         String?
+  situation     String?
+  world         String?
+  userId        String   // Discord user ID who created the request
+  lastAlert     DateTime? // Last time a warning was sent
+  acknowledgedAt DateTime?
+}

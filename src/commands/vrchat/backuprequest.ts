@@ -163,9 +163,23 @@ ${roleMention}
 `.trim();
 
             // Send the message
-        await interaction.reply({
+        const sentMsg = await interaction.reply({
             content: replyMsg,
             flags: MessageFlags.Ephemeral,
+            fetchReply: true,
+        }) as Message;
+
+        // Create PendingAlert entry
+        await prisma.pendingAlert.create({
+            data: {
+                type: "backup-request",
+                discordMsgId: sentMsg.id,
+                status: "pending",
+                squad: squad,
+                situation: situation,
+                world: worldText,
+                userId: interaction.user.id,
+            }
         });
     }
 

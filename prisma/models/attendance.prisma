@@ -1,55 +1,63 @@
-// Model for attendance events
 model AttendanceEvent {
-  id         Int       @id @default(autoincrement())
-  date      DateTime  // Date of the event
-  hostId    Int?      // User ID of the host
-  host      User?     @relation("HostAttendanceEvent", fields: [hostId], references: [id])
-  cohostId  Int?      // User ID of the co-host
-  cohost    User?     @relation("CohostAttendanceEvent", fields: [cohostId], references: [id])
-  squads    Squad[]   // Squads for this event
-  staff     AttendanceStaff[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                     Int                     @id @default(autoincrement())
+  date                   DateTime
+  hostId                 Int?
+  cohostId               Int?
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
   activeAttendanceEvents ActiveAttendanceEvent[]
+  cohost                 User?                   @relation("CohostAttendanceEvent", fields: [cohostId], references: [id])
+  host                   User?                   @relation("HostAttendanceEvent", fields: [hostId], references: [id])
+  staff                  AttendanceStaff[]
+  squads                 Squad[]
+
+  @@index([cohostId], map: "AttendanceEvent_cohostId_fkey")
+  @@index([hostId], map: "AttendanceEvent_hostId_fkey")
 }
 
-// Model for squads within an attendance event
 model Squad {
-  id                Int              @id @default(autoincrement())
-  name              String           // Squad name (e.g., EAGLE, DELTA)
-  event             AttendanceEvent  @relation(fields: [eventId], references: [id])
-  eventId           Int
-  members           SquadMember[]
-}
-
-// Model for members within a squad
-model SquadMember {
-  id         Int      @id @default(autoincrement())
-  user       User     @relation(fields: [userId], references: [id])
-  userId     Int
-  squad      Squad    @relation(fields: [squadId], references: [id])
-  squadId    Int
-  isLead     Boolean  @default(false)
-  isLate     Boolean  @default(false)
-  lateNote   String?  // e.g., "Joined 1 hour into the event"
-  isSplit    Boolean  @default(false)
-  splitFrom  String?  // e.g., "Split from Eagle"
-}
-
-// Model for staff attending the event
-model AttendanceStaff {
-  id         Int             @id @default(autoincrement())
-  user       User            @relation(fields: [userId], references: [id])
-  userId     Int
-  event      AttendanceEvent @relation(fields: [eventId], references: [id])
-  eventId    Int
-}
-
-// Model to track the active attendance event for each user
-model ActiveAttendanceEvent {
-  id      Int   @id @default(autoincrement())
-  user    User  @relation("UserActiveAttendanceEvent", fields: [userId], references: [id])
-  userId  Int   @unique
-  event   AttendanceEvent @relation(fields: [eventId], references: [id])
+  id      Int             @id @default(autoincrement())
+  name    String
   eventId Int
+  event   AttendanceEvent @relation(fields: [eventId], references: [id])
+  members SquadMember[]
+
+  @@index([eventId], map: "Squad_eventId_fkey")
+}
+
+model SquadMember {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  squadId   Int
+  isLead    Boolean @default(false)
+  isLate    Boolean @default(false)
+  lateNote  String?
+  isSplit   Boolean @default(false)
+  splitFrom String?
+  squad     Squad   @relation(fields: [squadId], references: [id])
+  user      User    @relation(fields: [userId], references: [id])
+
+  @@index([squadId], map: "SquadMember_squadId_fkey")
+  @@index([userId], map: "SquadMember_userId_fkey")
+}
+
+model AttendanceStaff {
+  id      Int             @id @default(autoincrement())
+  userId  Int
+  eventId Int
+  event   AttendanceEvent @relation(fields: [eventId], references: [id])
+  user    User            @relation(fields: [userId], references: [id])
+
+  @@index([eventId], map: "AttendanceStaff_eventId_fkey")
+  @@index([userId], map: "AttendanceStaff_userId_fkey")
+}
+
+model ActiveAttendanceEvent {
+  id      Int             @id @default(autoincrement())
+  userId  Int             @unique
+  eventId Int
+  event   AttendanceEvent @relation(fields: [eventId], references: [id])
+  user    User            @relation("UserActiveAttendanceEvent", fields: [userId], references: [id])
+
+  @@index([eventId], map: "ActiveAttendanceEvent_eventId_fkey")
 }

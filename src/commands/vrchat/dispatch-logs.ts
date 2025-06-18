@@ -1,5 +1,5 @@
 import { Discord, Slash, SlashOption, SlashChoice, Guard, SlashGroup } from "discordx";
-import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, MessageFlags, InteractionContextType, AutocompleteInteraction } from "discord.js";
+import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, Message, MessageFlags, InteractionContextType, AutocompleteInteraction } from "discord.js";
 import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName, getUserById, hasFriendLocationConsent } from "../../utility/vrchat.js";
 import { VRChatLoginGuard } from "../../utility/guards.js";
 import { prisma } from "../../main.js";
@@ -143,9 +143,23 @@ export default class DispatchLogsCommand {
         instanceNumber = worldResult.instanceNumber;
 
         const replyMsg = `\u0060\u0060\u0060\nWorld: ${worldText}\nRequest: ${requestType}\nSituation: ${situationText}\nSquad: ${squadText}\nStatus: ${statusText}\n\u0060\u0060\u0060`;
-        await interaction.reply({
+        const sentMsg = await interaction.reply({
             content: replyMsg,
             flags: MessageFlags.Ephemeral,
+            fetchReply: true,
+        }) as Message;
+
+        // Create PendingAlert entry
+        await prisma.pendingAlert.create({
+            data: {
+                type: "dispatch-log",
+                discordMsgId: sentMsg.id,
+                status: "pending",
+                squad: squad,
+                situation: situation,
+                world: worldText,
+                userId: interaction.user.id,
+            }
         });
     }
 
