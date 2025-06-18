@@ -165,9 +165,8 @@ ${roleMention}
             // Send the message
         const sentMsg = await interaction.reply({
             content: replyMsg,
-            flags: MessageFlags.Ephemeral,
-            fetchReply: true,
-        }) as Message;
+            flags: MessageFlags.Ephemeral
+        });
 
         // Create PendingAlert entry
         await prisma.pendingAlert.create({

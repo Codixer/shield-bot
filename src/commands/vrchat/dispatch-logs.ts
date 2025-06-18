@@ -146,8 +146,7 @@ export default class DispatchLogsCommand {
         const sentMsg = await interaction.reply({
             content: replyMsg,
             flags: MessageFlags.Ephemeral,
-            fetchReply: true,
-        }) as Message;
+        });
 
         // Create PendingAlert entry
         await prisma.pendingAlert.create({
