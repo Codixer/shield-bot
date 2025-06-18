@@ -13,7 +13,9 @@ export function alertScheduler() {
       where: { status: "pending" }
     });
     for (const alert of alerts) {
+      if (!alert.createdAt) continue;
       const created = new Date(alert.createdAt);
+      if (isNaN(created.getTime())) continue;
       const msSince = now.getTime() - created.getTime();
       const user = await bot.users.fetch(alert.userId).catch(() => null);
       if (msSince > ONE_HOUR) {
