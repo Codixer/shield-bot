@@ -8,7 +8,15 @@ model User {
   friendLocationConsents FriendLocationConsent[]
   squadMemberships       SquadMember[]
   vrchatAccounts         VRChatAccount[]
+  // PiShock fields
+  pishockApiKey          String?
+  pishockUserId          String?
+  pishockToken           String?
+  pishockDevices         PiShockDevice[]
+  pishockShares          PiShockShare[]
 }
+
+
 
 model VRChatAccount {
   id               Int               @id @default(autoincrement())

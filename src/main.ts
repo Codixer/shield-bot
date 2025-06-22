@@ -10,8 +10,10 @@ import { isLoggedInAndVerified, loginAndGetCurrentUser } from "./utility/vrchat.
 import { startVRChatWebSocketListener } from "./events/vrchat/vrchat-websocket.js";
 import { syncAllInviteMessages, syncInviteMessageIfDifferent } from './managers/messages/InviteMessageManager.js';
 import { initializeSchedules } from "./schedules/schedules.js";
+import { PiShockConnectionManager } from './utility/pishock/connectionManager.js';
 
 export const prisma = new PrismaClient();
+export const piShockConnectionManager = new PiShockConnectionManager();
 
 export const bot = new Client({
 	intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMembers],

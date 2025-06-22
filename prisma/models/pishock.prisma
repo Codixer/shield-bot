@@ -1,0 +1,47 @@
+model PiShockDevice {
+  id         Int      @id @default(autoincrement())
+  clientId   Int
+  name       String
+  shockers   PiShockShocker[]
+  user       User     @relation(fields: [userId], references: [id])
+  userId     Int
+
+  @@unique([clientId, userId])
+}
+
+model PiShockShocker {
+  id         Int      @id @default(autoincrement())
+  shockerId  Int
+  name       String
+  isPaused   Boolean
+  device     PiShockDevice @relation(fields: [deviceId], references: [id])
+  deviceId   Int
+
+  @@unique([shockerId, deviceId])
+}
+
+model PiShockShare {
+  id         Int      @id @default(autoincrement())
+  shareId    Int
+  clientId   Int
+  shockerId  Int
+  shockerName String
+  isPaused   Boolean
+  shareCode  String
+  user       User     @relation(fields: [userId], references: [id])
+  userId     Int
+
+  @@unique([shareCode, shockerId, userId])
+}
+
+model PiShockPanelState {
+  id           Int      @id @default(autoincrement())
+  messageId    String   @unique // Discord message or interaction ID
+  ownerId      String   // Discord user ID of the owner
+  intensity    Int      // 1-5
+  duration     Int      // 1-5
+  mode         String   // 'shock', 'vibrate', 'beep'
+  estop        Boolean  @default(false)
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+}
