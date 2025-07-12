@@ -20,10 +20,22 @@ export class PiShockModalHandler {
     }
 
     // Upsert user
+    let pishockUserId: string | null = null;
+    let pishockToken: string | null = null;
+    if (apiKey && username) {
+      try {
+        const fetchedId = await PiShockAPI.getUserId({ username, apiKey });
+        pishockUserId = fetchedId != null ? String(fetchedId) : null;
+        pishockToken = apiKey;
+      } catch (e) {
+        await interaction.reply({ content: "Failed to fetch PiShock UserID. Please check your credentials.", ephemeral: true });
+        return;
+      }
+    }
     let user = await prisma.user.upsert({
       where: { discordId },
-      update: { pishockApiKey: apiKey, pishockUserId: null, pishockToken: null },
-      create: { discordId, pishockApiKey: apiKey, pishockUserId: null, pishockToken: null }
+      update: { pishockApiKey: apiKey, pishockUserId, pishockToken },
+      create: { discordId, pishockApiKey: apiKey, pishockUserId, pishockToken }
     });
 
     // If API Key, fetch and upsert devices and shockers
