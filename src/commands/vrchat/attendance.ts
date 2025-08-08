@@ -32,6 +32,7 @@ export class VRChatAttendanceCommand {
     @SlashChoice({ name: "Mag", value: "1012880059415150642" })
     @SlashChoice({ name: "EMT", value: "814932938961190953" })
     @SlashChoice({ name: "TRU", value: "814933108658274365" })
+    @SlashChoice({ name: "AOC", value: "850458906697924608" })
     @SlashOption({ name: "squad", description: "Squad (Adam, Baker, Coffee, etc)", type: ApplicationCommandOptionType.String, required: true }) squad: string,
     interaction: CommandInteraction
   ) {
