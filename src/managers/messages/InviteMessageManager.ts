@@ -94,11 +94,11 @@ export class InviteMessageManager {
         messages: string[];
     }): Promise<InviteMessage[]> {
         // Get current messages
-        const current = await listInviteMessages({ userId, messageType });
+        const current: InviteMessage[] = await listInviteMessages({ userId, messageType });
         // Update only if different
         for (let slot = 0; slot < messages.length; slot++) {
             const newMsg = messages[slot];
-            const currentMsg = current.find((m: any) => m.slot === slot);
+            const currentMsg = current.find((m: InviteMessage) => m.slot === slot);
             if (!currentMsg || currentMsg.message !== newMsg) {
                 try {
                     await updateInviteMessage({ userId, messageType, slot, message: newMsg });
@@ -196,9 +196,9 @@ export async function syncInviteMessageIfDifferent({
     slot: number;
     expected: string;
 }) {
-    const current = await listInviteMessages({ userId, messageType: type });
-    const msg = current.find((m: any) => m.slot === slot);
-    if (msg.message !== expected) {
+    const current: InviteMessage[] = await listInviteMessages({ userId, messageType: type });
+    const msg = current.find((m: InviteMessage) => m.slot === slot);
+    if (msg && msg.message !== expected) {
         console.log(`[InviteMessageManager] Message mismatch for userId=${userId}, type=${type}, slot=${slot}.`);
         console.log(`[InviteMessageManager] Current: "${msg.message}" | Expected: "${expected}"`);
         await updateInviteMessage({ userId, messageType: type, slot, message: expected });

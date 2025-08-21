@@ -2,6 +2,7 @@
 
 import { loadCookie, USER_AGENT } from "../vrchat/index.js";
 import fetch from "node-fetch";
+import type { InviteMessage } from "../../managers/messages/InviteMessageManager.js";
 
 export async function updateInviteMessage({
     userId,
@@ -44,7 +45,7 @@ export async function listInviteMessages({
 }: {
     userId: string;
     messageType?: "message" | "response" | "request" | "requestResponse";
-}) {
+}): Promise<InviteMessage[]> {
     if (!userId) throw new Error("userId is required");
     const cookie = loadCookie();
     if (!cookie) throw new Error("Not authenticated. Please log in first.");
@@ -60,5 +61,5 @@ export async function listInviteMessages({
         const text = await response.text();
         throw new Error(`Failed to list invite messages: ${response.status} ${text}`);
     }
-    return await response.json();
+    return (await response.json()) as InviteMessage[];
 }
