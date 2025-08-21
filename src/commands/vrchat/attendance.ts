@@ -248,7 +248,7 @@ export class VRChatAttendanceCommand {
     let text = `Attendance for ${today.toLocaleString('en-US', { month: 'long', day: 'numeric' })}\n\n`;
     text += `Host: ${summary?.host ? `<@${summary.host.discordId}>` : 'None'}\n`;
     text += `Co-Host: ${summary?.cohost ? `<@${summary.cohost.discordId}>` : 'None'}\n`;
-    text += `Attending Staff: ${summary?.staff?.map(s => `<@${s.user.discordId}>`).join(' ') || 'None'} \n\n`;
+    text += `Attending Staff: ${summary?.staff?.map((s: { user: { discordId: any; }; }) => `<@${s.user.discordId}>`).join(' ') || 'None'} \n\n`;
     for (const squad of summary?.squads || []) {
       const squadInfo = squadMap[squad.name] || { name: squad.name };
       let squadLine = squadInfo.name;

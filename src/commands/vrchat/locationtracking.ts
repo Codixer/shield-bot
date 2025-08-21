@@ -39,7 +39,7 @@ export class VRChatLocationTrackingCommand {
             return;
         }
         // List all verified accounts
-        const verifiedAccounts = user.vrchatAccounts.filter(acc => acc.verified);
+        const verifiedAccounts = user.vrchatAccounts.filter((acc: { verified: any; }) => acc.verified);
         if (verifiedAccounts.length === 0) {
             await interaction.reply({
                 content: "No verified VRChat accounts found for your Discord account.",

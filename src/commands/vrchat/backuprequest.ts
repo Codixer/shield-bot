@@ -119,8 +119,8 @@ export default class BackupRequestCommand {
                 where: { discordId: interaction.user.id },
                 include: { vrchatAccounts: true }
             });
-            const mainAccount = user?.vrchatAccounts.find(acc => acc.verified && acc.accountType === "MAIN");
-            vrcUserId = mainAccount?.vrcUserId ?? (user?.vrchatAccounts.find(acc => acc.verified)?.vrcUserId ?? null);
+            const mainAccount = user?.vrchatAccounts.find((acc: { verified: any; accountType: string; }) => acc.verified && acc.accountType === "MAIN");
+            vrcUserId = mainAccount?.vrcUserId ?? (user?.vrchatAccounts.find((acc: { verified: any; }) => acc.verified)?.vrcUserId ?? null);
             if (mainAccount?.vrcUserId) {
                 const vrcUser = await getUserById(mainAccount.vrcUserId);
                 accountUsername = vrcUser?.displayName ?? null;
@@ -214,7 +214,7 @@ ${roleMention}
         }
         // If no choices, show MAIN if available
         if (choices.length === 0) {
-            const main = user.vrchatAccounts.find(acc => acc.verified && acc.accountType === "MAIN");
+            const main = user.vrchatAccounts.find((acc: { verified: any; accountType: string; }) => acc.verified && acc.accountType === "MAIN");
             if (main) {
                 let username = main.vrcUserId;
                 try {
