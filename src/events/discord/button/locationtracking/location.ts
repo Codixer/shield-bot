@@ -13,7 +13,7 @@ export class LocationTrackingButtonHandler {
         // Get user and verified accounts
         const user = await prisma.user.findUnique({ where: { discordId }, include: { vrchatAccounts: true } });
         if (!user || !user.vrchatAccounts) return;
-        const verifiedAccounts = user.vrchatAccounts.filter((acc: any) => acc.verified);
+        const verifiedAccounts = user.vrchatAccounts.filter((acc: any) => acc.accountType === "MAIN" || acc.accountType === "ALT");
         // Update consent in DB
         if (action === "tracking") {
             // Remove consent

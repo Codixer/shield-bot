@@ -13,7 +13,7 @@ config();
   name: "vrchat",
   description: "VRChat related commands.",
   contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
-  integrationTypes: [ApplicationIntegrationType.UserInstall]
+  integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
 })
 @SlashGroup("vrchat")
 @Guard(VRChatLoginGuard)
@@ -65,22 +65,30 @@ export default class VRChatCommands {
         }
         const embed = new EmbedBuilder()
             .setTitle(`Is this your VRChat account?`)
-            .setDescription(`**${userInfo.displayName}** (${userInfo.id})\nIs this the correct account?`)
+            .setDescription(`**${userInfo.displayName}** (${userInfo.id})\n\nChoose how you want to add this account:`)
             .setColor(Colors.Blue)
             .setImage(userInfo.profilePicOverride || userInfo.currentAvatarImageUrl || userInfo.currentAvatarThumbnailImageUrl || null)
             .setThumbnail(userInfo.userIcon || userInfo.profilePicOverride || null)
-            .setFooter({ text: "VRChat Verification" });
+            .setFooter({ text: "VRChat Account Binding" });
 
         // Use the discord and VRChat IDs in the confirm button's custom_id
-        const confirmBtn = new ButtonBuilder()
+        const addUnverifiedBtn = new ButtonBuilder()
+            .setCustomId(`vrchat-add:${interaction.user.id}:${userInfo.id}`)
+            .setLabel("Add unverified (can be taken over)")
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji("⚠️");
+
+        const verifyBtn = new ButtonBuilder()
             .setCustomId(`vrchat-verify:${interaction.user.id}:${userInfo.id}`)
-            .setLabel("Confirm account")
-            .setStyle(ButtonStyle.Success);
+            .setLabel("Add and verify (protected)")
+            .setStyle(ButtonStyle.Success)
+            .setEmoji("🔒");
+
         const tryAgainBtn = new ButtonBuilder()
             .setCustomId("vrchat-verify-try-again")
             .setLabel("Try again")
             .setStyle(ButtonStyle.Secondary);
-        const row = { type: 1, components: [confirmBtn, tryAgainBtn] };
+        const row = { type: 1, components: [addUnverifiedBtn, verifyBtn, tryAgainBtn] };
         await interaction.reply({
             embeds: [embed],
             components: [row],

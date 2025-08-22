@@ -76,14 +76,28 @@ export class VRChatStatusVerifyButtonHandler {
         }
         // Check if the statusDescription contains the verification code
         if (userInfo.statusDescription.includes(vrcAccount.verificationCode)) {
-            // Mark as verified and wipe the code
+            // Update username cache and promote from IN_VERIFICATION to MAIN/ALT
+            const vrchatUsername = userInfo?.displayName || userInfo?.username;
+            
+            // Determine final account type based on whether user has a MAIN account
+            const hasMainAccount = await prisma.vRChatAccount.findFirst({ 
+                where: { userId: vrcAccount.userId, accountType: "MAIN" } 
+            });
+            const finalAccountType = hasMainAccount ? "ALT" : "MAIN";
+            
             await prisma.vRChatAccount.update({
                 where: { id: vrcAccount.id },
-                data: { verified: true, verificationCode: null }
+                data: { 
+                    accountType: finalAccountType,
+                    verificationCode: null,
+                    vrchatUsername,
+                    usernameUpdatedAt: new Date()
+                }
             });
+            
             const embed = new EmbedBuilder()
                 .setTitle("Verification Successful")
-                .setDescription(`Your VRChat account (**${vrcUserId}**) has been successfully verified via status change!`)
+                .setDescription(`Your VRChat account (**${vrchatUsername || vrcUserId}**) has been successfully verified via status change!\n\n✅ Your account is now fully verified and protected from takeover.`)
                 .setColor(0x57F287);
             await interaction.update({
                 embeds: [embed],

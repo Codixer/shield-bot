@@ -8,16 +8,19 @@ model User {
   friendLocationConsents FriendLocationConsent[]
   squadMemberships       SquadMember[]
   vrchatAccounts         VRChatAccount[]
+  whitelistEntry         WhitelistEntry?
 }
 
 model VRChatAccount {
-  id               Int               @id @default(autoincrement())
-  userId           Int
-  vrcUserId        String
-  accountType      VRChatAccountType
-  verificationCode String?
-  verified         Boolean           @default(false)
-  user             User              @relation(fields: [userId], references: [id])
+  id                   Int                        @id @default(autoincrement())
+  userId               Int
+  vrcUserId            String
+  accountType          VRChatAccountType          @default(IN_VERIFICATION)
+  verificationCode     String?
+  vrchatUsername       String?                    // Cached VRChat username
+  usernameUpdatedAt    DateTime?                  // Last time username was updated
+  user                 User                       @relation(fields: [userId], references: [id])
 
   @@index([userId], map: "VRChatAccount_userId_fkey")
+  @@index([vrcUserId], map: "VRChatAccount_vrcUserId_idx")
 }

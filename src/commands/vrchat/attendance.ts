@@ -10,7 +10,7 @@ const attendanceManager = new AttendanceManager();
   name: "vrchat",
   description: "VRChat related commands.",
   contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
-  integrationTypes: [ApplicationIntegrationType.UserInstall]
+  integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
 })
 @SlashGroup({ name: "attendance", description: "Attendance tracking commands.", root: "vrchat" })
 @SlashGroup("attendance", "vrchat")

@@ -10,7 +10,7 @@ import { extractInstanceNumber, resolveWorldDisplay } from "../../utility/vrchat
   name: "vrchat",
   description: "VRChat related commands.",
   contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
-  integrationTypes: [ApplicationIntegrationType.UserInstall]
+  integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
 })
 @SlashGroup("vrchat")
 @Guard(VRChatLoginGuard)
@@ -110,8 +110,8 @@ export default class DispatchLogsCommand {
                 where: { discordId: interaction.user.id },
                 include: { vrchatAccounts: true }
             });
-            const mainAccount = user?.vrchatAccounts.find((acc: { verified: any; accountType: string; }) => acc.verified && acc.accountType === "MAIN");
-            vrcUserId = mainAccount?.vrcUserId ?? (user?.vrchatAccounts.find((acc: { verified: any; }) => acc.verified)?.vrcUserId ?? null);
+            const mainAccount = user?.vrchatAccounts.find((acc: any) => acc.accountType === "MAIN");
+            vrcUserId = mainAccount?.vrcUserId ?? (user?.vrchatAccounts.find((acc: any) => acc.accountType === "MAIN" || acc.accountType === "ALT")?.vrcUserId ?? null);
             if (mainAccount?.vrcUserId) {
                 const vrcUser = await getUserById(mainAccount.vrcUserId);
                 accountUsername = vrcUser?.displayName ?? null;
@@ -147,19 +147,6 @@ export default class DispatchLogsCommand {
             content: replyMsg,
             flags: MessageFlags.Ephemeral,
         });
-
-        // Create PendingAlert entry
-        await prisma.pendingAlert.create({
-            data: {
-                type: "dispatch-log",
-                discordMsgId: sentMsg.id,
-                status: "pending",
-                squad: squad,
-                situation: situation,
-                world: worldText,
-                userId: interaction.user.id,
-            }
-        });
     }
 
     async autocompleteAccount(interaction: AutocompleteInteraction) {
@@ -173,7 +160,7 @@ export default class DispatchLogsCommand {
         }
         const choices = [];
         for (const acc of user.vrchatAccounts) {
-            if (!acc.verified) continue;
+            if (acc.accountType === "UNVERIFIED") continue;
             const consent = await prisma.friendLocationConsent.findFirst({
                 where: { ownerVrcUserId: acc.vrcUserId }
             });
@@ -190,7 +177,7 @@ export default class DispatchLogsCommand {
             }
         }
         if (choices.length === 0) {
-            const main = user.vrchatAccounts.find((acc: { verified: any; accountType: string; }) => acc.verified && acc.accountType === "MAIN");
+            const main = user.vrchatAccounts.find((acc: any) => acc.accountType === "MAIN");
             if (main) {
                 let username = main.vrcUserId;
                 try {

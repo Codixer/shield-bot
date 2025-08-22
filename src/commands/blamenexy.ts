@@ -8,7 +8,7 @@ export default class BlameNexyCommand {
     name: "blamenexy",
     description: "Blame Nexy for a VRChat issue.",
     contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel, InteractionContextType.BotDM],
-    integrationTypes: [ApplicationIntegrationType.UserInstall]
+    integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
   })
   async blamenexy(
     @SlashOption({

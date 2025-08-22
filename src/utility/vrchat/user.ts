@@ -224,3 +224,30 @@ export async function getCurrentUser() {
         throw e;
     }
 }
+
+/**
+ * Get VRChat account status for a Discord user
+ */
+export async function getVRChatAccountStatus(discordId: string) {
+    const { PrismaClient } = await import('@prisma/client');
+    const prisma = new PrismaClient();
+    
+    try {
+        const user = await prisma.user.findUnique({
+            where: { discordId },
+            include: { vrchatAccounts: true }
+        });
+
+        const boundAccounts = user?.vrchatAccounts || [];
+        const verifiedAccounts = boundAccounts.filter((acc: any) => acc.accountType === "MAIN" || acc.accountType === "ALT");
+
+        return {
+            hasBoundAccount: boundAccounts.length > 0,
+            hasVerifiedAccount: verifiedAccounts.length > 0,
+            boundAccounts,
+            verifiedAccounts
+        };
+    } finally {
+        await prisma.$disconnect();
+    }
+}

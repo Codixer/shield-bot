@@ -1,5 +1,5 @@
-import { alertScheduler } from "./alertScheduler.js";
 
 export function initializeSchedules() {
-    alertScheduler();
+    // No scheduled tasks to initialize
+    console.log("[SCHEDULES] No scheduled tasks to initialize.");
 }

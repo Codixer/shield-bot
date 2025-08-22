@@ -1,4 +1,61 @@
+import { prisma } from "../../../../main.js";
+import { updateUsernameCache } from "../../../../utility/vrchat/usernameCache.js";
+import { WhitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
+
+const whitelistManager = new WhitelistManager();
+
 export async function handleFriendUpdate(content: any) {
-    // TODO: Implement friend-update event handling
-    console.log("[Friend Update]", content);
+    try {
+        console.log("[Friend Update]", content);
+        
+        const { userId, user } = content;
+        
+        if (!userId || !user) {
+            console.warn("[Friend Update] Missing userId or user data");
+            return;
+        }
+
+        // Update username cache in verification system
+        const currentUsername = user.displayName || user.username;
+        if (currentUsername) {
+            try {
+                // Find VRChat account in verification system
+                const vrcAccount = await prisma.vRChatAccount.findFirst({
+                    where: { vrcUserId: userId },
+                    include: { user: true }
+                });
+
+                if (vrcAccount) {
+                    // Check if username actually changed
+                    const usernameChanged = vrcAccount.vrchatUsername !== currentUsername;
+                    
+                    // Update the username cache
+                    await prisma.vRChatAccount.update({
+                        where: { id: vrcAccount.id },
+                        data: {
+                            vrchatUsername: currentUsername,
+                            usernameUpdatedAt: new Date()
+                        }
+                    });
+                    
+                    console.log(`[Friend Update] Updated username for ${userId}: ${currentUsername}`);
+                    
+                    // If username changed, update whitelist gist
+                    if (usernameChanged) {
+                        try {
+                            await whitelistManager.updateGistWithWhitelist();
+                            console.log(`[Friend Update] Whitelist gist updated due to username change for ${userId}`);
+                        } catch (gistError) {
+                            console.warn(`[Friend Update] Failed to update whitelist gist for ${userId}:`, gistError);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(`[Friend Update] Error updating username cache for ${userId}:`, error);
+            }
+        }
+        
+    } catch (error) {
+        console.error("[Friend Update] Error processing friend update:", error);
+    }
 }

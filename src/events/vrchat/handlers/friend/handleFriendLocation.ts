@@ -1,11 +1,20 @@
 import { prisma } from "../../../../main.js";
 import { hasFriendLocationConsent } from "../../../../utility/vrchat.js";
+import { updateUsernameCache } from "../../../../utility/vrchat/usernameCache.js";
 
 export async function handleFriendLocation(content: any) {
     // Ignore if the location is "travelling"
     if (content.location === "travelling") {
         return;
     }
+    
+    // Update username cache for this user (if it's been a week or more)
+    if (content.userId) {
+        updateUsernameCache(content.userId).catch(e => 
+            console.warn(`[Friend Location] Username cache update failed for ${content.userId}:`, e)
+        );
+    }
+    
     // Check consent: only track if the user has allowed the sender to track them
     if (content.userId) {
         const consent = await hasFriendLocationConsent(content.userId);

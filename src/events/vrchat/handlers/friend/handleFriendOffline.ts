@@ -1,7 +1,15 @@
 import { prisma } from "../../../../main.js";
 import { hasFriendLocationConsent } from "../../../../utility/vrchat.js";
+import { updateUsernameCache } from "../../../../utility/vrchat/usernameCache.js";
 
 export async function handleFriendOffline(content: any) {
+    // Update username cache for this user (if it's been a week or more)
+    if (content.userId) {
+        updateUsernameCache(content.userId).catch(e => 
+            console.warn(`[Friend Offline] Username cache update failed for ${content.userId}:`, e)
+        );
+    }
+    
     // Upsert friend location event in the database as offline
 
     // Check if user has given consent for location tracking using utility method

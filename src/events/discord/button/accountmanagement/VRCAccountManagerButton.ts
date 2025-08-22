@@ -152,7 +152,7 @@ export class VRCAccountManagerButtonHandler {
         }
 
         // Filter to only verified accounts
-        const verifiedAccounts = user.vrchatAccounts.filter((acc: any) => acc.verified);
+        const verifiedAccounts = user.vrchatAccounts.filter((acc: any) => acc.accountType === "MAIN" || acc.accountType === "ALT");
         
         if (verifiedAccounts.length === 0) {
             await interaction.update({

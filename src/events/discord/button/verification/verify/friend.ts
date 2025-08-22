@@ -63,14 +63,38 @@ export class VRChatFriendVerifyButtonHandler {
             where: {
                 vrcUserId,
                 user: { discordId },
-                verified: true
+                accountType: { in: ["MAIN", "ALT"] }
             },
             include: { user: true }
         });
         if (vrcAccount) {
+            // Update username cache when checking verification status
+            const { getUserById } = await import("../../../../../utility/vrchat.js");
+            let vrchatUsername = vrcAccount.vrchatUsername;
+            try {
+                const userInfo = await getUserById(vrcUserId);
+                vrchatUsername = userInfo?.displayName || userInfo?.username;
+                
+                // Update username if it's different or if it's been more than a week
+                const oneWeekAgo = new Date();
+                oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+                
+                if (vrchatUsername !== vrcAccount.vrchatUsername || !vrcAccount.usernameUpdatedAt || vrcAccount.usernameUpdatedAt < oneWeekAgo) {
+                    await prisma.vRChatAccount.update({
+                        where: { id: vrcAccount.id },
+                        data: {
+                            vrchatUsername,
+                            usernameUpdatedAt: new Date()
+                        }
+                    });
+                }
+            } catch (e) {
+                console.warn(`Failed to fetch username for ${vrcUserId}:`, e);
+            }
+
             const embed = new EmbedBuilder()
                 .setTitle("Verification Successful")
-                .setDescription(`Your VRChat account (**${vrcUserId}**) has been successfully verified via friend request!`)
+                .setDescription(`Your VRChat account (**${vrchatUsername || vrcUserId}**) has been successfully verified via friend request!\n\n✅ Your account is now fully verified and protected from takeover.`)
                 .setColor(0x57F287);
             await interaction.update({
                 embeds: [embed],

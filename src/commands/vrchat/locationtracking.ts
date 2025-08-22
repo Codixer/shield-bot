@@ -9,7 +9,7 @@ import { getUserById } from "../../utility/vrchat.js";
   name: "vrchat",
   description: "VRChat related commands.",
   contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
-  integrationTypes: [ApplicationIntegrationType.UserInstall]
+  integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
 })
 @SlashGroup("vrchat")
 @Guard(VRChatLoginGuard)
@@ -39,7 +39,7 @@ export class VRChatLocationTrackingCommand {
             return;
         }
         // List all verified accounts
-        const verifiedAccounts = user.vrchatAccounts.filter((acc: { verified: any; }) => acc.verified);
+        const verifiedAccounts = user.vrchatAccounts.filter((acc: any) => acc.accountType === "MAIN" || acc.accountType === "ALT");
         if (verifiedAccounts.length === 0) {
             await interaction.reply({
                 content: "No verified VRChat accounts found for your Discord account.",
