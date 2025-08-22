@@ -278,9 +278,9 @@ export class WhitelistManager {
     const usersWithCurrentNames = [];
 
     for (const entry of entries) {
-      // Get all VRChat accounts for this user (MAIN, ALT, and UNVERIFIED)
+      // Get all VRChat accounts for this user (MAIN, ALT, UNVERIFIED, and IN_VERIFICATION)
       const validAccounts = entry.user.vrchatAccounts?.filter(acc => 
-        acc.accountType === 'MAIN' || acc.accountType === 'ALT' || acc.accountType === 'UNVERIFIED'
+        acc.accountType === 'MAIN' || acc.accountType === 'ALT' || acc.accountType === 'UNVERIFIED' || acc.accountType === 'IN_VERIFICATION'
       ) || [];
 
       if (validAccounts.length === 0) {
@@ -301,7 +301,30 @@ export class WhitelistManager {
 
       // Create an entry for each VRChat account
       for (const vrchatAccount of validAccounts) {
-        const vrchatUsername = vrchatAccount.vrchatUsername || vrchatAccount.vrcUserId || 'Unknown';
+        let vrchatUsername = vrchatAccount.vrchatUsername;
+        
+        // If we don't have a cached username or it's outdated, try to fetch from VRChat API
+        if (!vrchatUsername || vrchatUsername === vrchatAccount.vrcUserId) {
+          try {
+            const { getUserById } = await import('../../utility/vrchat.js');
+            const userInfo = await getUserById(vrchatAccount.vrcUserId);
+            vrchatUsername = userInfo?.displayName || userInfo?.username || vrchatAccount.vrcUserId;
+            
+            // Update the cached username in the database
+            if (vrchatUsername !== vrchatAccount.vrcUserId) {
+              await prisma.vRChatAccount.update({
+                where: { id: vrchatAccount.id },
+                data: { 
+                  vrchatUsername,
+                  usernameUpdatedAt: new Date()
+                }
+              });
+            }
+          } catch (error) {
+            console.warn(`Failed to fetch username for ${vrchatAccount.vrcUserId}:`, error);
+            vrchatUsername = vrchatAccount.vrcUserId; // Fallback to VRC user ID
+          }
+        }
         
         usersWithCurrentNames.push({
           discordId: entry.user.discordId,
@@ -572,11 +595,13 @@ export class WhitelistManager {
       return;
     }
 
-    // Check if user has unverified accounts
-    const hasUnverifiedAccount = user.vrchatAccounts.some(acc => acc.accountType === 'UNVERIFIED');
+    // Check if user has unverified or in-verification accounts
+    const hasUnverifiedOrInVerificationAccount = user.vrchatAccounts.some(acc => 
+      acc.accountType === 'UNVERIFIED' || acc.accountType === 'IN_VERIFICATION'
+    );
     
-    if (!hasUnverifiedAccount) {
-      return; // No unverified accounts
+    if (!hasUnverifiedOrInVerificationAccount) {
+      return; // No unverified or in-verification accounts
     }
 
     // Ensure user has whitelist entry for basic access
@@ -586,7 +611,7 @@ export class WhitelistManager {
       create: { userId: user.id }
     });
 
-    console.log(`[Whitelist] Granted basic access to unverified account for user ${discordId}`);
+    console.log(`[Whitelist] Granted basic access to unverified/in-verification account for user ${discordId}`);
   }
 
   /**
@@ -734,3 +759,6 @@ export class WhitelistManager {
     return results;
   }
 }
+
+// Export instance
+export const whitelistManager = new WhitelistManager();
