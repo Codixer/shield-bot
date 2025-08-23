@@ -124,9 +124,9 @@ export function startVRChatWebSocketListener() {
                     case "friend-offline":
                         await handleFriendOffline(content);
                         break;
-                    // case "friend-update":
-                    //     await handleFriendUpdate(content);
-                    //     break;
+                    case "friend-update":
+                        await handleFriendUpdate(content);
+                        break;
                     case "friend-location":
                         await handleFriendLocation(content);
                         break;
