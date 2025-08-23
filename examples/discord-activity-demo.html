@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System - Discord Activity Example</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #1e1e1e;
+            color: #ffffff;
+        }
+        .container {
+            background-color: #2f3136;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+        .status.success { background-color: #43b581; }
+        .status.error { background-color: #f04747; }
+        .status.warning { background-color: #faa61a; }
+        .status.info { background-color: #7289da; }
+        button {
+            background-color: #5865f2;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background-color: #4752c4; }
+        button:disabled { 
+            background-color: #2c2f33; 
+            cursor: not-allowed; 
+        }
+        .user-info {
+            background-color: #40444b;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .event-list {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #40444b;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .event-item {
+            background-color: #36393f;
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 4px;
+            border-left: 4px solid #5865f2;
+        }
+        pre {
+            background-color: #36393f;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛡️ Attendance System - Discord Activity Demo</h1>
+        <div id="status" class="status info">Initializing...</div>
+        
+        <div id="auth-section">
+            <h2>Authentication</h2>
+            <button id="auth-btn" onclick="authenticate()">Authenticate with Discord</button>
+            <button id="mock-auth-btn" onclick="useMockAuth()">Use Mock Auth (Development)</button>
+        </div>
+
+        <div id="user-section" style="display: none;">
+            <h2>User Information</h2>
+            <div id="user-info" class="user-info"></div>
+        </div>
+
+        <div id="api-section" style="display: none;">
+            <h2>API Actions</h2>
+            <button onclick="loadEvents()">Load Events</button>
+            <button onclick="createSampleEvent()">Create Sample Event</button>
+            <button onclick="getSquadTemplates()">Get Squad Templates</button>
+            <button onclick="testConnection()">Test API Connection</button>
+        </div>
+
+        <div id="events-section" style="display: none;">
+            <h2>Events</h2>
+            <div id="events-list" class="event-list"></div>
+        </div>
+
+        <div id="debug-section">
+            <h2>Debug Information</h2>
+            <pre id="debug-log"></pre>
+        </div>
+    </div>
+
+    <!-- Import the Discord SDK -->
+    <script src="https://sdk.discord.dev/embedded-sdk.min.js"></script>
+    
+    <script type="module">
+        // Configuration
+        const CONFIG = {
+            CLIENT_ID: '1369034090103439470', // Replace with your actual client ID
+            BASE_URL: window.location.origin // Adjust if your API is on a different domain
+        };
+
+        // Global state
+        let discordSdk = null;
+        let authWorkflow = null;
+        let apiClient = null;
+        let currentUser = null;
+        let debugLog = [];
+
+        // Utility functions
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            debugLog.push(`[${timestamp}] ${type.toUpperCase()}: ${message}`);
+            updateDebugLog();
+            console.log(message);
+        }
+
+        function updateDebugLog() {
+            document.getElementById('debug-log').textContent = debugLog.slice(-20).join('\n');
+        }
+
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            log(message, type);
+        }
+
+        function showSection(sectionId, show = true) {
+            document.getElementById(sectionId).style.display = show ? 'block' : 'none';
+        }
+
+        // Mock classes for development (these would normally be imported)
+        class AttendanceAPIError extends Error {
+            constructor(message, statusCode = 500, details) {
+                super(message);
+                this.statusCode = statusCode;
+                this.details = details;
+                this.name = 'AttendanceAPIError';
+            }
+        }
+
+        class DiscordAuthHelper {
+            constructor(baseUrl, clientId) {
+                this.baseUrl = baseUrl.replace(/\/$/, '');
+                this.clientId = clientId;
+            }
+
+            async exchangeCodeForToken(code) {
+                const endpoints = [
+                    '/api/v1/oauth/token',
+                    '/api/v1/auth/token', 
+                    '/api/v1/attendance/auth/token',
+                    '/api/oauth/token',
+                    '/api/discord/token'
+                ];
+
+                const requestBody = { code, client_id: this.clientId };
+
+                for (const endpoint of endpoints) {
+                    try {
+                        log(`Attempting token exchange at: ${endpoint}`);
+                        
+                        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(requestBody),
+                        });
+
+                        const data = await response.json();
+
+                        if (response.ok && data.access_token) {
+                            log(`Token exchange successful at: ${endpoint}`, 'success');
+                            return data;
+                        }
+
+                        log(`Token exchange failed at ${endpoint}: ${data.error}`);
+                    } catch (error) {
+                        log(`Token exchange error at ${endpoint}: ${error.message}`, 'error');
+                    }
+                }
+
+                throw new AttendanceAPIError('Failed to exchange authorization code');
+            }
+
+            async getCurrentUser(accessToken) {
+                const endpoints = ['/api/v1/oauth/user', '/api/v1/auth/user', '/api/discord/user'];
+
+                for (const endpoint of endpoints) {
+                    try {
+                        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+                            headers: { 'Authorization': `Bearer ${accessToken}` },
+                        });
+
+                        if (response.ok) {
+                            return await response.json();
+                        }
+                    } catch (error) {
+                        log(`Get user error at ${endpoint}: ${error.message}`, 'error');
+                    }
+                }
+
+                throw new AttendanceAPIError('Failed to get user information');
+            }
+        }
+
+        class AttendanceAPIClient {
+            constructor(baseUrl, discordToken) {
+                this.baseUrl = baseUrl.replace(/\/$/, '');
+                this.discordToken = discordToken;
+            }
+
+            async request(endpoint, options = {}) {
+                const url = `${this.baseUrl}/api/v1/attendance${endpoint}`;
+                
+                const response = await fetch(url, {
+                    ...options,
+                    headers: {
+                        'Authorization': `Bearer ${this.discordToken}`,
+                        'Content-Type': 'application/json',
+                        ...options.headers,
+                    },
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new AttendanceAPIError(data.error || 'API request failed', response.status, data.details);
+                }
+
+                return data;
+            }
+
+            async getEvents(params = {}) {
+                const query = new URLSearchParams();
+                Object.entries(params).forEach(([key, value]) => {
+                    if (value !== undefined) query.append(key, value.toString());
+                });
+
+                const endpoint = `/events${query.toString() ? `?${query.toString()}` : ''}`;
+                return this.request(endpoint);
+            }
+
+            async createEvent(data) {
+                return this.request('/events', {
+                    method: 'POST',
+                    body: JSON.stringify(data),
+                });
+            }
+
+            async getSquadTemplates() {
+                return this.request('/squads/templates');
+            }
+        }
+
+        class DiscordAuthWorkflow {
+            constructor(baseUrl, clientId) {
+                this.baseUrl = baseUrl;
+                this.clientId = clientId;
+                this.authHelper = new DiscordAuthHelper(baseUrl, clientId);
+            }
+
+            async authenticateDiscordActivity(discordSdk) {
+                try {
+                    log('Starting Discord Activity authentication...');
+                    
+                    const { code } = await discordSdk.commands.authorize({
+                        client_id: this.clientId,
+                        response_type: 'code',
+                        state: '',
+                        prompt: 'none',
+                        scope: ['identify', 'guilds.members.read'],
+                    });
+
+                    log('Received authorization code from Discord');
+
+                    const tokens = await this.authHelper.exchangeCodeForToken(code);
+                    log('Successfully exchanged code for access token', 'success');
+
+                    const user = await this.authHelper.getCurrentUser(tokens.access_token);
+                    log(`Retrieved user information: ${user.username}`, 'success');
+
+                    const client = new AttendanceAPIClient(this.baseUrl, tokens.access_token);
+
+                    return { client, user, tokens };
+                } catch (error) {
+                    log(`Discord Activity authentication failed: ${error.message}`, 'error');
+                    throw error;
+                }
+            }
+
+            createMockAuthentication() {
+                const mockToken = 'mock_access_token_' + Date.now();
+                const mockUser = {
+                    id: '123456789012345678',
+                    username: 'DemoUser',
+                    discriminator: '0001',
+                    global_name: 'Demo User'
+                };
+
+                const client = new AttendanceAPIClient(this.baseUrl, mockToken);
+                
+                return { client, user: mockUser };
+            }
+        }
+
+        // Main functions
+        async function initialize() {
+            try {
+                updateStatus('Initializing Discord SDK...');
+                
+                // Initialize Discord SDK
+                discordSdk = new window.DiscordSDK(CONFIG.CLIENT_ID);
+                await discordSdk.ready();
+                
+                // Initialize auth workflow
+                authWorkflow = new DiscordAuthWorkflow(CONFIG.BASE_URL, CONFIG.CLIENT_ID);
+                
+                updateStatus('Ready for authentication', 'success');
+                log(`SDK initialized for client ID: ${CONFIG.CLIENT_ID}`);
+                
+            } catch (error) {
+                updateStatus('Failed to initialize Discord SDK', 'error');
+                log(`Initialization error: ${error.message}`, 'error');
+                
+                // Enable mock auth as fallback
+                document.getElementById('mock-auth-btn').style.display = 'inline-block';
+            }
+        }
+
+        async function authenticate() {
+            try {
+                updateStatus('Authenticating...', 'info');
+                document.getElementById('auth-btn').disabled = true;
+                
+                const result = await authWorkflow.authenticateDiscordActivity(discordSdk);
+                
+                apiClient = result.client;
+                currentUser = result.user;
+                
+                updateStatus(`Authenticated as ${currentUser.username}`, 'success');
+                updateUserInfo(currentUser);
+                
+                showSection('user-section');
+                showSection('api-section');
+                
+            } catch (error) {
+                updateStatus(`Authentication failed: ${error.message}`, 'error');
+                log(`Authentication error: ${error.message}`, 'error');
+            } finally {
+                document.getElementById('auth-btn').disabled = false;
+            }
+        }
+
+        async function useMockAuth() {
+            try {
+                updateStatus('Using mock authentication...', 'warning');
+                
+                if (!authWorkflow) {
+                    authWorkflow = new DiscordAuthWorkflow(CONFIG.BASE_URL, CONFIG.CLIENT_ID);
+                }
+                
+                const result = authWorkflow.createMockAuthentication();
+                
+                apiClient = result.client;
+                currentUser = result.user;
+                
+                updateStatus(`Mock authenticated as ${currentUser.username}`, 'warning');
+                updateUserInfo(currentUser);
+                
+                showSection('user-section');
+                showSection('api-section');
+                
+            } catch (error) {
+                updateStatus(`Mock authentication failed: ${error.message}`, 'error');
+            }
+        }
+
+        function updateUserInfo(user) {
+            const userInfoEl = document.getElementById('user-info');
+            userInfoEl.innerHTML = `
+                <h3>${user.global_name || user.username}</h3>
+                <p><strong>Username:</strong> ${user.username}${user.discriminator ? `#${user.discriminator}` : ''}</p>
+                <p><strong>User ID:</strong> ${user.id}</p>
+                ${user.avatar ? `<p><strong>Avatar:</strong> ${user.avatar}</p>` : ''}
+            `;
+        }
+
+        // API Functions
+        async function loadEvents() {
+            try {
+                updateStatus('Loading events...', 'info');
+                
+                const response = await apiClient.getEvents({ limit: 10 });
+                
+                updateStatus(`Loaded ${response.data.length} events`, 'success');
+                displayEvents(response.data);
+                showSection('events-section');
+                
+            } catch (error) {
+                updateStatus(`Failed to load events: ${error.message}`, 'error');
+                log(`Load events error: ${error.message}`, 'error');
+            }
+        }
+
+        async function createSampleEvent() {
+            try {
+                updateStatus('Creating sample event...', 'info');
+                
+                const tomorrow = new Date();
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                tomorrow.setHours(14, 0, 0, 0);
+                
+                const eventData = {
+                    date: tomorrow.toISOString(),
+                    hostDiscordId: currentUser.id
+                };
+                
+                const response = await apiClient.createEvent(eventData);
+                
+                updateStatus('Sample event created successfully', 'success');
+                log(`Created event with ID: ${response.data.id}`, 'success');
+                
+                // Refresh events list
+                await loadEvents();
+                
+            } catch (error) {
+                updateStatus(`Failed to create event: ${error.message}`, 'error');
+                log(`Create event error: ${error.message}`, 'error');
+            }
+        }
+
+        async function getSquadTemplates() {
+            try {
+                updateStatus('Loading squad templates...', 'info');
+                
+                const response = await apiClient.getSquadTemplates();
+                
+                updateStatus(`Loaded ${response.data.length} squad templates`, 'success');
+                log(`Squad templates: ${JSON.stringify(response.data)}`, 'info');
+                
+            } catch (error) {
+                updateStatus(`Failed to load squad templates: ${error.message}`, 'error');
+                log(`Squad templates error: ${error.message}`, 'error');
+            }
+        }
+
+        async function testConnection() {
+            try {
+                updateStatus('Testing API connection...', 'info');
+                
+                // Test by getting events with a very small limit
+                const response = await apiClient.getEvents({ limit: 1 });
+                
+                updateStatus('API connection test successful', 'success');
+                log('API connection test passed', 'success');
+                
+            } catch (error) {
+                updateStatus(`API connection test failed: ${error.message}`, 'error');
+                log(`Connection test error: ${error.message}`, 'error');
+            }
+        }
+
+        function displayEvents(events) {
+            const eventsListEl = document.getElementById('events-list');
+            
+            if (events.length === 0) {
+                eventsListEl.innerHTML = '<p>No events found</p>';
+                return;
+            }
+            
+            eventsListEl.innerHTML = events.map(event => `
+                <div class="event-item">
+                    <h4>Event #${event.id}</h4>
+                    <p><strong>Date:</strong> ${new Date(event.date).toLocaleString()}</p>
+                    <p><strong>Host:</strong> ${event.host ? event.host.discordId : 'None'}</p>
+                    <p><strong>Squads:</strong> ${event._count?.squads || 0}</p>
+                    <p><strong>Staff:</strong> ${event._count?.staff || 0}</p>
+                </div>
+            `).join('');
+        }
+
+        // Global functions for button clicks
+        window.authenticate = authenticate;
+        window.useMockAuth = useMockAuth;
+        window.loadEvents = loadEvents;
+        window.createSampleEvent = createSampleEvent;
+        window.getSquadTemplates = getSquadTemplates;
+        window.testConnection = testConnection;
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', initialize);
+    </script>
+</body>
+</html>
