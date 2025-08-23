@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SHIELD Attendance Tracker</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --discord-bg: #36393f;
+            --discord-bg-secondary: #2f3136;
+            --discord-bg-tertiary: #202225;
+            --discord-text: #dcddde;
+            --discord-text-muted: #72767d;
+            --discord-accent: #5865f2;
+            --discord-success: #3ba55c;
+            --discord-warning: #faa61a;
+            --discord-error: #ed4245;
+            --discord-border: #40444b;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--discord-bg);
+            color: var(--discord-text);
+            padding: 16px;
+            min-height: 100vh;
+            line-height: 1.4;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+            padding: 20px;
+            background: var(--discord-bg-secondary);
+            border-radius: 8px;
+            border: 1px solid var(--discord-border);
+        }
+
+        .header h1 {
+            color: var(--discord-accent);
+            margin-bottom: 8px;
+            font-size: 24px;
+        }
+
+        .status {
+            color: var(--discord-text-muted);
+            font-size: 14px;
+        }
+
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .control-panel {
+            background: var(--discord-bg-secondary);
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--discord-border);
+        }
+
+        .control-panel h3 {
+            color: var(--discord-accent);
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--discord-text-muted);
+            text-transform: uppercase;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 8px 12px;
+            background: var(--discord-bg-tertiary);
+            border: 1px solid var(--discord-border);
+            border-radius: 4px;
+            color: var(--discord-text);
+            font-size: 14px;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: var(--discord-accent);
+        }
+
+        button {
+            background: var(--discord-accent);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            width: 100%;
+            margin-top: 8px;
+        }
+
+        button:hover {
+            background: #4752c4;
+        }
+
+        button:disabled {
+            background: var(--discord-text-muted);
+            cursor: not-allowed;
+        }
+
+        .summary {
+            background: var(--discord-bg-secondary);
+            padding: 16px;
+            border-radius: 8px;
+            border: 1px solid var(--discord-border);
+        }
+
+        .summary h3 {
+            color: var(--discord-accent);
+            margin-bottom: 16px;
+            font-size: 18px;
+        }
+
+        .squad {
+            margin-bottom: 20px;
+            background: var(--discord-bg-tertiary);
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 4px solid var(--discord-accent);
+        }
+
+        .squad-header {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--discord-accent);
+        }
+
+        .member {
+            padding: 4px 0;
+            font-size: 14px;
+            border-bottom: 1px solid var(--discord-border);
+        }
+
+        .member:last-child {
+            border-bottom: none;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-left: 8px;
+        }
+
+        .badge.lead {
+            background: var(--discord-warning);
+            color: var(--discord-bg);
+        }
+
+        .badge.late {
+            background: var(--discord-error);
+            color: white;
+        }
+
+        .badge.split {
+            background: var(--discord-text-muted);
+            color: white;
+        }
+
+        .error {
+            background: var(--discord-error);
+            color: white;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+        }
+
+        .success {
+            background: var(--discord-success);
+            color: white;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--discord-text-muted);
+        }
+
+        .event-info {
+            background: var(--discord-bg-tertiary);
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+        }
+
+        .event-info div {
+            margin-bottom: 4px;
+        }
+
+        .event-info strong {
+            color: var(--discord-accent);
+        }
+
+        .formatted-output {
+            background: var(--discord-bg-tertiary);
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            white-space: pre-line;
+            margin-top: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        @media (max-width: 768px) {
+            .controls {
+                grid-template-columns: 1fr;
+            }
+            
+            body {
+                padding: 8px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🛡️ SHIELD Attendance Tracker</h1>
+            <div class="status" id="status">Loading...</div>
+        </div>
+
+        <div id="error-container"></div>
+        <div id="success-container"></div>
+
+        <div id="loading" class="loading">
+            <div>Connecting to Discord...</div>
+        </div>
+
+        <div id="main-content" style="display: none;">
+            <div class="controls">
+                <!-- Member Management -->
+                <div class="control-panel">
+                    <h3>👥 Member Management</h3>
+                    <div class="form-group">
+                        <label>User ID</label>
+                        <input type="text" id="targetUserId" placeholder="Enter Discord User ID">
+                    </div>
+                    <div class="form-group">
+                        <label>Squad</label>
+                        <select id="squadSelect">
+                            <option value="">Select Squad...</option>
+                        </select>
+                    </div>
+                    <button onclick="addMember()">Add to Squad</button>
+                    <button onclick="moveMember()">Move to Squad</button>
+                    <button onclick="removeMember()">Remove from Event</button>
+                </div>
+
+                <!-- Special Actions -->
+                <div class="control-panel">
+                    <h3>⭐ Special Actions</h3>
+                    <div class="form-group">
+                        <label>Target User ID</label>
+                        <input type="text" id="specialTargetUserId" placeholder="Enter Discord User ID">
+                    </div>
+                    <div class="form-group">
+                        <label>Late Note (optional)</label>
+                        <input type="text" id="lateNote" placeholder="e.g., 'at 10:15'">
+                    </div>
+                    <button onclick="markAsLead()">Mark as Lead</button>
+                    <button onclick="markAsLate()">Mark as Late</button>
+                    <button onclick="addAsStaff()">Add as Staff</button>
+                    <button onclick="setAsCohost()">Set as Co-Host</button>
+                </div>
+
+                <!-- Output -->
+                <div class="control-panel">
+                    <h3>📋 Export</h3>
+                    <button onclick="refreshSummary()">Refresh Summary</button>
+                    <button onclick="copyFormattedText()">Copy Formatted Text</button>
+                </div>
+            </div>
+
+            <div class="summary">
+                <h3>📊 Event Summary</h3>
+                <div id="event-summary">
+                    <div class="loading">No event data available</div>
+                </div>
+                <div id="formatted-text" class="formatted-output" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/activity.js"></script>
+</body>
+</html>

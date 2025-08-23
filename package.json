@@ -10,9 +10,12 @@
   },
   "scripts": {
     "build": "tsc -p ./tsconfig.json",
+    "build:activity": "esbuild src/activity/index.ts --bundle --outfile=public/activity.js --format=esm --sourcemap --external:@discord/embedded-app-sdk",
     "build:prod": "tsc -p ./tsconfig.json",
+    "build:all": "npm run build && npm run build:activity",
     "build:changelog": "npx @discordx/changelog --src src",
     "dev": "ts-node-esm src/main.ts",
+    "dev:activity": "esbuild src/activity/index.ts --bundle --outfile=public/activity.js --format=esm --sourcemap --watch --external:@discord/embedded-app-sdk",
     "start": "ENV=development node build/main.js",
     "start:prod": "node build/main.js",
     "watch": "nodemon --exec ts-node-esm src/main.ts",

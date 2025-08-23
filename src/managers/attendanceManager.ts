@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import type { CommandInteraction } from "discord.js";
+import fetch from 'node-fetch';
 
 const prisma = new PrismaClient();
 
@@ -152,5 +153,180 @@ export class AttendanceManager {
     await prisma.attendanceStaff.deleteMany({ where: { eventId } });
     // Optionally, delete the event itself (uncomment if desired)
     await prisma.attendanceEvent.delete({ where: { id: eventId } });
+  }
+
+  // Discord Activity Integration Methods
+
+  /**
+   * Create a new attendance event linked to a Discord Activity instance
+   */
+  async createActivityEvent(discordInstanceId: string, discordUserId: string) {
+    const today = new Date();
+    
+    // Find or create the user by Discord ID
+    const user = await this.findOrCreateUserByDiscordId(discordUserId);
+    
+    // Create the event
+    const event = await prisma.attendanceEvent.create({
+      data: {
+        date: today,
+        hostId: user.id,
+      },
+    });
+
+    // Create the activity mapping
+    await prisma.activityAttendanceMapping.create({
+      data: {
+        discordInstanceId,
+        attendanceEventId: event.id,
+      },
+    });
+
+    return event;
+  }
+
+  /**
+   * Get the active event for a Discord Activity instance
+   */
+  async getActiveEventByInstanceId(discordInstanceId: string) {
+    const mapping = await prisma.activityAttendanceMapping.findUnique({
+      where: { discordInstanceId },
+      include: { attendanceEvent: true },
+    });
+    
+    return mapping?.attendanceEvent || null;
+  }
+
+  /**
+   * Add user to squad by Discord Activity instance
+   */
+  async addUserToSquadByInstance(discordInstanceId: string, discordUserId: string, squadName: string) {
+    const event = await this.getActiveEventByInstanceId(discordInstanceId);
+    if (!event) {
+      throw new Error("No active event found for this activity instance");
+    }
+    
+    const dbUser = await this.findOrCreateUserByDiscordId(discordUserId);
+    return await this.addUserToSquad(event.id, dbUser.id, squadName);
+  }
+
+  /**
+   * Remove user from event by Discord Activity instance
+   */
+  async removeUserFromEventByInstance(discordInstanceId: string, discordUserId: string) {
+    const event = await this.getActiveEventByInstanceId(discordInstanceId);
+    if (!event) {
+      throw new Error("No active event found for this activity instance");
+    }
+    
+    const dbUser = await this.findOrCreateUserByDiscordId(discordUserId);
+    return await this.removeUserFromEvent(event.id, dbUser.id);
+  }
+
+  /**
+   * Move user to squad by Discord Activity instance
+   */
+  async moveUserToSquadByInstance(discordInstanceId: string, discordUserId: string, squadName: string) {
+    const event = await this.getActiveEventByInstanceId(discordInstanceId);
+    if (!event) {
+      throw new Error("No active event found for this activity instance");
+    }
+    
+    const dbUser = await this.findOrCreateUserByDiscordId(discordUserId);
+    return await this.moveUserToSquad(event.id, dbUser.id, squadName);
+  }
+
+  /**
+   * Mark user as lead by Discord Activity instance
+   */
+  async markUserAsLeadByInstance(discordInstanceId: string, discordUserId: string) {
+    const event = await this.getActiveEventByInstanceId(discordInstanceId);
+    if (!event) {
+      throw new Error("No active event found for this activity instance");
+    }
+    
+    const dbUser = await this.findOrCreateUserByDiscordId(discordUserId);
+    return await this.markUserAsLead(event.id, dbUser.id);
+  }
+
+  /**
+   * Mark user as late by Discord Activity instance
+   */
+  async markUserAsLateByInstance(discordInstanceId: string, discordUserId: string, note?: string) {
+    const event = await this.getActiveEventByInstanceId(discordInstanceId);
+    if (!event) {
+      throw new Error("No active event found for this activity instance");
+    }
+    
+    const dbUser = await this.findOrCreateUserByDiscordId(discordUserId);
+    return await this.markUserAsLate(event.id, dbUser.id, note);
+  }
+
+  /**
+   * Split user to squad by Discord Activity instance
+   */
+  async markUserAsSplitByInstance(discordInstanceId: string, discordUserId: string, newSquadName: string, splitFrom: string) {
+    const event = await this.getActiveEventByInstanceId(discordInstanceId);
+    if (!event) {
+      throw new Error("No active event found for this activity instance");
+    }
+    
+    const dbUser = await this.findOrCreateUserByDiscordId(discordUserId);
+    return await this.markUserAsSplit(event.id, dbUser.id, newSquadName, splitFrom);
+  }
+
+  /**
+   * Add staff by Discord Activity instance
+   */
+  async addStaffByInstance(discordInstanceId: string, discordUserId: string) {
+    const event = await this.getActiveEventByInstanceId(discordInstanceId);
+    if (!event) {
+      throw new Error("No active event found for this activity instance");
+    }
+    
+    const dbUser = await this.findOrCreateUserByDiscordId(discordUserId);
+    return await this.addStaff(event.id, dbUser.id);
+  }
+
+  /**
+   * Set cohost by Discord Activity instance
+   */
+  async setCohostByInstance(discordInstanceId: string, discordUserId: string) {
+    const event = await this.getActiveEventByInstanceId(discordInstanceId);
+    if (!event) {
+      throw new Error("No active event found for this activity instance");
+    }
+    
+    const dbUser = await this.findOrCreateUserByDiscordId(discordUserId);
+    return await this.setCohost(event.id, dbUser.id);
+  }
+
+  /**
+   * Get event summary by Discord Activity instance
+   */
+  async getEventSummaryByInstance(discordInstanceId: string) {
+    const event = await this.getActiveEventByInstanceId(discordInstanceId);
+    if (!event) {
+      return null;
+    }
+    
+    return await this.getEventSummary(event.id);
+  }
+
+  /**
+   * Validate Discord access token and return user information
+   */
+  async validateDiscordToken(accessToken: string) {
+    const response = await fetch('https://discord.com/api/users/@me', {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error('Invalid Discord access token');
+    }
+
+    return await response.json();
   }
 }

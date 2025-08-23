@@ -10,6 +10,7 @@ model AttendanceEvent {
   host                   User?                   @relation("HostAttendanceEvent", fields: [hostId], references: [id])
   staff                  AttendanceStaff[]
   squads                 Squad[]
+  activityMapping        ActivityAttendanceMapping?
 
   @@index([cohostId], map: "AttendanceEvent_cohostId_fkey")
   @@index([hostId], map: "AttendanceEvent_hostId_fkey")

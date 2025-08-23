@@ -9,4 +9,10 @@ export class Home {
     const file = readFileSync("public/index.html", "utf-8");
     context.body = file;
   }
+
+  @Get("/activity")
+  async activity(context: Context) {
+    const file = readFileSync("public/activity.html", "utf-8");
+    context.body = file;
+  }
 }

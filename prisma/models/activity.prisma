@@ -1,0 +1,11 @@
+model ActivityAttendanceMapping {
+  id                Int             @id @default(autoincrement())
+  discordInstanceId String          @unique
+  attendanceEventId Int             @unique
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  attendanceEvent   AttendanceEvent @relation(fields: [attendanceEventId], references: [id], onDelete: Cascade)
+  
+  @@map("activity_attendance_mappings")
+}
