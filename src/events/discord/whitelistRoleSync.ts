@@ -71,37 +71,17 @@ export class WhitelistRoleSync {
 
       console.log(`[Whitelist] Whitelist role changes detected for ${newMember.displayName} - Current: [${currentRolesSorted.join(', ')}], Expected: [${expectedRolesSorted.join(', ')}]`);
       
-      let whitelistChanged = false;
+      // Sync user roles (this handles both granting and removing access based on current roles)
+      await whitelistManager.syncUserRolesFromDiscord(newMember.id, newRoleIds);
       
-      if (shouldBeWhitelisted) {
-        console.log(`[Whitelist] Syncing roles for ${newMember.displayName} (${newMember.id}) - Discord Roles: [${newRoleIds.join(', ')}]`);
-        await whitelistManager.syncUserRolesFromDiscord(newMember.id, newRoleIds);
-        whitelistChanged = true;
-      } else {
-        // Even if no Discord roles qualify, ensure unverified accounts get basic access
-        await whitelistManager.ensureUnverifiedAccountAccess(newMember.id);
-        
-        // Only remove from whitelist if they have no VRChat accounts at all
-        const hasAnyVRChatAccount = await this.hasVRChatAccount(newMember.id);
-        if (!hasAnyVRChatAccount) {
-          console.log(`[Whitelist] Removing ${newMember.displayName} from whitelist (no VRChat accounts)`);
-          await whitelistManager.removeUserFromWhitelistIfNoRoles(newMember.id);
-          whitelistChanged = true;
-        } else {
-          console.log(`[Whitelist] User ${newMember.displayName} has VRChat accounts but no qualifying Discord roles - basic access maintained`);
-        }
-      }
-
       console.log(`[Whitelist] Successfully updated whitelist for ${newMember.displayName}`);
       
-      // Update GitHub Gist if whitelist changed
-      if (whitelistChanged) {
-        try {
-          await whitelistManager.updateGistWithWhitelist();
-          console.log(`[Whitelist] GitHub Gist updated after role change for ${newMember.displayName}`);
-        } catch (gistError) {
-          console.warn(`[Whitelist] Failed to update GitHub Gist after role change for ${newMember.displayName}:`, gistError);
-        }
+      // Update GitHub Gist after role changes
+      try {
+        await whitelistManager.updateGistWithWhitelist();
+        console.log(`[Whitelist] GitHub Gist updated after role change for ${newMember.displayName}`);
+      } catch (gistError) {
+        console.warn(`[Whitelist] Failed to update GitHub Gist after role change for ${newMember.displayName}:`, gistError);
       }
     } catch (error) {
       console.error(`[Whitelist] Error syncing roles for ${newMember.displayName}:`, error);
@@ -122,67 +102,29 @@ export class WhitelistRoleSync {
         return;
       }
 
-      // Get current whitelist roles for this user (should be empty for new members)
-      const currentUser = await whitelistManager.getUserByDiscordId(member.id);
-      const currentWhitelistRoles = currentUser?.whitelistEntry?.roleAssignments?.map((assignment: any) => assignment.role.name) || [];
+      // Sync their roles (this will grant access if they have qualifying roles)
+      await whitelistManager.syncUserRolesFromDiscord(member.id, roleIds);
       
-      // Check what whitelist roles they should have based on their Discord roles
-      const shouldBeWhitelisted = await whitelistManager.shouldUserBeWhitelisted(roleIds);
-      const expectedWhitelistRoles: string[] = [];
+      console.log(`[Whitelist] Successfully processed new member ${member.displayName}`);
       
-      if (shouldBeWhitelisted) {
-        // Get the roles they should have based on Discord role mappings
-        const roleMappings = await whitelistManager.getDiscordRoleMappings();
-        for (const mapping of roleMappings) {
-          if (roleIds.includes(mapping.discordRoleId)) {
-            expectedWhitelistRoles.push(mapping.name);
-          }
-        }
-      }
-
-      // Compare current whitelist roles with expected roles
-      const currentRolesSorted = [...currentWhitelistRoles].sort();
-      const expectedRolesSorted = [...expectedWhitelistRoles].sort();
-      
-      if (JSON.stringify(currentRolesSorted) === JSON.stringify(expectedRolesSorted)) {
-        console.log(`[Whitelist] No whitelist changes needed for new member ${member.displayName} - Current: [${currentRolesSorted.join(', ')}], Expected: [${expectedRolesSorted.join(', ')}]`);
-        return; // No whitelist changes needed
-      }
-
-      console.log(`[Whitelist] Whitelist setup needed for new member ${member.displayName} - Expected: [${expectedRolesSorted.join(', ')}]`);
-      
-      let whitelistChanged = false;
-      
-      if (shouldBeWhitelisted) {
-        console.log(`[Whitelist] Adding new member ${member.displayName} to whitelist with roles: [${roleIds.join(', ')}]`);
-        await whitelistManager.syncUserRolesFromDiscord(member.id, roleIds);
-        whitelistChanged = true;
-      } else {
-        // Even if no Discord roles qualify, ensure unverified accounts get basic access
-        await whitelistManager.ensureUnverifiedAccountAccess(member.id);
-        console.log(`[Whitelist] New member ${member.displayName} granted basic access for VRChat accounts`);
-      }
-      
-      // Update GitHub Gist if whitelist changed
-      if (whitelistChanged) {
-        try {
-          await whitelistManager.updateGistWithWhitelist();
-          console.log(`[Whitelist] GitHub Gist updated after new member ${member.displayName} joined`);
-        } catch (gistError) {
-          console.warn(`[Whitelist] Failed to update GitHub Gist after new member ${member.displayName} joined:`, gistError);
-        }
+      // Update GitHub Gist after adding new member
+      try {
+        await whitelistManager.updateGistWithWhitelist();
+        console.log(`[Whitelist] GitHub Gist updated after new member ${member.displayName} joined`);
+      } catch (gistError) {
+        console.warn(`[Whitelist] Failed to update GitHub Gist after new member ${member.displayName} joined:`, gistError);
       }
     } catch (error) {
       console.error(`[Whitelist] Error processing new member ${member.displayName}:`, error);
     }
-  }
-
-  @On({ event: "guildMemberRemove" })
+  }  @On({ event: "guildMemberRemove" })
   async onGuildMemberRemove([member]: ArgsOf<"guildMemberRemove">): Promise<void> {
     try {
       // Use displayName or fallback to user info
       const memberName = member.displayName || member.user?.displayName || member.user?.username || member.id;
-      console.log(`[Whitelist] Removing ${memberName} from whitelist (left server)`);
+      console.log(`[Whitelist] Member ${memberName} left/kicked/banned - removing from whitelist`);
+      
+      // Always remove from whitelist when they leave the server (includes kicks/bans)
       await whitelistManager.removeUserFromWhitelistIfNoRoles(member.id);
       
       // Update GitHub Gist after removing user
@@ -195,6 +137,29 @@ export class WhitelistRoleSync {
     } catch (error) {
       const memberName = member.displayName || member.user?.displayName || member.user?.username || member.id;
       console.error(`[Whitelist] Error removing member ${memberName} from whitelist:`, error);
+    }
+  }
+
+  @On({ event: "guildBanAdd" })
+  async onGuildBanAdd([ban]: ArgsOf<"guildBanAdd">): Promise<void> {
+    try {
+      const user = ban.user;
+      const userName = user.displayName || user.username || user.id;
+      console.log(`[Whitelist] User ${userName} was banned - ensuring removal from whitelist`);
+      
+      // Ensure banned user is removed from whitelist
+      await whitelistManager.removeUserFromWhitelistIfNoRoles(user.id);
+      
+      // Update GitHub Gist after removing banned user
+      try {
+        await whitelistManager.updateGistWithWhitelist();
+        console.log(`[Whitelist] GitHub Gist updated after ${userName} was banned`);
+      } catch (gistError) {
+        console.warn(`[Whitelist] Failed to update GitHub Gist after ${userName} was banned:`, gistError);
+      }
+    } catch (error) {
+      const userName = ban.user?.displayName || ban.user?.username || ban.user?.id || 'Unknown';
+      console.error(`[Whitelist] Error removing banned user ${userName} from whitelist:`, error);
     }
   }
 

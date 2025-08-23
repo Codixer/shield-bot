@@ -150,18 +150,36 @@ export class WhitelistCommands {
             member.roles.cache.has(discordRole.id)
           );
           
+          console.log(`[Whitelist] Revalidating access for ${membersWithRole.size} members after removing role mapping for ${discordRole.name}`);
+          
+          let accessUpdated = 0;
+          let errors = 0;
+          
           for (const [, member] of membersWithRole) {
             try {
               const roleIds = member.roles.cache.map(role => role.id);
-              if (await whitelistManager.shouldUserBeWhitelisted(roleIds)) {
-                await whitelistManager.syncUserRolesFromDiscord(member.id, roleIds);
-              } else {
-                await whitelistManager.removeUserFromWhitelistIfNoRoles(member.id);
+              
+              // Get their current whitelist status
+              const userBefore = await whitelistManager.getUserByDiscordId(member.id);
+              const hadAccessBefore = !!userBefore?.whitelistEntry;
+              
+              // Sync their roles (this will remove access if they no longer qualify)
+              await whitelistManager.syncUserRolesFromDiscord(member.id, roleIds);
+              
+              // Check their status after sync
+              const userAfter = await whitelistManager.getUserByDiscordId(member.id);
+              const hasAccessAfter = !!userAfter?.whitelistEntry;
+              
+              if (hadAccessBefore !== hasAccessAfter) {
+                accessUpdated++;
               }
             } catch (error) {
-              console.error(`[Whitelist] Error resyncing ${member.displayName}:`, error);
+              console.error(`[Whitelist] Error revalidating access for ${member.displayName}:`, error);
+              errors++;
             }
           }
+          
+          console.log(`[Whitelist] Role removal revalidation complete: ${accessUpdated} access changed, ${errors} errors`);
         }
       } else {
         await interaction.reply({ 
@@ -568,6 +586,137 @@ export class WhitelistCommands {
     } catch (error: any) {
       await interaction.editReply({ 
         content: `❌ Failed to update gist: ${error.message}`
+      });
+    }
+  }
+
+  @Slash({ description: "Validate and cleanup whitelist access for all server members" })
+  async validateaccess(
+    @SlashOption({
+      description: "Specific user to validate (optional)",
+      name: "user",
+      required: false,
+      type: ApplicationCommandOptionType.User,
+    })
+    user: any,
+    interaction: CommandInteraction
+  ): Promise<void> {
+    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
+      await interaction.reply({ content: "You don't have permission to manage the whitelist.", ephemeral: true });
+      return;
+    }
+
+    try {
+      await interaction.deferReply();
+      
+      const guild = interaction.guild;
+      if (!guild) {
+        await interaction.editReply({ content: "❌ This command can only be used in a server." });
+        return;
+      }
+
+      if (user) {
+        // Validate specific user
+        const member = await guild.members.fetch(user.id).catch(() => null);
+        if (!member) {
+          await interaction.editReply({ content: "❌ User not found in this server." });
+          return;
+        }
+        
+        const roleIds = member.roles.cache.map(role => role.id);
+        
+        // Get their current whitelist status
+        const userBefore = await whitelistManager.getUserByDiscordId(user.id);
+        const hadAccessBefore = !!userBefore?.whitelistEntry;
+        
+        // Sync their roles (this will add/remove access as needed)
+        await whitelistManager.syncUserRolesFromDiscord(user.id, roleIds);
+        
+        // Check their status after sync
+        const userAfter = await whitelistManager.getUserByDiscordId(user.id);
+        const hasAccessAfter = !!userAfter?.whitelistEntry;
+        const rolesAfter = userAfter?.whitelistEntry?.roleAssignments?.map(a => a.role.name) || [];
+        
+        const embed = new EmbedBuilder()
+          .setTitle("✅ User Access Validation Complete")
+          .setColor(hasAccessAfter ? 0x00ff00 : 0xff0000)
+          .addFields(
+            { name: "User", value: `<@${user.id}>`, inline: true },
+            { name: "Has Access", value: hasAccessAfter ? "✅ Yes" : "❌ No", inline: true },
+            { name: "Changes Made", value: hadAccessBefore !== hasAccessAfter ? "✅ Yes" : "❌ No", inline: true }
+          )
+          .setTimestamp();
+
+        if (hasAccessAfter) {
+          embed.addFields({ name: "Current Roles", value: rolesAfter.join(', ') || 'None', inline: false });
+        }
+
+        await interaction.editReply({ embeds: [embed] });
+      } else {
+        // Validate all members
+        const members = await guild.members.fetch();
+        let validated = 0;
+        let accessGranted = 0;
+        let accessRevoked = 0;
+        let errors = 0;
+
+        for (const [, member] of members) {
+          try {
+            const roleIds = member.roles.cache.map(role => role.id);
+            
+            // Get their current whitelist status
+            const userBefore = await whitelistManager.getUserByDiscordId(member.id);
+            const hadAccessBefore = !!userBefore?.whitelistEntry;
+            
+            // Sync their roles
+            await whitelistManager.syncUserRolesFromDiscord(member.id, roleIds);
+            
+            // Check their status after sync
+            const userAfter = await whitelistManager.getUserByDiscordId(member.id);
+            const hasAccessAfter = !!userAfter?.whitelistEntry;
+            
+            validated++;
+            
+            if (hadAccessBefore !== hasAccessAfter) {
+              if (hasAccessAfter) {
+                accessGranted++;
+              } else {
+                accessRevoked++;
+              }
+            }
+          } catch (error) {
+            console.error(`[Whitelist] Error validating access for ${member.displayName}:`, error);
+            errors++;
+          }
+        }
+        
+        const embed = new EmbedBuilder()
+          .setTitle("✅ Bulk Access Validation Complete")
+          .setColor(0x00ff00)
+          .addFields(
+            { name: "Users Validated", value: validated.toString(), inline: true },
+            { name: "Access Granted", value: accessGranted.toString(), inline: true },
+            { name: "Access Revoked", value: accessRevoked.toString(), inline: true },
+            { name: "Errors", value: errors.toString(), inline: true }
+          )
+          .setDescription(`Validated whitelist access for ${validated} server members.`)
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+        
+        // Update GitHub Gist if any changes were made
+        if (accessGranted > 0 || accessRevoked > 0) {
+          try {
+            await whitelistManager.updateGistWithWhitelist();
+            console.log(`[Whitelist] GitHub Gist updated after bulk validation`);
+          } catch (gistError) {
+            console.warn(`[Whitelist] Failed to update GitHub Gist after bulk validation:`, gistError);
+          }
+        }
+      }
+    } catch (error: any) {
+      await interaction.editReply({ 
+        content: `❌ Failed to validate access: ${error.message}`
       });
     }
   }

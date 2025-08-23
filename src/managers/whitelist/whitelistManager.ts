@@ -518,6 +518,7 @@ export class WhitelistManager {
     if (mappedRoles.length === 0) {
       // User has no qualifying roles, remove from whitelist if present
       await this.removeUserFromWhitelistIfNoRoles(discordId);
+      console.log(`[Whitelist] User ${discordId} has no qualifying Discord roles - removed from whitelist`);
       return;
     }
 
@@ -539,38 +540,25 @@ export class WhitelistManager {
       where: { userId: user.id }
     });
 
-    // Remove existing role assignments that aren't in the mapped roles
+    // Remove ALL existing role assignments for this user to ensure clean state
     await prisma.whitelistRoleAssignment.deleteMany({
       where: {
-        whitelistId: whitelistEntry!.id,
-        role: {
-          discordRoleId: {
-            not: null,
-            notIn: discordRoleIds
-          }
-        }
+        whitelistId: whitelistEntry!.id
       }
     });
 
     // Add new role assignments for mapped roles
     for (const role of mappedRoles) {
-      await prisma.whitelistRoleAssignment.upsert({
-        where: {
-          whitelistId_roleId: {
-            whitelistId: whitelistEntry!.id,
-            roleId: role.id
-          }
-        },
-        update: {
-          // No updatedAt field needed - it's auto-managed
-        },
-        create: {
+      await prisma.whitelistRoleAssignment.create({
+        data: {
           whitelistId: whitelistEntry!.id,
           roleId: role.id,
           assignedBy: 'Discord Role Sync'
         }
       });
     }
+
+    console.log(`[Whitelist] User ${discordId} synced with roles: [${mappedRoles.map(r => r.name).join(', ')}]`);
   }
 
   /**
@@ -616,15 +604,25 @@ export class WhitelistManager {
 
   /**
    * Remove user from whitelist if they have no qualifying roles
+   * This function ensures complete removal of whitelist access
    */
   async removeUserFromWhitelistIfNoRoles(discordId: string): Promise<void> {
     const user = await this.getUserByDiscordId(discordId);
-    if (!user || !user.whitelistEntry) return;
+    if (!user || !user.whitelistEntry) {
+      console.log(`[Whitelist] User ${discordId} not found or has no whitelist entry - nothing to remove`);
+      return;
+    }
 
-    // Remove whitelist entry
+    // Get current role assignments for logging
+    const currentAssignments = user.whitelistEntry.roleAssignments || [];
+    const roleNames = currentAssignments.map(assignment => assignment.role.name);
+
+    // Remove whitelist entry (this will cascade delete role assignments)
     await prisma.whitelistEntry.delete({
       where: { userId: user.id }
     });
+
+    console.log(`[Whitelist] Removed user ${discordId} from whitelist - had roles: [${roleNames.join(', ')}]`);
   }
 
   /**

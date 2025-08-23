@@ -56,7 +56,7 @@ bot.once("ready", async () => {
 	}
 
 	console.log("[Schedules] Initializing schedules...");
-	initializeSchedules();
+	initializeSchedules(bot);
 	console.log("[Schedules] Schedules initialized.");
 
 	const vrchatIsRunning = await isLoggedInAndVerified();
