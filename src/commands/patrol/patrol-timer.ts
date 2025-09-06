@@ -5,7 +5,6 @@ import { patrolTimer, prisma } from "../../main.js";
 
 @Discord()
 @SlashGroup({ name: "patrol", description: "Voice patrol timer" })
-@SlashGroup("patrol")
 export class PatrolTimerCommands {
   @Slash({ name: "setup-role", description: "Set role allowed to use patrol commands." })
   async setupRole(
