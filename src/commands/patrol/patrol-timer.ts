@@ -1,10 +1,16 @@
 import { Discord, Slash, SlashGroup, SlashOption, SlashChoice } from "discordx";
-import { ApplicationCommandOptionType, ChannelType, CommandInteraction, GuildMember, MessageFlags, PermissionFlagsBits, Role, User } from "discord.js";
+import { ApplicationCommandOptionType, ApplicationIntegrationType, ChannelType, CommandInteraction, GuildMember, InteractionContextType, MessageFlags, PermissionFlagsBits, Role, User } from "discord.js";
 import { patrolTimer, prisma } from "../../main.js";
 
 
 @Discord()
-@SlashGroup({ name: "patrol", description: "Voice patrol timer" })
+@SlashGroup({
+  name: "patrol", description: "Voice patrol timer",
+  contexts: [InteractionContextType.Guild],
+  integrationTypes: [ApplicationIntegrationType.GuildInstall]
+})
+@SlashGroup("patrol")
+
 export class PatrolTimerCommands {
   @Slash({ name: "setup-role", description: "Set role allowed to use patrol commands." })
   async setupRole(
