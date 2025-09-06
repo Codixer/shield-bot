@@ -10,16 +10,16 @@ config();
 @Discord()
 
 @SlashGroup({
-  name: "vrchat",
+  name: "verify",
   description: "VRChat related commands.",
   contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
   integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
 })
-@SlashGroup("vrchat")
+@SlashGroup("verify")
 @Guard(VRChatLoginGuard)
 export default class VRChatCommands {
     @Slash({
-        name: "verify",
+        name: "account",
         description: "Start the verification process.",
     })
     async verify(

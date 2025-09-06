@@ -6,16 +6,16 @@ import { getUserById } from "../../utility/vrchat/user.js";
 
 @Discord()
 @SlashGroup({
-  name: "vrchat",
+  name: "verify",
   description: "VRChat related commands.",
   contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
   integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
 })
-@SlashGroup("vrchat")
+@SlashGroup("verify")
 @Guard(VRChatLoginGuard)
 export class VRChatAccountManagerCommand {
   @Slash({
-    name: "accountmanager",
+    name: "manager",
     description: "Manage MAIN/ALT status for your verified VRChat accounts.",
   })
   async accountManager(interaction: CommandInteraction) {
