@@ -30,3 +30,17 @@ model VoicePatrolMonthlyTime {
   @@index([guildId, year, month], map: "VoicePatrolMonthlyTime_guild_year_month_idx")
   @@index([userId], map: "VoicePatrolMonthlyTime_user_idx")
 }
+
+/// Active voice patrol sessions for persistence across restarts
+model ActiveVoicePatrolSession {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  userId    String
+  channelId String
+  startedAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, userId], map: "ActiveVoicePatrolSession_guild_user_unique")
+  @@index([guildId], map: "ActiveVoicePatrolSession_guild_idx")
+}

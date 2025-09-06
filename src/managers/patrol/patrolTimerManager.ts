@@ -22,11 +22,19 @@ export class PatrolTimerManager {
       this.tracked.set(guild.id, new Map());
     }
 
+    // Load persisted active sessions
+    const activeSessions = await (prisma as any).activeVoicePatrolSession.findMany();
+    for (const session of activeSessions) {
+      if (!this.tracked.has(session.guildId)) this.tracked.set(session.guildId, new Map());
+      const guildMap = this.tracked.get(session.guildId)!;
+      guildMap.set(session.userId, { userId: session.userId, channelId: session.channelId, startedAt: session.startedAt });
+    }
+
     // On startup, scan current voice states and resume tracking for members
     // already connected to channels within the configured category.
     for (const guild of this.client.guilds.cache.values()) {
       try {
-  await this.resumeActiveForGuild(guild);
+        await this.resumeActiveForGuild(guild);
       } catch (err) {
         console.error(`[PatrolTimer] Failed to resume active sessions for guild ${guild.id}:`, err);
       }
@@ -117,9 +125,16 @@ export class PatrolTimerManager {
     if (member.user.bot) return;
     if (!this.tracked.has(guildId)) this.tracked.set(guildId, new Map());
     const guildMap = this.tracked.get(guildId)!;
-  // Avoid clobbering an existing tracking session (e.g., during startup scan)
-  if (guildMap.has(member.id)) return;
-    guildMap.set(member.id, { userId: member.id, channelId, startedAt: new Date() });
+    // Avoid clobbering an existing tracking session (e.g., during startup scan)
+    if (guildMap.has(member.id)) return;
+    const startedAt = new Date();
+    guildMap.set(member.id, { userId: member.id, channelId, startedAt });
+    // Persist to DB
+    (prisma as any).activeVoicePatrolSession.upsert({
+      where: { guildId_userId: { guildId, userId: member.id } },
+      update: { channelId, startedAt },
+      create: { guildId, userId: member.id, channelId, startedAt },
+    }).catch((err: any) => console.error("[PatrolTimer] Failed to persist session:", err));
     // console.log(`[PatrolTimer] Start ${member.user.tag} in ${channelId}`);
   }
 
@@ -133,10 +148,14 @@ export class PatrolTimerManager {
     const delta = nowMs - tracked.startedAt.getTime();
     guildMap.delete(member.id);
     if (delta < 3000) return; // ignore very short joins; parity with original impl
-  // Ensure a corresponding User row exists for this Discord ID
-  await this.ensureUser(member.id);
-  // Upsert DB row and increment time
-  await (prisma as any).voicePatrolTime.upsert({
+    // Delete persisted session
+    await (prisma as any).activeVoicePatrolSession.deleteMany({
+      where: { guildId, userId: member.id },
+    }).catch((err: any) => console.error("[PatrolTimer] Failed to delete session:", err));
+    // Ensure a corresponding User row exists for this Discord ID
+    await this.ensureUser(member.id);
+    // Upsert DB row and increment time
+    await (prisma as any).voicePatrolTime.upsert({
       where: { guildId_userId: { guildId, userId: member.id } },
       update: { totalMs: { increment: BigInt(delta) } },
       create: { guildId, userId: member.id, totalMs: BigInt(delta) },
@@ -146,7 +165,7 @@ export class PatrolTimerManager {
     await this.persistMonthly(guildId, member.id, tracked.startedAt, new Date(nowMs));
   }
 
-  /** Scan the guild's voice channels within the tracked category and start tracking present members. */
+  /** Scan the guild's voice channels within the tracked category and resume tracking for present members. */
   private async resumeActiveForGuild(guild: Guild): Promise<void> {
     const settings = await this.getSettings(guild.id);
     if (!settings.patrolChannelCategoryId) return;
@@ -158,11 +177,34 @@ export class PatrolTimerManager {
 
     if (!voiceChannels.size) return;
 
+    const trackedUsers = new Set<string>();
+
     for (const ch of voiceChannels.values()) {
       // ch.members contains members currently connected to this voice channel
       for (const member of ch.members.values()) {
         if (member.user.bot) continue;
+        trackedUsers.add(member.id);
         this.startTracking(guild.id, member, ch.id);
+      }
+    }
+
+    // Stop tracking for users who have persisted sessions but are no longer in a tracked channel
+    const guildMap = this.tracked.get(guild.id);
+    if (guildMap) {
+      for (const [userId, tracked] of guildMap.entries()) {
+        if (!trackedUsers.has(userId)) {
+          // User left while bot was down, stop and persist
+          const member = guild.members.cache.get(userId);
+          if (member) {
+            await this.stopTrackingAndPersist(guild.id, member);
+          } else {
+            // Member not in cache, perhaps left guild, just delete session
+            guildMap.delete(userId);
+            await (prisma as any).activeVoicePatrolSession.deleteMany({
+              where: { guildId: guild.id, userId },
+            }).catch((err: any) => console.error("[PatrolTimer] Failed to delete session:", err));
+          }
+        }
       }
     }
   }
@@ -306,14 +348,17 @@ export class PatrolTimerManager {
   async reset(guildId: string, userId?: string) {
     if (userId) {
       await (prisma as any).voicePatrolTime.updateMany({ where: { guildId, userId }, data: { totalMs: BigInt(0) } });
+      await (prisma as any).activeVoicePatrolSession.deleteMany({ where: { guildId, userId } });
     } else {
       await (prisma as any).voicePatrolTime.updateMany({ where: { guildId }, data: { totalMs: BigInt(0) } });
+      await (prisma as any).activeVoicePatrolSession.deleteMany({ where: { guildId } });
     }
   }
 
   async wipe(guildId: string) {
     await (prisma as any).voicePatrolTime.deleteMany({ where: { guildId } });
     await (prisma as any).voicePatrolMonthlyTime.deleteMany({ where: { guildId } });
+    await (prisma as any).activeVoicePatrolSession.deleteMany({ where: { guildId } });
   }
 
   async getUserTotal(guildId: string, userId: string) {
