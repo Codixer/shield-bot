@@ -13,6 +13,19 @@
 				"isDefault": true
 			},
 			"problemMatcher": []
+		},
+		{
+			"label": "build",
+			"type": "shell",
+			"command": "yarn",
+			"args": [
+				"build"
+			],
+			"isBackground": false,
+			"problemMatcher": [
+				"$tsc"
+			],
+			"group": "build"
 		}
 	]
 }

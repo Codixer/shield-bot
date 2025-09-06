@@ -1,6 +1,9 @@
 model GuildSettings {
   id        Int      @id @default(autoincrement())
   guildId   String   @unique
+  // Voice patrol settings
+  patrolBotuserRoleId     String?
+  patrolChannelCategoryId String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

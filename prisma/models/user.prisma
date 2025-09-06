@@ -9,6 +9,8 @@ model User {
   squadMemberships       SquadMember[]
   vrchatAccounts         VRChatAccount[]
   whitelistEntry         WhitelistEntry?
+  voicePatrolTimes       VoicePatrolTime[]
+  voicePatrolMonthly     VoicePatrolMonthlyTime[]
 }
 
 model VRChatAccount {

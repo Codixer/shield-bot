@@ -225,7 +225,8 @@ function msToReadable(ms: number) {
 
 async function hasPatrolPermission(member: GuildMember, guildId: string) {
   if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;
-  const settings = await (prisma as any).voicePatrolSettings.findUnique({ where: { guildId } });
-  if (!settings?.botuserRoleId) return false;
-  return member.roles.cache.has(settings.botuserRoleId);
+  const settings = await (prisma as any).guildSettings.findUnique({ where: { guildId } });
+  const roleId = settings?.patrolBotuserRoleId as string | undefined;
+  if (!roleId) return false;
+  return member.roles.cache.has(roleId);
 }

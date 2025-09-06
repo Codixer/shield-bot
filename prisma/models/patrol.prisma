@@ -1,22 +1,17 @@
-model VoicePatrolSettings {
-  id                Int      @id @default(autoincrement())
-  guildId           String   @unique
-  botuserRoleId     String?  // Discord Role ID allowed to use patrol commands
-  channelCategoryId String?  // Discord Category ID of tracked voice channels
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-}
+// Voice patrol settings now live in GuildSettings (patrolBotuserRoleId, patrolChannelCategoryId)
 
 model VoicePatrolTime {
   id        Int      @id @default(autoincrement())
   guildId   String
   userId    String   // Discord User ID
+  user      User     @relation(fields: [userId], references: [discordId])
   totalMs   BigInt   @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([guildId, userId], map: "VoicePatrolTime_guild_user_unique")
   @@index([guildId], map: "VoicePatrolTime_guild_idx")
+  @@index([userId], map: "VoicePatrolTime_user_idx")
 }
 
 /// Aggregated monthly totals (UTC) for voice patrol time.
@@ -24,6 +19,7 @@ model VoicePatrolMonthlyTime {
   id        Int      @id @default(autoincrement())
   guildId   String
   userId    String
+  user      User     @relation(fields: [userId], references: [discordId])
   year      Int      // UTC year
   month     Int      // 1-12, UTC month
   totalMs   BigInt   @default(0)
@@ -32,4 +28,5 @@ model VoicePatrolMonthlyTime {
 
   @@unique([guildId, userId, year, month], map: "VoicePatrolMonthlyTime_guild_user_year_month_unique")
   @@index([guildId, year, month], map: "VoicePatrolMonthlyTime_guild_year_month_idx")
+  @@index([userId], map: "VoicePatrolMonthlyTime_user_idx")
 }
