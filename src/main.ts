@@ -6,6 +6,7 @@ import { ActivityType, IntentsBitField, Interaction, Message } from "discord.js"
 import { Client } from "discordx";
 import bodyParser from "@koa/bodyparser";
 import { PrismaClient } from "@prisma/client";
+import { PatrolTimerManager } from "./managers/patrol/patrolTimerManager.js";
 import { isLoggedInAndVerified, loginAndGetCurrentUser } from "./utility/vrchat.js";
 import { startVRChatWebSocketListener } from "./events/vrchat/vrchat-websocket.js";
 import { syncAllInviteMessages, syncInviteMessageIfDifferent } from './managers/messages/InviteMessageManager.js';
@@ -14,9 +15,16 @@ import { initializeSchedules } from "./schedules/schedules.js";
 export const prisma = new PrismaClient();
 
 export const bot = new Client({
-	intents: [IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMembers],
+	intents: [
+		IntentsBitField.Flags.Guilds,
+		IntentsBitField.Flags.GuildMembers,
+		IntentsBitField.Flags.GuildVoiceStates,
+	],
 	silent: false,
 });
+
+// Global patrol timer manager singleton
+export const patrolTimer = new PatrolTimerManager(bot);
 
 bot.rest.on("rateLimited", (info) => {
 	console.log("Rate limit hit!");
@@ -25,7 +33,7 @@ bot.rest.on("rateLimited", (info) => {
 	console.log(`Limit: ${info.limit}`);
 });
 
-bot.once("ready", async () => {
+bot.once("clientReady", async () => {
 	try {
 		await bot.initApplicationCommands();
 		console.log("###################################################");
@@ -58,6 +66,11 @@ bot.once("ready", async () => {
 	console.log("[Schedules] Initializing schedules...");
 	initializeSchedules(bot);
 	console.log("[Schedules] Schedules initialized.");
+
+	// Initialize Patrol Timer after bot is ready
+	console.log("[PatrolTimer] Initializing patrol timer...");
+	await patrolTimer.init();
+	console.log("[PatrolTimer] Patrol timer initialized.");
 
 	const vrchatIsRunning = await isLoggedInAndVerified();
 	if (vrchatIsRunning) {

@@ -1,7 +1,7 @@
 import { ButtonInteraction, MessageFlags, ButtonStyle, EmbedBuilder } from "discord.js";
 import { Discord, ButtonComponent } from "discordx";
 import { ButtonBuilder } from "discord.js";
-import { sendFriendRequest, unfriendUser } from "../../../../../utility/vrchat.js";
+import { sendFriendRequest, unfriendUser, getUserById } from "../../../../../utility/vrchat.js";
 import { prisma } from "../../../../../main.js";
 
 @Discord()
@@ -69,7 +69,6 @@ export class VRChatFriendVerifyButtonHandler {
         });
         if (vrcAccount) {
             // Update username cache when checking verification status
-            const { getUserById } = await import("../../../../../utility/vrchat.js");
             let vrchatUsername = vrcAccount.vrchatUsername;
             try {
                 const userInfo = await getUserById(vrcUserId);

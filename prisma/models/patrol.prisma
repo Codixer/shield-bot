@@ -1,0 +1,20 @@
+model VoicePatrolSettings {
+  id                Int      @id @default(autoincrement())
+  guildId           String   @unique
+  botuserRoleId     String?  // Discord Role ID allowed to use patrol commands
+  channelCategoryId String?  // Discord Category ID of tracked voice channels
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model VoicePatrolTime {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  userId    String   // Discord User ID
+  totalMs   BigInt   @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, userId], map: "VoicePatrolTime_guild_user_unique")
+  @@index([guildId], map: "VoicePatrolTime_guild_idx")
+}

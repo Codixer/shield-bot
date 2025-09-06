@@ -1,6 +1,6 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { getUserById } from '../../utility/vrchat.js';
+import { searchUsers } from '../../utility/vrchat/user.js';
+import { prisma, bot } from "../../main.js";
 
 export class WhitelistManager {
 
@@ -87,8 +87,7 @@ export class WhitelistManager {
    */
   async addUserByVrcUsername(vrchatUsername: string): Promise<any> {
     try {
-      const { searchUsers } = await import('../../utility/vrchat/user.js');
-      const searchResults = await searchUsers({ search: vrchatUsername, n: 1 });
+  const searchResults = await searchUsers({ search: vrchatUsername, n: 1 });
       
       if (searchResults.length === 0) {
         throw new Error(`VRChat user "${vrchatUsername}" not found.`);
@@ -305,9 +304,8 @@ export class WhitelistManager {
         
         // If we don't have a cached username or it's outdated, try to fetch from VRChat API
         if (!vrchatUsername || vrchatUsername === vrchatAccount.vrcUserId) {
-          try {
-            const { getUserById } = await import('../../utility/vrchat.js');
-            const userInfo = await getUserById(vrchatAccount.vrcUserId);
+      try {
+        const userInfo = await getUserById(vrchatAccount.vrcUserId);
             vrchatUsername = userInfo?.displayName || userInfo?.username || vrchatAccount.vrcUserId;
             
             // Update the cached username in the database
@@ -420,50 +418,11 @@ export class WhitelistManager {
   }
 
   /**
-   * Update GitHub Gist with base64 encoded whitelist data
+   * Publish the whitelist to the configured GitHub repository.
+   * Writes both encoded and decoded files in a single commit.
    */
-  async updateGistWithWhitelist(): Promise<any> {
-    const gistId = process.env.GITHUB_GIST_ID;
-    const githubToken = process.env.GITHUB_TOKEN;
-    const filename = process.env.GITHUB_GIST_FILENAME || 'whitelist.txt';
-
-    if (!gistId) {
-      throw new Error('GITHUB_GIST_ID environment variable is required');
-    }
-
-    if (!githubToken) {
-      throw new Error('GITHUB_TOKEN environment variable is required');
-    }
-
-    // Generate the base64 encoded whitelist data
-    const encodedData = await this.generateEncodedWhitelist();
-
-    const requestBody = {
-      description: `Whitelist updated at ${new Date().toISOString()}`,
-      files: {
-        [filename]: {
-          content: encodedData
-        }
-      }
-    };
-
-    const response = await fetch(`https://api.github.com/gists/${gistId}`, {
-      method: 'PATCH',
-      headers: {
-        'Accept': 'application/vnd.github+json',
-        'Authorization': `Bearer ${githubToken}`,
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Failed to update gist: ${response.status} ${response.statusText} - ${errorText}`);
-    }
-
-    return await response.json();
+  async publishWhitelist(commitMessage?: string): Promise<any> {
+    return await this.updateRepositoryWithWhitelist(commitMessage);
   }
 
   /**
@@ -500,6 +459,126 @@ export class WhitelistManager {
     
     // Base64 encode
     return xoredBytes.toString('base64');
+  }
+
+  /**
+   * Update a GitHub repository with BOTH encoded and decoded whitelist files in a single commit.
+   * Uses the low-level Git data API per the provided guide.
+   * Required env vars: GITHUB_TOKEN, GITHUB_REPO_OWNER, GITHUB_REPO_NAME
+   * Optional env vars:
+   *   - GITHUB_REPO_BRANCH (default: 'main')
+   *   - GITHUB_REPO_ENCODED_FILE_PATH (default: 'whitelist.encoded.txt')
+   *   - GITHUB_REPO_DECODED_FILE_PATH (default: 'whitelist.txt')
+   */
+  private async updateRepositoryWithWhitelist(commitMessage?: string): Promise<any> {
+    const token = process.env.GITHUB_TOKEN;
+    const owner = process.env.GITHUB_REPO_OWNER;
+    const repo = process.env.GITHUB_REPO_NAME;
+    const branch = process.env.GITHUB_REPO_BRANCH || 'main';
+  const encodedFilePath = process.env.GITHUB_REPO_ENCODED_FILE_PATH || 'whitelist.encoded.txt';
+    const decodedFilePath = process.env.GITHUB_REPO_DECODED_FILE_PATH || 'whitelist.txt';
+
+    if (!token) throw new Error('GITHUB_TOKEN environment variable is required');
+    if (!owner) throw new Error('GITHUB_REPO_OWNER environment variable is required');
+    if (!repo) throw new Error('GITHUB_REPO_NAME environment variable is required');
+
+    const apiBase = `https://api.github.com`;
+
+    const gh = async (path: string, init?: RequestInit) => {
+      const res = await fetch(`${apiBase}${path}`, {
+        ...init,
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'Authorization': `Bearer ${token}`,
+          'X-GitHub-Api-Version': '2022-11-28',
+          'Content-Type': 'application/json',
+          ...(init?.headers || {})
+        }
+      } as RequestInit);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(`GitHub API error ${res.status} ${res.statusText}: ${text}`);
+      }
+      return res.json();
+    };
+
+    // Prepare content
+    const [encodedData, decodedData] = await Promise.all([
+      this.generateEncodedWhitelist(),
+      this.generateWhitelistContent()
+    ]);
+
+    // Step 1: Get latest commit on branch
+  const ref = await gh(`/repos/${owner}/${repo}/git/refs/heads/${branch}`);
+    const latestCommitSha = ref?.object?.sha;
+    if (!latestCommitSha) throw new Error('Failed to resolve latest commit sha');
+
+    // Step 2: Get base tree of that commit
+    const latestCommit = await gh(`/repos/${owner}/${repo}/git/commits/${latestCommitSha}`);
+    const baseTreeSha = latestCommit?.tree?.sha;
+    if (!baseTreeSha) throw new Error('Failed to resolve base tree sha');
+
+    // Step 3: Create blobs for both files
+    const [encodedBlob, decodedBlob] = await Promise.all([
+      gh(`/repos/${owner}/${repo}/git/blobs`, {
+        method: 'POST',
+        body: JSON.stringify({ content: encodedData, encoding: 'utf-8' })
+      }),
+      gh(`/repos/${owner}/${repo}/git/blobs`, {
+        method: 'POST',
+        body: JSON.stringify({ content: decodedData, encoding: 'utf-8' })
+      })
+    ]);
+    const encodedBlobSha = encodedBlob?.sha;
+    const decodedBlobSha = decodedBlob?.sha;
+    if (!encodedBlobSha || !decodedBlobSha) throw new Error('Failed to create blobs for whitelist files');
+
+    // Step 4: Create a new tree with both updated files
+    const newTree = await gh(`/repos/${owner}/${repo}/git/trees`, {
+      method: 'POST',
+      body: JSON.stringify({
+        base_tree: baseTreeSha,
+        tree: [
+          {
+            path: encodedFilePath,
+            mode: '100644',
+            type: 'blob',
+            sha: encodedBlobSha
+          },
+          {
+            path: decodedFilePath,
+            mode: '100644',
+            type: 'blob',
+            sha: decodedBlobSha
+          }
+        ]
+      })
+    });
+    const newTreeSha = newTree?.sha;
+    if (!newTreeSha) throw new Error('Failed to create new tree');
+
+    // Step 5: Create a new commit
+    const message = commitMessage?.trim() && commitMessage.length > 0
+      ? commitMessage
+      : `chore(whitelist): update encoded (${encodedFilePath}) and decoded (${decodedFilePath}) at ${new Date().toISOString()}`;
+    const newCommit = await gh(`/repos/${owner}/${repo}/git/commits`, {
+      method: 'POST',
+      body: JSON.stringify({
+        message,
+        tree: newTreeSha,
+        parents: [latestCommitSha]
+      })
+    });
+    const newCommitSha = newCommit?.sha;
+    if (!newCommitSha) throw new Error('Failed to create new commit');
+
+    // Step 6: Update branch reference
+  await gh(`/repos/${owner}/${repo}/git/refs/heads/${branch}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ sha: newCommitSha, force: false })
+    });
+
+  return { updated: true, commitSha: newCommitSha, paths: [encodedFilePath, decodedFilePath], branch };
   }
 
   /**
@@ -600,6 +679,43 @@ export class WhitelistManager {
     });
 
     console.log(`[Whitelist] Granted basic access to unverified/in-verification account for user ${discordId}`);
+
+    // Now check if user has eligible Discord roles for full sync and publish
+    try {
+  let member: any = null;
+      for (const guild of bot.guilds.cache.values()) {
+        try {
+          member = await guild.members.fetch(discordId);
+          if (member) break;
+        } catch {
+          // Not in this guild; continue searching
+        }
+      }
+
+      if (!member) {
+        console.log(`[Whitelist] Discord user ${discordId} not found in any guild; skipping full sync`);
+        return;
+      }
+
+      const roleIds: string[] = member.roles.cache.map((role: any) => role.id);
+      if (!roleIds.length) {
+        console.log(`[Whitelist] Discord user ${discordId} has no roles; skipping full sync`);
+        return;
+      }
+
+      // Check for eligible mapped roles
+      const mappings = await this.getDiscordRoleMappings();
+      const eligible = mappings.filter(m => m.discordRoleId && roleIds.includes(m.discordRoleId));
+      if (eligible.length === 0) {
+        console.log(`[Whitelist] Discord user ${discordId} has no eligible mapped roles; skipping full sync`);
+        return;
+      }
+
+      // Perform full sync and publish
+      await this.syncAndPublishAfterVerification(discordId);
+    } catch (e) {
+      console.warn(`[Whitelist] Failed to perform full sync for unverified user ${discordId}:`, e);
+    }
   }
 
   /**
@@ -755,6 +871,66 @@ export class WhitelistManager {
     }
 
     return results;
+  }
+
+  /**
+   * Sync whitelist roles and publish after user verification
+   */
+  async syncAndPublishAfterVerification(discordId: string, bot?: any): Promise<void> {
+    if (!bot) {
+  // bot is available via static import
+    }
+    try {
+      // Find the Discord member across guilds
+      let member: any = null;
+      for (const guild of bot.guilds.cache.values()) {
+        try {
+          member = await guild.members.fetch(discordId);
+          if (member) break;
+        } catch {
+          // Not in this guild; continue searching
+        }
+      }
+
+      if (!member) {
+        console.log(`[Whitelist] Discord user ${discordId} not found in any guild; skipping whitelist sync`);
+        return;
+      }
+
+      const roleIds: string[] = member.roles.cache.map((role: any) => role.id);
+      if (!roleIds.length) {
+        console.log(`[Whitelist] Discord user ${discordId} has no roles; skipping whitelist sync`);
+        return;
+      }
+
+      // Determine if user has eligible mapped roles and collect permissions for commit message
+      const mappings = await this.getDiscordRoleMappings();
+      const eligible = mappings.filter(m => m.discordRoleId && roleIds.includes(m.discordRoleId));
+      if (eligible.length === 0) {
+        console.log(`[Whitelist] Discord user ${discordId} has no eligible mapped roles; skipping whitelist sync`);
+        return;
+      }
+
+      // Sync whitelist role assignments
+      await this.syncUserRolesFromDiscord(discordId, roleIds);
+
+      // Build permissions list from mapping descriptions
+      const permSet = new Set<string>();
+      for (const m of eligible) {
+        if (m.description) {
+          for (const p of String(m.description).split(',').map(s => s.trim()).filter(Boolean)) permSet.add(p);
+        }
+      }
+      const permissions = Array.from(permSet).sort();
+      const who = member.displayName || member.user?.username || discordId;
+      const msg = `${who} was added with the roles ${permissions.length ? permissions.join(', ') : 'none'}`;
+
+      // Publish updated whitelist to the repository
+      await this.publishWhitelist(msg);
+      console.log(`[Whitelist] Repository updated after verification for ${who}`);
+    } catch (e) {
+      console.warn(`[Whitelist] Failed to sync/publish whitelist for verified user ${discordId}:`, e);
+    }
   }
 }
 

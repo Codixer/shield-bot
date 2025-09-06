@@ -1,3 +1,5 @@
+import { getUserById } from '../../../../utility/vrchat.js';
+import { whitelistManager } from '../../../../managers/whitelist/whitelistManager.js';
 import { prisma } from '../../../../main.js';
 
 export async function handleFriendAdd(content: any) {
@@ -9,17 +11,16 @@ export async function handleFriendAdd(content: any) {
     }
     // Find the VRChatAccount in the database (pending verification)
     const vrcAccount = await prisma.vRChatAccount.findFirst({
-        where: { vrcUserId, accountType: { in: ["UNVERIFIED", "IN_VERIFICATION"] } },
+        where: { vrcUserId, accountType: { in: ["IN_VERIFICATION"] } },
     });
     if (!vrcAccount) {
         console.log('[Friend Add] No VRChatAccount found for VRChat user:', vrcUserId);
         return;
     }
     // Try to update the verified field and set verification status to VERIFIED
+    let vrchatUsername: string | null = null;
     try {
         // Get VRChat username for caching
-        const { getUserById } = await import("../../../../utility/vrchat.js");
-        let vrchatUsername = null;
         try {
             const userInfo = await getUserById(vrcUserId);
             vrchatUsername = userInfo?.displayName || userInfo?.username;
@@ -46,10 +47,21 @@ export async function handleFriendAdd(content: any) {
     } catch (e) {
         console.log('[Friend Add] Could not update verification status:', e);
     }
-    // Fetch the Discord user by userId
+    // Fetch the Discord user by userId and update whitelist
     const user = await prisma.user.findUnique({ where: { id: vrcAccount.userId, } });
     if (user && user.discordId) {
-        console.log(`[Friend Add] Verified VRChat account for Discord user: ${user.discordId}`);
+        console.log(`[Friend Add] VRChat account for Discord user: ${user.discordId}`);
+            try {
+                // For verified accounts, sync and publish with roles
+                if (vrchatUsername) { // If username was fetched, it was verified
+                    await whitelistManager.syncAndPublishAfterVerification(user.discordId);
+                } else {
+                    // For unverified binding, ensure basic access and sync if eligible
+                    await whitelistManager.ensureUnverifiedAccountAccess(user.discordId);
+                }
+            } catch (e) {
+                console.warn(`[Friend Add] Failed to update whitelist for user ${user.discordId}:`, e);
+            }
         // Optionally, send a Discord notification here
     }
 }

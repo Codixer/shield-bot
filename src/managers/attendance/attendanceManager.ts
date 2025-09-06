@@ -1,7 +1,5 @@
-import { PrismaClient } from '@prisma/client';
 import type { CommandInteraction } from "discord.js";
-
-const prisma = new PrismaClient();
+import { prisma } from "../../main.js";
 
 export class AttendanceManager {
   async createEvent(date: Date, hostId?: number, cohostId?: number) {

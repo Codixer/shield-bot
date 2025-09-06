@@ -1,6 +1,6 @@
 import { Discord, Slash, SlashOption, Guard, SlashGroup, SlashChoice } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, InteractionContextType, ApplicationIntegrationType } from "discord.js";
-import { AttendanceManager } from "../../managers/attendanceManager.js";
+import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
 import { VRChatLoginGuard } from "../../utility/guards.js";
 
 const attendanceManager = new AttendanceManager();

@@ -3,6 +3,8 @@
 import axios from "axios";
 import { authenticator } from "otplib";
 import { loadCookie, saveCookie, USER_AGENT } from "../vrchat/index.js";
+import { prisma } from "../../main.js";
+// Use the application's Prisma instance from main.ts at runtime to avoid creating a separate client here.
 
 export async function sendFriendRequest(userId: string): Promise<object> {
     const cookie = loadCookie();
@@ -229,25 +231,19 @@ export async function getCurrentUser() {
  * Get VRChat account status for a Discord user
  */
 export async function getVRChatAccountStatus(discordId: string) {
-    const { PrismaClient } = await import('@prisma/client');
-    const prisma = new PrismaClient();
-    
-    try {
-        const user = await prisma.user.findUnique({
-            where: { discordId },
-            include: { vrchatAccounts: true }
-        });
 
-        const boundAccounts = user?.vrchatAccounts || [];
-        const verifiedAccounts = boundAccounts.filter((acc: any) => acc.accountType === "MAIN" || acc.accountType === "ALT");
+    const user = await prisma.user.findUnique({
+        where: { discordId },
+        include: { vrchatAccounts: true }
+    });
 
-        return {
-            hasBoundAccount: boundAccounts.length > 0,
-            hasVerifiedAccount: verifiedAccounts.length > 0,
-            boundAccounts,
-            verifiedAccounts
-        };
-    } finally {
-        await prisma.$disconnect();
-    }
+    const boundAccounts = user?.vrchatAccounts || [];
+    const verifiedAccounts = boundAccounts.filter((acc: any) => acc.accountType === "MAIN" || acc.accountType === "ALT");
+
+    return {
+        hasBoundAccount: boundAccounts.length > 0,
+        hasVerifiedAccount: verifiedAccounts.length > 0,
+        boundAccounts,
+        verifiedAccounts
+    };
 }

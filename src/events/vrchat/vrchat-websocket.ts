@@ -1,13 +1,7 @@
 import WebSocket from "ws";
 import { loadCookie } from "../../utility/vrchat.js";
-import { prisma } from "../../main.js";
-import { handleFriendAdd } from "./handlers/friend/handleFriendAdd.js";
-import { handleFriendDelete } from "./handlers/friend/handleFriendDelete.js";
-import { handleFriendLocation } from "./handlers/friend/handleFriendLocation.js";
-import { handleFriendOnline } from "./handlers/friend/handleFriendOnline.js";
-import { handleFriendActive } from "./handlers/friend/handleFriendActive.js";
-import { handleFriendOffline } from "./handlers/friend/handleFriendOffline.js";
-import { handleFriendUpdate } from "./handlers/friend/handleFriendUpdate.js";
+import { handleFriendActive, handleFriendDelete, handleFriendLocation, handleFriendOffline, handleFriendOnline, handleFriendUpdate } from "./handlers/friend/index.js";
+import { handleFriendAdd } from "./handlers/friend/handleFriendAdded.js";
 import { handleUserUpdate } from "./handlers/user/handleUserUpdate.js";
 import { handleUserLocation } from "./handlers/user/handleUserLocation.js";
 import { handleUserBadgeAssigned } from "./handlers/user/handleUserBadgeAssigned.js";

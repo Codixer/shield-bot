@@ -1,10 +1,32 @@
 import { Discord, On, ArgsOf } from 'discordx';
-import { WhitelistManager } from "../../managers/whitelist/whitelistManager.js";
+import { WhitelistManager } from "../../../managers/whitelist/whitelistManager.js";
+import { prisma } from "../../../main.js";
 
 const whitelistManager = new WhitelistManager();
 
 @Discord()
 export class WhitelistRoleSync {
+  // Build a human commit message using permissions list
+  private buildCommitMessage(username: string, action: 'added' | 'removed' | 'granted', permissions: Set<string>): string {
+    const list = permissions.size ? Array.from(permissions).sort().join(', ') : 'none';
+    return `${username} was ${action} with the roles ${list}`;
+  }
+
+  // Resolve expected whitelist roles and permissions based on Discord roles
+  private async getExpectedFromDiscordRoles(discordRoleIds: string[]): Promise<{ roles: string[]; permissions: Set<string> }> {
+    const roles: string[] = [];
+    const permissions = new Set<string>();
+    const roleMappings = await whitelistManager.getDiscordRoleMappings();
+    for (const mapping of roleMappings) {
+      if (!mapping.discordRoleId) continue;
+      if (discordRoleIds.includes(mapping.discordRoleId)) {
+        roles.push(mapping.name);
+        const desc = mapping.description as string | null | undefined;
+        if (desc) for (const p of desc.split(',').map((s: string) => s.trim()).filter(Boolean)) permissions.add(p);
+      }
+    }
+    return { roles, permissions };
+  }
   
   @On({ event: "guildMemberUpdate" })
   async onGuildMemberUpdate(
@@ -42,27 +64,14 @@ export class WhitelistRoleSync {
         return;
       }
 
-      // Get current whitelist roles for this user
-      const currentUser = await whitelistManager.getUserByDiscordId(newMember.id);
-      const currentWhitelistRoles = currentUser?.whitelistEntry?.roleAssignments?.map((assignment: any) => assignment.role.name) || [];
+  // Get current and expected state
+  const currentUser = await whitelistManager.getUserByDiscordId(newMember.id);
+  const currentWhitelistRoles = currentUser?.whitelistEntry?.roleAssignments?.map((a: any) => a.role.name) || [];
+  const { roles: expectedWhitelistRoles, permissions: expectedPermissions } = await this.getExpectedFromDiscordRoles(newRoleIds);
       
-      // Check what whitelist roles they should have based on new Discord roles
-      const shouldBeWhitelisted = await whitelistManager.shouldUserBeWhitelisted(newRoleIds);
-      const expectedWhitelistRoles: string[] = [];
-      
-      if (shouldBeWhitelisted) {
-        // Get the roles they should have based on Discord role mappings
-        const roleMappings = await whitelistManager.getDiscordRoleMappings();
-        for (const mapping of roleMappings) {
-          if (newRoleIds.includes(mapping.discordRoleId)) {
-            expectedWhitelistRoles.push(mapping.name);
-          }
-        }
-      }
-
-      // Compare current whitelist roles with expected roles
-      const currentRolesSorted = [...currentWhitelistRoles].sort();
-      const expectedRolesSorted = [...expectedWhitelistRoles].sort();
+  // Compare current whitelist roles with expected roles using sets
+  const currentRolesSorted = [...currentWhitelistRoles].sort();
+  const expectedRolesSorted = [...expectedWhitelistRoles].sort();
       
       if (JSON.stringify(currentRolesSorted) === JSON.stringify(expectedRolesSorted)) {
         console.log(`[Whitelist] No whitelist role changes needed for ${newMember.displayName} - Current: [${currentRolesSorted.join(', ')}], Expected: [${expectedRolesSorted.join(', ')}]`);
@@ -71,17 +80,23 @@ export class WhitelistRoleSync {
 
       console.log(`[Whitelist] Whitelist role changes detected for ${newMember.displayName} - Current: [${currentRolesSorted.join(', ')}], Expected: [${expectedRolesSorted.join(', ')}]`);
       
-      // Sync user roles (this handles both granting and removing access based on current roles)
-      await whitelistManager.syncUserRolesFromDiscord(newMember.id, newRoleIds);
+  // Sync user roles (this handles both granting and removing access based on current roles)
+  await whitelistManager.syncUserRolesFromDiscord(newMember.id, newRoleIds);
       
       console.log(`[Whitelist] Successfully updated whitelist for ${newMember.displayName}`);
       
-      // Update GitHub Gist after role changes
+      // Publish whitelist with contextual commit message after role changes (use permissions, not Discord roles)
       try {
-        await whitelistManager.updateGistWithWhitelist();
-        console.log(`[Whitelist] GitHub Gist updated after role change for ${newMember.displayName}`);
-      } catch (gistError) {
-        console.warn(`[Whitelist] Failed to update GitHub Gist after role change for ${newMember.displayName}:`, gistError);
+        const action: 'added' | 'removed' | 'granted' = expectedRolesSorted.length === 0
+          ? 'removed'
+          : (currentRolesSorted.length === 0 ? 'added' : 'granted');
+        const username = newMember.displayName || newMember.user?.username || newMember.id;
+        // Use expected permissions for commit message (if removed, show none)
+        const permsForMsg = action === 'removed' ? new Set<string>() : expectedPermissions;
+        await whitelistManager.publishWhitelist(this.buildCommitMessage(username, action, permsForMsg));
+        console.log(`[Whitelist] GitHub repository updated after role change for ${newMember.displayName}`);
+      } catch (repoError) {
+        console.warn(`[Whitelist] Failed to update GitHub repository after role change for ${newMember.displayName}:`, repoError);
       }
     } catch (error) {
       console.error(`[Whitelist] Error syncing roles for ${newMember.displayName}:`, error);
@@ -107,12 +122,15 @@ export class WhitelistRoleSync {
       
       console.log(`[Whitelist] Successfully processed new member ${member.displayName}`);
       
-      // Update GitHub Gist after adding new member
+      // Publish whitelist with contextual commit message after adding new member (use permissions)
       try {
-        await whitelistManager.updateGistWithWhitelist();
-        console.log(`[Whitelist] GitHub Gist updated after new member ${member.displayName} joined`);
-      } catch (gistError) {
-        console.warn(`[Whitelist] Failed to update GitHub Gist after new member ${member.displayName} joined:`, gistError);
+        const username = member.displayName || member.user?.username || member.id;
+        // Determine permissions user now should have
+        const { permissions } = await this.getExpectedFromDiscordRoles(roleIds);
+        await whitelistManager.publishWhitelist(this.buildCommitMessage(username, 'added', permissions));
+        console.log(`[Whitelist] GitHub repository updated after new member ${member.displayName} joined`);
+      } catch (repoError) {
+        console.warn(`[Whitelist] Failed to update GitHub repository after new member ${member.displayName} joined:`, repoError);
       }
     } catch (error) {
       console.error(`[Whitelist] Error processing new member ${member.displayName}:`, error);
@@ -127,12 +145,13 @@ export class WhitelistRoleSync {
       // Always remove from whitelist when they leave the server (includes kicks/bans)
       await whitelistManager.removeUserFromWhitelistIfNoRoles(member.id);
       
-      // Update GitHub Gist after removing user
+      // Publish whitelist with contextual commit message after removing user
       try {
-        await whitelistManager.updateGistWithWhitelist();
-        console.log(`[Whitelist] GitHub Gist updated after ${memberName} left server`);
-      } catch (gistError) {
-        console.warn(`[Whitelist] Failed to update GitHub Gist after ${memberName} left server:`, gistError);
+        const username = memberName;
+        await whitelistManager.publishWhitelist(`${username} was removed with the roles none`);
+        console.log(`[Whitelist] GitHub repository updated after ${memberName} left server`);
+      } catch (repoError) {
+        console.warn(`[Whitelist] Failed to update GitHub repository after ${memberName} left server:`, repoError);
       }
     } catch (error) {
       const memberName = member.displayName || member.user?.displayName || member.user?.username || member.id;
@@ -150,12 +169,13 @@ export class WhitelistRoleSync {
       // Ensure banned user is removed from whitelist
       await whitelistManager.removeUserFromWhitelistIfNoRoles(user.id);
       
-      // Update GitHub Gist after removing banned user
+      // Publish whitelist with contextual commit message after removing banned user
       try {
-        await whitelistManager.updateGistWithWhitelist();
-        console.log(`[Whitelist] GitHub Gist updated after ${userName} was banned`);
-      } catch (gistError) {
-        console.warn(`[Whitelist] Failed to update GitHub Gist after ${userName} was banned:`, gistError);
+        const username = userName;
+        await whitelistManager.publishWhitelist(`${username} was removed with the roles none`);
+        console.log(`[Whitelist] GitHub repository updated after ${userName} was banned`);
+      } catch (repoError) {
+        console.warn(`[Whitelist] Failed to update GitHub repository after ${userName} was banned:`, repoError);
       }
     } catch (error) {
       const userName = ban.user?.displayName || ban.user?.username || ban.user?.id || 'Unknown';
@@ -164,8 +184,6 @@ export class WhitelistRoleSync {
   }
 
   private async hasVRChatAccount(discordId: string): Promise<boolean> {
-    const { prisma } = await import("../../main.js");
-    
     const user = await prisma.user.findUnique({
       where: { discordId },
       include: {

@@ -1,6 +1,7 @@
 import { ApplicationCommandOptionType, CommandInteraction, EmbedBuilder, PermissionFlagsBits, AttachmentBuilder, ApplicationIntegrationType, InteractionContextType } from "discord.js";
 import { Discord, Slash, SlashGroup, SlashOption } from "discordx";
 import { WhitelistManager } from "../../managers/whitelist/whitelistManager.js";
+import { searchUsers } from '../../utility/vrchat/user.js';
 
 const whitelistManager = new WhitelistManager();
 
@@ -252,7 +253,6 @@ export class WhitelistCommands {
       if (targetUser) {
         userInfo = await whitelistManager.getUserByDiscordId(targetUser.id);
       } else if (vrchatUsername) {
-        const { searchUsers } = await import('../../utility/vrchat/user.js');
         const searchResults = await searchUsers({ search: vrchatUsername.trim(), n: 1 });
         if (searchResults.length > 0) {
           userInfo = await whitelistManager.getUserByVrcUserId(searchResults[0].id);
@@ -475,7 +475,7 @@ export class WhitelistCommands {
           { name: "Active Assignments", value: stats.totalActiveAssignments.toString(), inline: true },
           { name: "Expired Assignments", value: stats.totalExpiredAssignments.toString(), inline: true }
         )
-        .setTimestamp();
+        .setTimestamp()
 
       await interaction.reply({ embeds: [embed] });
     } catch (error: any) {
@@ -503,15 +503,15 @@ export class WhitelistCommands {
 
       const stats = await whitelistManager.getStatistics();
 
-      // Try to update the GitHub Gist with the new whitelist
-      let gistUpdateSuccess = false;
-      let gistUpdateError = null;
+      // Try to update the GitHub repository with the new whitelist
+      let repoUpdateSuccess = false;
+      let repoUpdateError = null;
       try {
-        await whitelistManager.updateGistWithWhitelist();
-        gistUpdateSuccess = true;
-      } catch (gistError: any) {
-        gistUpdateError = gistError.message;
-        console.warn('Failed to update GitHub Gist:', gistError);
+        await whitelistManager.publishWhitelist(`manual generate: latest whitelist`);
+        repoUpdateSuccess = true;
+      } catch (repoError: any) {
+        repoUpdateError = repoError.message;
+        console.warn('Failed to update GitHub repository:', repoError);
       }
 
       const embed = new EmbedBuilder()
@@ -522,11 +522,7 @@ export class WhitelistCommands {
           { name: "Active Assignments", value: stats.totalActiveAssignments.toString(), inline: true },
           { name: "Raw Content Size", value: `${rawContent.length} characters`, inline: true },
           { name: "Encoded Size", value: `${encodedContent.length} characters`, inline: true },
-          { 
-            name: "GitHub Gist", 
-            value: gistUpdateSuccess ? "✅ Updated" : `❌ Failed: ${gistUpdateError}`, 
-            inline: true 
-          }
+          { name: "GitHub Repository", value: repoUpdateSuccess ? "✅ Updated" : `❌ Failed: ${repoUpdateError}`, inline: true }
         )
         .setDescription("```\n" + rawContent.substring(0, 1000) + (rawContent.length > 1000 ? "...\n```" : "\n```"))
         .setTimestamp();
@@ -564,28 +560,28 @@ export class WhitelistCommands {
     }
   }
 
-  @Slash({ description: "Update GitHub Gist with current whitelist data" })
-  async updategist(interaction: CommandInteraction): Promise<void> {
+  @Slash({ description: "Update GitHub repository with current whitelist data" })
+  async updaterepo(interaction: CommandInteraction): Promise<void> {
     if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
-      await interaction.reply({ content: "You don't have permission to update the gist.", ephemeral: true });
+      await interaction.reply({ content: "You don't have permission to update the repository.", ephemeral: true });
       return;
     }
 
     try {
       await interaction.deferReply();
       
-      await whitelistManager.updateGistWithWhitelist();
+      await whitelistManager.publishWhitelist(`manual update: latest whitelist`);
       
       const embed = new EmbedBuilder()
-        .setTitle("📝 Gist Updated")
+        .setTitle("📝 Repository Updated")
         .setColor(0x00ff00)
-        .setDescription("Successfully updated GitHub Gist with current whitelist data")
+        .setDescription("Successfully updated GitHub repository with current whitelist data")
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error: any) {
       await interaction.editReply({ 
-        content: `❌ Failed to update gist: ${error.message}`
+        content: `❌ Failed to update repository: ${error.message}`
       });
     }
   }
@@ -704,13 +700,13 @@ export class WhitelistCommands {
 
         await interaction.editReply({ embeds: [embed] });
         
-        // Update GitHub Gist if any changes were made
+  // Update GitHub repository if any changes were made
         if (accessGranted > 0 || accessRevoked > 0) {
           try {
-            await whitelistManager.updateGistWithWhitelist();
-            console.log(`[Whitelist] GitHub Gist updated after bulk validation`);
+            await whitelistManager.publishWhitelist(`bulk validation: access changed (granted=${accessGranted>0}, revoked=${accessRevoked>0})`);
+            console.log(`[Whitelist] GitHub repository updated after bulk validation`);
           } catch (gistError) {
-            console.warn(`[Whitelist] Failed to update GitHub Gist after bulk validation:`, gistError);
+            console.warn(`[Whitelist] Failed to update GitHub repository after bulk validation:`, gistError);
           }
         }
       }

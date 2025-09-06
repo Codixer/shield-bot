@@ -2,7 +2,7 @@ import { ButtonInteraction, MessageFlags, ButtonStyle, EmbedBuilder } from "disc
 import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
 import { ButtonBuilder } from "discord.js";
-
+import { getUserById } from "../../../../utility/vrchat.js";
 @Discord()
 export class VRChatVerifyButtonHandler {
     @ButtonComponent({
@@ -43,7 +43,6 @@ export class VRChatVerifyButtonHandler {
             // Transfer account to new user but keep as UNVERIFIED until verification
             
             // Get VRChat username for caching
-            const { getUserById } = await import("../../../../utility/vrchat.js");
             let vrchatUsername = null;
             try {
                 const userInfo = await getUserById(vrcUserId);
@@ -78,7 +77,6 @@ export class VRChatVerifyButtonHandler {
         // If no account exists, create new unverified bound account
         if (!vrcAccount) {
             // Get VRChat username for caching
-            const { getUserById } = await import("../../../../utility/vrchat.js");
             let vrchatUsername = null;
             try {
                 const userInfo = await getUserById(vrcUserId);
@@ -142,9 +140,8 @@ export class VRChatVerifyButtonHandler {
             return;
         }
 
-        // Get VRChat username for caching
-        const { getUserById } = await import("../../../../utility/vrchat.js");
-        let vrchatUsername = null;
+    // Get VRChat username for caching
+    let vrchatUsername = null;
         try {
             const userInfo = await getUserById(vrcUserId);
             vrchatUsername = userInfo?.displayName || userInfo?.username;
