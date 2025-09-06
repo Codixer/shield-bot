@@ -316,6 +316,21 @@ export class PatrolTimerManager {
     await (prisma as any).voicePatrolMonthlyTime.deleteMany({ where: { guildId } });
   }
 
+  async getUserTotal(guildId: string, userId: string) {
+    const row = await (prisma as any).voicePatrolTime.findUnique({
+      where: { guildId_userId: { guildId, userId } },
+    });
+    let base = row?.totalMs ? Number(row.totalMs) : 0;
+    // Add live delta
+    const guildMap = this.tracked.get(guildId);
+    const tu = guildMap?.get(userId);
+    if (tu) {
+      const delta = Date.now() - tu.startedAt.getTime();
+      base += delta;
+    }
+    return base;
+  }
+
   // Internals
   private async ensureUser(discordId: string) {
     try {

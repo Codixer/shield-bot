@@ -1,6 +1,6 @@
-import { Discord, Slash, SlashGroup, SlashOption } from "discordx";
-import { ApplicationCommandOptionType, ChannelType, CommandInteraction, GuildMember, MessageFlags, PermissionFlagsBits } from "discord.js";
-import { patrolTimer, prisma } from "../main.js";
+import { Discord, Slash, SlashGroup, SlashOption, SlashChoice } from "discordx";
+import { ApplicationCommandOptionType, ChannelType, CommandInteraction, GuildMember, MessageFlags, PermissionFlagsBits, Role, User } from "discord.js";
+import { patrolTimer, prisma } from "../../main.js";
 
 
 @Discord()
@@ -9,7 +9,7 @@ import { patrolTimer, prisma } from "../main.js";
 export class PatrolTimerCommands {
   @Slash({ name: "setup-role", description: "Set role allowed to use patrol commands." })
   async setupRole(
-    @SlashOption({ name: "role", description: "Discord role (ID or mention)", type: ApplicationCommandOptionType.String, required: true }) roleId: string,
+    @SlashOption({ name: "role", description: "Discord role", type: ApplicationCommandOptionType.Role, required: true }) role: Role,
     interaction: CommandInteraction
   ) {
     if (!interaction.guildId || !interaction.guild) return;
@@ -18,13 +18,8 @@ export class PatrolTimerCommands {
       await interaction.reply({ content: "Admin only.", flags: MessageFlags.Ephemeral });
       return;
     }
-    const id = parseRoleId(roleId);
-    if (!id) {
-      await interaction.reply({ content: "Provide a role ID or mention.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-    await patrolTimer.setBotuserRole(interaction.guildId, id);
-    await interaction.reply({ content: `Set bot user role ID: ${id}`, flags: MessageFlags.Ephemeral });
+    await patrolTimer.setBotuserRole(interaction.guildId, role.id);
+    await interaction.reply({ content: `Set bot user role ID: ${role.id}`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({ name: "setup-category", description: "Set tracked voice category to your current voice channel's parent." })
@@ -63,7 +58,34 @@ export class PatrolTimerCommands {
 
   @Slash({ name: "top", description: "Show top users by total voice time." })
   async top(
-    @SlashOption({ name: "limit", description: "Limit (1-1000)", type: ApplicationCommandOptionType.Integer, required: false }) limit: number | undefined,
+    @SlashOption({ name: "limit", description: "Limit", type: ApplicationCommandOptionType.String, required: false })
+    @SlashChoice({ name: "10", value: "10" })
+    @SlashChoice({ name: "25", value: "25" })
+    @SlashChoice({ name: "50", value: "50" })
+    @SlashChoice({ name: "100", value: "100" })
+    @SlashChoice({ name: "500", value: "500" })
+    @SlashChoice({ name: "1000", value: "1000" })
+    limit: string | undefined,
+    @SlashOption({ name: "year", description: "Year", type: ApplicationCommandOptionType.String, required: false })
+    @SlashChoice({ name: "2024", value: "2024" })
+    @SlashChoice({ name: "2025", value: "2025" })
+    @SlashChoice({ name: "2026", value: "2026" })
+    year: string | undefined,
+    @SlashOption({ name: "month", description: "Month", type: ApplicationCommandOptionType.String, required: false })
+    @SlashChoice({ name: "January", value: "1" })
+    @SlashChoice({ name: "February", value: "2" })
+    @SlashChoice({ name: "March", value: "3" })
+    @SlashChoice({ name: "April", value: "4" })
+    @SlashChoice({ name: "May", value: "5" })
+    @SlashChoice({ name: "June", value: "6" })
+    @SlashChoice({ name: "July", value: "7" })
+    @SlashChoice({ name: "August", value: "8" })
+    @SlashChoice({ name: "September", value: "9" })
+    @SlashChoice({ name: "October", value: "10" })
+    @SlashChoice({ name: "November", value: "11" })
+    @SlashChoice({ name: "December", value: "12" })
+    month: string | undefined,
+    @SlashOption({ name: "here", description: "Top for your current voice channel", type: ApplicationCommandOptionType.Boolean, required: false }) here: boolean | undefined,
     interaction: CommandInteraction
   ) {
     if (!interaction.guildId) return;
@@ -72,7 +94,26 @@ export class PatrolTimerCommands {
       await interaction.reply({ content: "You don't have permission to use this.", flags: MessageFlags.Ephemeral });
       return;
     }
-    const rows = await patrolTimer.getTop(interaction.guildId, limit ?? undefined);
+    const member = interaction.member as GuildMember;
+    let rows: any[];
+    if (here) {
+      const channelId = member.voice?.channelId;
+      if (!channelId) {
+        await interaction.reply({ content: "Join a voice channel first.", flags: MessageFlags.Ephemeral });
+        return;
+      }
+      rows = await patrolTimer.getTopForChannel(interaction.guild!, channelId);
+    } else if (year && month) {
+      const y = parseInt(year);
+      const m = parseInt(month);
+      if (!(m >= 1 && m <= 12)) {
+        await interaction.reply({ content: "Invalid month.", flags: MessageFlags.Ephemeral });
+        return;
+      }
+      rows = await (patrolTimer as any).getTopByMonth(interaction.guildId, y, m, limit ? parseInt(limit) : undefined);
+    } else {
+      rows = await patrolTimer.getTop(interaction.guildId, limit ? parseInt(limit) : undefined);
+    }
     if (rows.length === 0) {
       await interaction.reply({ content: "No data.", flags: MessageFlags.Ephemeral });
       return;
@@ -81,11 +122,28 @@ export class PatrolTimerCommands {
     await interaction.reply({ content: lines.join("\n"), flags: MessageFlags.Ephemeral });
   }
 
-  @Slash({ name: "top-month", description: "Show top users by voice time for a given month (UTC)." })
-  async topMonth(
-    @SlashOption({ name: "year", description: "Year (e.g., 2025)", type: ApplicationCommandOptionType.Integer, required: false }) year: number | undefined,
-    @SlashOption({ name: "month", description: "Month 1-12 (UTC)", type: ApplicationCommandOptionType.Integer, required: false }) month: number | undefined,
-    @SlashOption({ name: "limit", description: "Limit (1-1000)", type: ApplicationCommandOptionType.Integer, required: false }) limit: number | undefined,
+  @Slash({ name: "user", description: "Show a user's voice time." })
+  async user(
+    @SlashOption({ name: "user", description: "User (defaults to you)", type: ApplicationCommandOptionType.User, required: false }) user: User | undefined,
+    @SlashOption({ name: "year", description: "Year", type: ApplicationCommandOptionType.String, required: false })
+    @SlashChoice({ name: "2024", value: "2024" })
+    @SlashChoice({ name: "2025", value: "2025" })
+    @SlashChoice({ name: "2026", value: "2026" })
+    year: string | undefined,
+    @SlashOption({ name: "month", description: "Month", type: ApplicationCommandOptionType.String, required: false })
+    @SlashChoice({ name: "January", value: "1" })
+    @SlashChoice({ name: "February", value: "2" })
+    @SlashChoice({ name: "March", value: "3" })
+    @SlashChoice({ name: "April", value: "4" })
+    @SlashChoice({ name: "May", value: "5" })
+    @SlashChoice({ name: "June", value: "6" })
+    @SlashChoice({ name: "July", value: "7" })
+    @SlashChoice({ name: "August", value: "8" })
+    @SlashChoice({ name: "September", value: "9" })
+    @SlashChoice({ name: "October", value: "10" })
+    @SlashChoice({ name: "November", value: "11" })
+    @SlashChoice({ name: "December", value: "12" })
+    month: string | undefined,
     interaction: CommandInteraction
   ) {
     if (!interaction.guildId) return;
@@ -95,76 +153,30 @@ export class PatrolTimerCommands {
       return;
     }
     const now = new Date();
-    const y = year ?? now.getUTCFullYear();
-    const m = month ?? (now.getUTCMonth() + 1);
-    if (!(m >= 1 && m <= 12)) {
-      await interaction.reply({ content: "Month must be 1-12.", flags: MessageFlags.Ephemeral });
+    const y = year ? parseInt(year) : now.getUTCFullYear();
+    const m = month ? parseInt(month) : (now.getUTCMonth() + 1);
+    if (month && !(m >= 1 && m <= 12)) {
+      await interaction.reply({ content: "Invalid month.", flags: MessageFlags.Ephemeral });
       return;
     }
-    const rows = await (patrolTimer as any).getTopByMonth(interaction.guildId, y, m, limit ?? undefined);
-    if (!rows || rows.length === 0) {
-      await interaction.reply({ content: `No data for ${y}-${String(m).padStart(2, "0")}.`, flags: MessageFlags.Ephemeral });
-      return;
-    }
-    const lines = rows.map((r: any, idx: number) => `${idx + 1}. <@${r.userId}> — ${msToReadable(Number(r.totalMs))}`);
-    await interaction.reply({ content: lines.join("\n"), flags: MessageFlags.Ephemeral });
-  }
-
-  @Slash({ name: "top-here", description: "Show top users for your current voice channel." })
-  async topHere(interaction: CommandInteraction) {
-    if (!interaction.guild || !interaction.guildId) return;
-    const member = interaction.member as GuildMember;
-    const channelId = member.voice?.channelId;
-    if (!channelId) {
-      await interaction.reply({ content: "Join a voice channel first.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-    const ok = await hasPatrolPermission(member, interaction.guildId);
-    if (!ok) {
-      await interaction.reply({ content: "You don't have permission to use this.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-    const rows = await patrolTimer.getTopForChannel(interaction.guild, channelId);
-    if (rows.length === 0) {
-      await interaction.reply({ content: "No data for this channel.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-    const lines = rows.map((r: any, idx: number) => `${idx + 1}. <@${r.userId}> — ${msToReadable(Number(r.totalMs))}`);
-    await interaction.reply({ content: lines.join("\n"), flags: MessageFlags.Ephemeral });
-  }
-
-  @Slash({ name: "user-month", description: "Show a user's voice time for a given month (UTC)." })
-  async userMonth(
-    @SlashOption({ name: "user", description: "User mention or ID (defaults to you)", type: ApplicationCommandOptionType.String, required: false }) user: string | undefined,
-    @SlashOption({ name: "year", description: "Year (e.g., 2025)", type: ApplicationCommandOptionType.Integer, required: false }) year: number | undefined,
-    @SlashOption({ name: "month", description: "Month 1-12 (UTC)", type: ApplicationCommandOptionType.Integer, required: false }) month: number | undefined,
-    interaction: CommandInteraction
-  ) {
-    if (!interaction.guildId) return;
-    const ok = await hasPatrolPermission(interaction.member as GuildMember, interaction.guildId);
-    if (!ok) {
-      await interaction.reply({ content: "You don't have permission to use this.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-    const now = new Date();
-    const y = year ?? now.getUTCFullYear();
-    const m = month ?? (now.getUTCMonth() + 1);
-    if (!(m >= 1 && m <= 12)) {
-      await interaction.reply({ content: "Month must be 1-12.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-    let userId = parseUserId(user);
+    let userId = user?.id;
     if (!userId) {
       const mbr = interaction.member as GuildMember;
       userId = mbr.id;
     }
-    const total = await (patrolTimer as any).getUserTotalForMonth(interaction.guildId, userId, y, m);
-    await interaction.reply({ content: `<@${userId}> — ${msToReadable(total)} for ${y}-${String(m).padStart(2, "0")}.`, flags: MessageFlags.Ephemeral });
+    let total: number;
+    if (month) {
+      total = await (patrolTimer as any).getUserTotalForMonth(interaction.guildId, userId, y, m);
+    } else {
+      total = await (patrolTimer as any).getUserTotal(interaction.guildId, userId);
+    }
+    const period = month ? ` for ${year}-${m.toString().padStart(2, "0")}` : "";
+    await interaction.reply({ content: `<@${userId}> — ${msToReadable(total)}${period}.`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({ name: "reset", description: "Reset times (admin)." })
   async reset(
-    @SlashOption({ name: "user", description: "User mention or ID (optional)", type: ApplicationCommandOptionType.String, required: false }) user: string | undefined,
+    @SlashOption({ name: "user", description: "User (optional)", type: ApplicationCommandOptionType.User, required: false }) user: User | undefined,
     interaction: CommandInteraction
   ) {
     if (!interaction.guildId) return;
@@ -173,7 +185,7 @@ export class PatrolTimerCommands {
       await interaction.reply({ content: "Admin only.", flags: MessageFlags.Ephemeral });
       return;
     }
-    const userId = parseUserId(user);
+    const userId = user?.id;
     await patrolTimer.reset(interaction.guildId, userId);
     await interaction.reply({ content: userId ? `Reset time for <@${userId}>.` : "Reset all times.", flags: MessageFlags.Ephemeral });
   }
@@ -189,24 +201,6 @@ export class PatrolTimerCommands {
     await patrolTimer.wipe(interaction.guildId);
     await interaction.reply({ content: "Wiped all patrol data for this guild.", flags: MessageFlags.Ephemeral });
   }
-}
-
-function parseUserId(input?: string) {
-  if (!input) return undefined;
-  const mention = input.trim();
-  if (mention.startsWith("<@") && mention.endsWith(">")) {
-    const id = mention.replace(/<@!?/, "").replace(">", "");
-    return id;
-  }
-  return mention;
-}
-
-function parseRoleId(input: string) {
-  const t = input.trim();
-  if (t.startsWith("<@&") && t.endsWith(">")) {
-    return t.slice(3, -1);
-  }
-  return t;
 }
 
 function msToReadable(ms: number) {

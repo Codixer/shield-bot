@@ -7,17 +7,10 @@ const whitelistManager = new WhitelistManager();
 
 @Discord()
 @SlashGroup({
-  name: "vrchat",
-  description: "VRChat related commands.",
-  contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
-  integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
-})
-@SlashGroup({
   name: "whitelist",
-  description: "VRChat whitelist management commands",
-  root: "vrchat"
+  description: "VRChat whitelist management commands"
 })
-@SlashGroup("whitelist", "vrchat")
+@SlashGroup("whitelist")
 export class WhitelistCommands {
 
   @Slash({ description: "Setup Discord role mapping to whitelist permissions" })
