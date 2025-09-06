@@ -18,3 +18,18 @@ model VoicePatrolTime {
   @@unique([guildId, userId], map: "VoicePatrolTime_guild_user_unique")
   @@index([guildId], map: "VoicePatrolTime_guild_idx")
 }
+
+/// Aggregated monthly totals (UTC) for voice patrol time.
+model VoicePatrolMonthlyTime {
+  id        Int      @id @default(autoincrement())
+  guildId   String
+  userId    String
+  year      Int      // UTC year
+  month     Int      // 1-12, UTC month
+  totalMs   BigInt   @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, userId, year, month], map: "VoicePatrolMonthlyTime_guild_user_year_month_unique")
+  @@index([guildId, year, month], map: "VoicePatrolMonthlyTime_guild_year_month_idx")
+}

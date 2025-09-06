@@ -2,6 +2,7 @@ import { Discord, Slash, SlashGroup, SlashOption } from "discordx";
 import { ApplicationCommandOptionType, ChannelType, CommandInteraction, GuildMember, MessageFlags, PermissionFlagsBits } from "discord.js";
 import { patrolTimer, prisma } from "../main.js";
 
+
 @Discord()
 @SlashGroup({ name: "patrol", description: "Voice patrol timer" })
 @SlashGroup("patrol")
@@ -80,6 +81,35 @@ export class PatrolTimerCommands {
     await interaction.reply({ content: lines.join("\n"), flags: MessageFlags.Ephemeral });
   }
 
+  @Slash({ name: "top-month", description: "Show top users by voice time for a given month (UTC)." })
+  async topMonth(
+    @SlashOption({ name: "year", description: "Year (e.g., 2025)", type: ApplicationCommandOptionType.Integer, required: false }) year: number | undefined,
+    @SlashOption({ name: "month", description: "Month 1-12 (UTC)", type: ApplicationCommandOptionType.Integer, required: false }) month: number | undefined,
+    @SlashOption({ name: "limit", description: "Limit (1-1000)", type: ApplicationCommandOptionType.Integer, required: false }) limit: number | undefined,
+    interaction: CommandInteraction
+  ) {
+    if (!interaction.guildId) return;
+    const ok = await hasPatrolPermission(interaction.member as GuildMember, interaction.guildId);
+    if (!ok) {
+      await interaction.reply({ content: "You don't have permission to use this.", flags: MessageFlags.Ephemeral });
+      return;
+    }
+    const now = new Date();
+    const y = year ?? now.getUTCFullYear();
+    const m = month ?? (now.getUTCMonth() + 1);
+    if (!(m >= 1 && m <= 12)) {
+      await interaction.reply({ content: "Month must be 1-12.", flags: MessageFlags.Ephemeral });
+      return;
+    }
+    const rows = await (patrolTimer as any).getTopByMonth(interaction.guildId, y, m, limit ?? undefined);
+    if (!rows || rows.length === 0) {
+      await interaction.reply({ content: `No data for ${y}-${String(m).padStart(2, "0")}.`, flags: MessageFlags.Ephemeral });
+      return;
+    }
+    const lines = rows.map((r: any, idx: number) => `${idx + 1}. <@${r.userId}> — ${msToReadable(Number(r.totalMs))}`);
+    await interaction.reply({ content: lines.join("\n"), flags: MessageFlags.Ephemeral });
+  }
+
   @Slash({ name: "top-here", description: "Show top users for your current voice channel." })
   async topHere(interaction: CommandInteraction) {
     if (!interaction.guild || !interaction.guildId) return;
@@ -101,6 +131,35 @@ export class PatrolTimerCommands {
     }
     const lines = rows.map((r: any, idx: number) => `${idx + 1}. <@${r.userId}> — ${msToReadable(Number(r.totalMs))}`);
     await interaction.reply({ content: lines.join("\n"), flags: MessageFlags.Ephemeral });
+  }
+
+  @Slash({ name: "user-month", description: "Show a user's voice time for a given month (UTC)." })
+  async userMonth(
+    @SlashOption({ name: "user", description: "User mention or ID (defaults to you)", type: ApplicationCommandOptionType.String, required: false }) user: string | undefined,
+    @SlashOption({ name: "year", description: "Year (e.g., 2025)", type: ApplicationCommandOptionType.Integer, required: false }) year: number | undefined,
+    @SlashOption({ name: "month", description: "Month 1-12 (UTC)", type: ApplicationCommandOptionType.Integer, required: false }) month: number | undefined,
+    interaction: CommandInteraction
+  ) {
+    if (!interaction.guildId) return;
+    const ok = await hasPatrolPermission(interaction.member as GuildMember, interaction.guildId);
+    if (!ok) {
+      await interaction.reply({ content: "You don't have permission to use this.", flags: MessageFlags.Ephemeral });
+      return;
+    }
+    const now = new Date();
+    const y = year ?? now.getUTCFullYear();
+    const m = month ?? (now.getUTCMonth() + 1);
+    if (!(m >= 1 && m <= 12)) {
+      await interaction.reply({ content: "Month must be 1-12.", flags: MessageFlags.Ephemeral });
+      return;
+    }
+    let userId = parseUserId(user);
+    if (!userId) {
+      const mbr = interaction.member as GuildMember;
+      userId = mbr.id;
+    }
+    const total = await (patrolTimer as any).getUserTotalForMonth(interaction.guildId, userId, y, m);
+    await interaction.reply({ content: `<@${userId}> — ${msToReadable(total)} for ${y}-${String(m).padStart(2, "0")}.`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({ name: "reset", description: "Reset times (admin)." })

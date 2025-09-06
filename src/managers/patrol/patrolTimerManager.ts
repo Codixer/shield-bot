@@ -100,7 +100,8 @@ export class PatrolTimerManager {
     const tracked = guildMap.get(member.id);
     if (!tracked) return;
     // If switching channels within same category, we still finalize from old channel
-    const delta = Date.now() - tracked.startedAt.getTime();
+    const nowMs = Date.now();
+    const delta = nowMs - tracked.startedAt.getTime();
     guildMap.delete(member.id);
     if (delta < 3000) return; // ignore very short joins; parity with original impl
     // Upsert DB row and increment time
@@ -109,6 +110,9 @@ export class PatrolTimerManager {
       update: { totalMs: { increment: BigInt(delta) } },
       create: { guildId, userId: member.id, totalMs: BigInt(delta) },
     });
+
+    // Also persist monthly totals, splitting across month boundaries (UTC)
+    await this.persistMonthly(guildId, member.id, tracked.startedAt, new Date(nowMs));
   }
 
   // Commands
@@ -130,6 +134,22 @@ export class PatrolTimerManager {
       take: limit && limit > 0 ? Math.min(limit, 1000) : undefined,
     });
     return rows;
+  }
+
+  async getTopByMonth(guildId: string, year: number, month: number, limit?: number) {
+    const rows = await (prisma as any).voicePatrolMonthlyTime.findMany({
+      where: { guildId, year, month },
+      orderBy: { totalMs: "desc" },
+      take: limit && limit > 0 ? Math.min(limit, 1000) : undefined,
+    });
+    return rows;
+  }
+
+  async getUserTotalForMonth(guildId: string, userId: string, year: number, month: number) {
+    const row = await (prisma as any).voicePatrolMonthlyTime.findUnique({
+      where: { guildId_userId_year_month: { guildId, userId, year, month } },
+    });
+    return row?.totalMs ? Number(row.totalMs) : 0;
   }
 
   async getTopForChannel(guild: Guild, channelId: string) {
@@ -154,6 +174,30 @@ export class PatrolTimerManager {
 
   async wipe(guildId: string) {
     await (prisma as any).voicePatrolTime.deleteMany({ where: { guildId } });
+    await (prisma as any).voicePatrolMonthlyTime.deleteMany({ where: { guildId } });
+  }
+
+  // Internals
+  private async persistMonthly(guildId: string, userId: string, startedAt: Date, endedAt: Date) {
+    // Split [startedAt, endedAt) across months in UTC and increment each bucket
+    let curStart = new Date(startedAt);
+    const endMs = endedAt.getTime();
+
+    while (curStart.getTime() < endMs) {
+      const y = curStart.getUTCFullYear();
+      const m = curStart.getUTCMonth(); // 0-11
+      const nextMonthStart = new Date(Date.UTC(m === 11 ? y + 1 : y, (m + 1) % 12, 1, 0, 0, 0, 0));
+      const segmentEndMs = Math.min(endMs, nextMonthStart.getTime());
+      const segDelta = segmentEndMs - curStart.getTime();
+      if (segDelta > 0) {
+        await (prisma as any).voicePatrolMonthlyTime.upsert({
+          where: { guildId_userId_year_month: { guildId, userId, year: y, month: m + 1 } },
+          update: { totalMs: { increment: BigInt(segDelta) } },
+          create: { guildId, userId, year: y, month: m + 1, totalMs: BigInt(segDelta) },
+        });
+      }
+      curStart = new Date(segmentEndMs);
+    }
   }
 }
 // No default export; a singleton is created and exported from main.ts
