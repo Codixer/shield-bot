@@ -100,6 +100,7 @@ export class PatrolTimerCommands {
       return;
     }
     const member = interaction.member as GuildMember;
+    const now = new Date();
     let rows: any[];
     if (here) {
       const channelId = member.voice?.channelId;
@@ -108,16 +109,10 @@ export class PatrolTimerCommands {
         return;
       }
       rows = await patrolTimer.getTopForChannel(interaction.guild!, channelId);
-    } else if (year && month) {
-      const y = parseInt(year);
-      const m = parseInt(month);
-      if (!(m >= 1 && m <= 12)) {
-        await interaction.reply({ content: "Invalid month.", flags: MessageFlags.Ephemeral });
-        return;
-      }
-      rows = await (patrolTimer as any).getTopByMonth(interaction.guildId, y, m, limit ? parseInt(limit) : undefined);
     } else {
-      rows = await patrolTimer.getTop(interaction.guildId, limit ? parseInt(limit) : undefined);
+      const y = year ? parseInt(year) : now.getUTCFullYear();
+      const m = month ? parseInt(month) : (now.getUTCMonth() + 1);
+      rows = await (patrolTimer as any).getTopByMonth(interaction.guildId, y, m, limit ? parseInt(limit) : undefined);
     }
     if (rows.length === 0) {
       await interaction.reply({ content: "No data.", flags: MessageFlags.Ephemeral });
@@ -131,7 +126,6 @@ export class PatrolTimerCommands {
   async user(
     @SlashOption({ name: "user", description: "User (defaults to you)", type: ApplicationCommandOptionType.User, required: false }) user: User | undefined,
     @SlashOption({ name: "year", description: "Year", type: ApplicationCommandOptionType.String, required: false })
-    @SlashChoice({ name: "2024", value: "2024" })
     @SlashChoice({ name: "2025", value: "2025" })
     @SlashChoice({ name: "2026", value: "2026" })
     year: string | undefined,
@@ -170,12 +164,8 @@ export class PatrolTimerCommands {
       userId = mbr.id;
     }
     let total: number;
-    if (month) {
-      total = await (patrolTimer as any).getUserTotalForMonth(interaction.guildId, userId, y, m);
-    } else {
-      total = await (patrolTimer as any).getUserTotal(interaction.guildId, userId);
-    }
-    const period = month ? ` for ${year}-${m.toString().padStart(2, "0")}` : "";
+    total = await (patrolTimer as any).getUserTotalForMonth(interaction.guildId, userId, y, m);
+    const period = ` for ${y}-${m.toString().padStart(2, "0")}`;
     await interaction.reply({ content: `<@${userId}> — ${msToReadable(total)}${period}.`, flags: MessageFlags.Ephemeral });
   }
 
