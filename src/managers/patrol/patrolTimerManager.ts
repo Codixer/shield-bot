@@ -180,28 +180,94 @@ export class PatrolTimerManager {
   }
 
   async getTop(guildId: string, limit?: number) {
-  const rows = await (prisma as any).voicePatrolTime.findMany({
+    const rows = await (prisma as any).voicePatrolTime.findMany({
       where: { guildId },
       orderBy: { totalMs: "desc" },
-      take: limit && limit > 0 ? Math.min(limit, 1000) : undefined,
+      take: undefined, // we'll sort after adding live deltas
     });
-    return rows;
+
+    // Merge live tracked deltas
+    const now = Date.now();
+    const guildMap = this.tracked.get(guildId);
+    const byUser: Record<string, number> = {};
+
+    for (const r of rows) {
+      byUser[r.userId] = Number(r.totalMs);
+    }
+    if (guildMap) {
+      for (const tu of guildMap.values()) {
+        const delta = now - tu.startedAt.getTime();
+        if (delta > 0) byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+      }
+    }
+
+    // To array and sort desc
+    const arr = Object.entries(byUser)
+      .map(([userId, totalMs]) => ({ userId, totalMs }))
+      .sort((a, b) => b.totalMs - a.totalMs);
+
+    const limited = limit && limit > 0 ? arr.slice(0, Math.min(limit, 1000)) : arr;
+
+    // Return in a shape similar to prisma rows expected by command code
+    return limited.map((r) => ({ userId: r.userId, totalMs: BigInt(Math.max(0, Math.floor(r.totalMs))) }));
   }
 
   async getTopByMonth(guildId: string, year: number, month: number, limit?: number) {
     const rows = await (prisma as any).voicePatrolMonthlyTime.findMany({
       where: { guildId, year, month },
       orderBy: { totalMs: "desc" },
-      take: limit && limit > 0 ? Math.min(limit, 1000) : undefined,
+      take: undefined,
     });
-    return rows;
+    // Merge live delta if querying the current UTC month
+    const now = new Date();
+    const isCurrentMonth = (now.getUTCFullYear() === year) && (now.getUTCMonth() + 1 === month);
+    if (!isCurrentMonth) {
+      const limited = limit && limit > 0 ? rows.slice(0, Math.min(limit, 1000)) : rows;
+      return limited;
+    }
+
+    const monthStart = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)).getTime();
+    const nowMs = now.getTime();
+    const guildMap = this.tracked.get(guildId);
+    const byUser: Record<string, number> = {};
+
+    for (const r of rows) byUser[r.userId] = Number(r.totalMs);
+
+    if (guildMap) {
+      for (const tu of guildMap.values()) {
+        const startMs = Math.max(tu.startedAt.getTime(), monthStart);
+        const delta = Math.max(0, nowMs - startMs);
+        if (delta > 0) byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+      }
+    }
+
+    const arr = Object.entries(byUser)
+      .map(([userId, totalMs]) => ({ userId, totalMs }))
+      .sort((a, b) => b.totalMs - a.totalMs);
+    const limited = limit && limit > 0 ? arr.slice(0, Math.min(limit, 1000)) : arr;
+    return limited.map(r => ({ userId: r.userId, totalMs: BigInt(Math.max(0, Math.floor(r.totalMs))) }));
   }
 
   async getUserTotalForMonth(guildId: string, userId: string, year: number, month: number) {
     const row = await (prisma as any).voicePatrolMonthlyTime.findUnique({
       where: { guildId_userId_year_month: { guildId, userId, year, month } },
     });
-    return row?.totalMs ? Number(row.totalMs) : 0;
+    let base = row?.totalMs ? Number(row.totalMs) : 0;
+
+    // Add live delta for current month if user is currently tracked
+    const now = new Date();
+    const isCurrentMonth = (now.getUTCFullYear() === year) && (now.getUTCMonth() + 1 === month);
+    if (isCurrentMonth) {
+      const guildMap = this.tracked.get(guildId);
+      const tu = guildMap?.get(userId);
+      if (tu) {
+        const monthStart = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0)).getTime();
+        const startMs = Math.max(tu.startedAt.getTime(), monthStart);
+        const delta = Math.max(0, Date.now() - startMs);
+        base += delta;
+      }
+    }
+    return base;
   }
 
   async getTopForChannel(guild: Guild, channelId: string) {
@@ -209,11 +275,32 @@ export class PatrolTimerManager {
   const members = guild.members.cache.filter(m => !m.user.bot && (m.voice?.channelId === channelId));
     const ids = members.map(m => m.id);
   if (ids.length === 0) return [] as any[];
-  const rows = await (prisma as any).voicePatrolTime.findMany({
+    const rows = await (prisma as any).voicePatrolTime.findMany({
       where: { guildId: guild.id, userId: { in: ids } },
       orderBy: { totalMs: "desc" },
     });
-    return rows;
+
+    const now = Date.now();
+    const guildMap = this.tracked.get(guild.id);
+    const byUser: Record<string, number> = {};
+
+    for (const r of rows) {
+      byUser[r.userId] = Number(r.totalMs);
+    }
+    if (guildMap) {
+      for (const tu of guildMap.values()) {
+        if (tu.channelId !== channelId) continue; // only add deltas for this channel
+        if (!ids.includes(tu.userId)) continue;
+        const delta = now - tu.startedAt.getTime();
+        if (delta > 0) byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+      }
+    }
+
+    const arr = Object.entries(byUser)
+      .map(([userId, totalMs]) => ({ userId, totalMs }))
+      .sort((a, b) => b.totalMs - a.totalMs);
+
+    return arr.map((r) => ({ userId: r.userId, totalMs: BigInt(Math.max(0, Math.floor(r.totalMs))) }));
   }
 
   async reset(guildId: string, userId?: string) {
