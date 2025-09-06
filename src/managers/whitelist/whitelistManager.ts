@@ -557,17 +557,74 @@ export class WhitelistManager {
     const newTreeSha = newTree?.sha;
     if (!newTreeSha) throw new Error('Failed to create new tree');
 
-    // Step 5: Create a new commit
+    // Step 5: Create a new commit (optionally PGP-signed)
     const message = commitMessage?.trim() && commitMessage.length > 0
       ? commitMessage
       : `chore(whitelist): update encoded (${encodedFilePath}) and decoded (${decodedFilePath}) at ${new Date().toISOString()}`;
+
+    // Optional author/committer and PGP signature support
+    const signEnabled = String(process.env.GIT_SIGN_COMMITS || '').toLowerCase() === 'true';
+    const authorName = process.env.GIT_AUTHOR_NAME || undefined;
+    const authorEmail = process.env.GIT_AUTHOR_EMAIL || undefined;
+    const committerName = process.env.GIT_COMMITTER_NAME || authorName;
+    const committerEmail = process.env.GIT_COMMITTER_EMAIL || authorEmail;
+    const nowIso = new Date().toISOString();
+
+    const author = (authorName && authorEmail) ? { name: authorName, email: authorEmail, date: nowIso } : undefined;
+    const committer = (committerName && committerEmail) ? { name: committerName, email: committerEmail, date: nowIso } : undefined;
+
+    let signature: string | undefined = undefined;
+
+    if (signEnabled) {
+      try {
+        const privateKeyArmored = process.env.GIT_PGP_PRIVATE_KEY;
+        const passphrase = process.env.GIT_PGP_PASSPHRASE || '';
+        if (!privateKeyArmored) {
+          throw new Error('GIT_SIGN_COMMITS is true but GIT_PGP_PRIVATE_KEY is not set');
+        }
+        if (!author || !committer) {
+          throw new Error('GIT_SIGN_COMMITS is true but author/committer identity env vars are missing');
+        }
+
+        // Build raw commit payload matching what GitHub expects for signing
+        const payload = this.buildRawCommitPayload({
+          treeSha: newTreeSha,
+          parentSha: latestCommitSha,
+          author: author,
+          committer: committer,
+          message
+        });
+
+        // Dynamic import to avoid cost if not signing
+        const openpgp = await import('openpgp');
+        const privateKey = await openpgp.readPrivateKey({ armoredKey: privateKeyArmored });
+        const decryptedKey = passphrase
+          ? await openpgp.decryptKey({ privateKey, passphrase })
+          : privateKey;
+        const signed = await openpgp.sign({
+          message: await openpgp.createMessage({ text: payload }),
+          signingKeys: decryptedKey,
+          detached: true,
+          format: 'armored'
+        } as any);
+        signature = typeof signed === 'string' ? signed : undefined;
+      } catch (e) {
+        console.warn('[Whitelist] Failed to sign commit, falling back to unsigned commit:', e);
+      }
+    }
+
+    const commitBody: any = {
+      message,
+      tree: newTreeSha,
+      parents: [latestCommitSha]
+    };
+    if (author) commitBody.author = author;
+    if (committer) commitBody.committer = committer;
+    if (signature) commitBody.signature = signature;
+
     const newCommit = await gh(`/repos/${owner}/${repo}/git/commits`, {
       method: 'POST',
-      body: JSON.stringify({
-        message,
-        tree: newTreeSha,
-        parents: [latestCommitSha]
-      })
+      body: JSON.stringify(commitBody)
     });
     const newCommitSha = newCommit?.sha;
     if (!newCommitSha) throw new Error('Failed to create new commit');
@@ -579,6 +636,46 @@ export class WhitelistManager {
     });
 
   return { updated: true, commitSha: newCommitSha, paths: [encodedFilePath, decodedFilePath], branch };
+  }
+
+  /**
+   * Build the raw commit payload used for PGP signing.
+   * Format:
+   *   tree <treeSha>\n
+   *   parent <parentSha>\n
+   *   author Name <email> <unixSeconds> +0000\n
+   *   committer Name <email> <unixSeconds> +0000\n
+   *   \n
+   *   <message>\n
+   */
+  private buildRawCommitPayload(input: {
+    treeSha: string;
+    parentSha: string;
+    author: { name: string; email: string; date: string };
+    committer: { name: string; email: string; date: string };
+    message: string;
+  }): string {
+    const toUnixAndTz = (iso: string) => {
+      const d = new Date(iso);
+      const unix = Math.floor(d.getTime() / 1000);
+      // Use UTC to avoid host-dependent offsets; ensures JSON date and payload align
+      const tz = '+0000';
+      return `${unix} ${tz}`;
+    };
+
+    const authorLine = `author ${input.author.name} <${input.author.email}> ${toUnixAndTz(input.author.date)}`;
+    const committerLine = `committer ${input.committer.name} <${input.committer.email}> ${toUnixAndTz(input.committer.date)}`;
+
+    const lines = [
+      `tree ${input.treeSha}`,
+      `parent ${input.parentSha}`,
+      authorLine,
+      committerLine,
+      '',
+      input.message,
+      ''
+    ];
+    return lines.join('\n');
   }
 
   /**
