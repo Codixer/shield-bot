@@ -1,7 +1,10 @@
-import { Discord, Slash, Guard, SlashGroup } from "discordx";
-import { CommandInteraction, MessageFlags, EmbedBuilder, Colors, ButtonBuilder, ButtonStyle, ActionRowBuilder, InteractionContextType, ApplicationIntegrationType } from "discord.js";
-import { BotOwnerGuard } from "../../../utility/guards.js";
+import { CommandInteraction, MessageFlags, ButtonBuilder, ButtonStyle,
+ContainerBuilder, SectionBuilder, TextDisplayBuilder, ActionRowBuilder,
+ApplicationIntegrationType, InteractionContextType, SeparatorBuilder, SeparatorSpacingSize, type
+MessageActionRowComponentBuilder } from "discord.js";
+import { Discord, Guard, Slash, SlashGroup } from "discordx";
 import { prisma } from "../../../main.js";
+import { VRChatLoginGuard } from "../../../utility/guards.js";
 
 @Discord()
 @SlashGroup({
@@ -11,90 +14,176 @@ import { prisma } from "../../../main.js";
   integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
 })
 @SlashGroup("verify")
-@Guard(BotOwnerGuard)
+@Guard(VRChatLoginGuard)
 export class VRChatVerifyManagerCommand {
-
   @Slash({
-    name: "manager",
-    description: "Manage verification status of VRChat accounts (Bot Owner only).",
+    name: "manage",
+    description: "Manage MAIN/ALT status for your verified VRChat accounts.",
   })
-  async manager(interaction: CommandInteraction) {
-    const user = await prisma.user.findUnique({
-      where: { discordId: interaction.user.id },
-      include: { vrchatAccounts: true }
+  async manage(interaction: CommandInteraction) {
+    const discordId = interaction.user.id;
+    
+    // Get all VRChat accounts for this user
+    const user = await prisma.user.findUnique({ 
+      where: { discordId }, 
+      include: { vrchatAccounts: true } 
     });
-
-    if (!user) {
+    
+    if (!user || !user.vrchatAccounts || user.vrchatAccounts.length === 0) {
       await interaction.reply({
-        content: "❌ User not found in database.",
+        content: "No VRChat accounts found for your Discord account.",
         flags: MessageFlags.Ephemeral
       });
       return;
     }
 
-    // Filter to only show accounts that can be managed
-    const manageableAccounts = user.vrchatAccounts.filter((acc: any) =>
-      acc.accountType === "MAIN" || acc.accountType === "ALT" || acc.accountType === "UNVERIFIED"
+    // Separate verified and unverified accounts
+    const verifiedAccounts = user.vrchatAccounts.filter((acc: any) => acc.accountType === 'MAIN' || acc.accountType === 'ALT');
+    const unverifiedAccounts = user.vrchatAccounts.filter((acc: any) => acc.accountType === 'UNVERIFIED');
+    
+    if (verifiedAccounts.length === 0 && unverifiedAccounts.length === 0) {
+      await interaction.reply({
+        content: "No VRChat accounts found for your Discord account.",
+        flags: MessageFlags.Ephemeral
+      });
+      return;
+    }
+
+    // Build the container using the new structure
+    const container = new ContainerBuilder();
+    
+    container.addSectionComponents(
+      new SectionBuilder()
+        .setButtonAccessory(
+          new ButtonBuilder()
+            .setStyle(ButtonStyle.Secondary)
+            .setLabel("Info")
+            .setEmoji({ name: "ℹ️" })
+            .setDisabled(true)
+            .setCustomId("accountmanager:info")
+        )
+        .addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            "**Account Manager**\n- Only **verified** accounts can be set as MAIN/ALT. Unverified accounts have basic whitelist access only.\n- One MAIN account allowed. Deleting an account will unfriend it.\n- Username updates require being friended with the bot."
+          )
+        )
     );
 
-    if (manageableAccounts.length === 0) {
-      await interaction.reply({
-        content: "❌ No VRChat accounts found that can be managed.",
-        flags: MessageFlags.Ephemeral
-      });
-      return;
+    container.addSeparatorComponents(
+      new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+    );
+
+    // Show verified accounts first
+    if (verifiedAccounts.length > 0) {
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent("**🔒 Verified Accounts**")
+      );
+
+      for (const acc of verifiedAccounts) {
+        const profileLink = `<https://vrchat.com/home/user/${acc.vrcUserId}>`;
+        const displayName = acc.vrchatUsername || acc.vrcUserId;
+        const consent = await prisma.friendLocationConsent.findFirst({ where: { ownerVrcUserId: acc.vrcUserId } });
+        const consentStatus = consent ? "Tracking: Enabled" : "Tracking: Disabled";
+        const discordPing = `<@${discordId}>`;
+        
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            `[${displayName}](${profileLink}) - ${consentStatus} - Linked to ${discordPing}`
+          )
+        );
+
+        const isMain = acc.accountType === "MAIN";
+        const isAlt = acc.accountType === "ALT";
+
+        // Button color/enable logic for verified accounts
+        let mainBtnStyle = ButtonStyle.Primary;
+        let mainBtnDisabled = false;
+        let altBtnStyle = ButtonStyle.Secondary;
+        let altBtnDisabled = false;
+
+        if (isMain) {
+          mainBtnStyle = ButtonStyle.Success; // Green
+          mainBtnDisabled = true;
+          altBtnStyle = ButtonStyle.Secondary; // Gray
+          altBtnDisabled = false;
+        } else if (isAlt) {
+          mainBtnStyle = ButtonStyle.Secondary; // Gray
+          mainBtnDisabled = false;
+          altBtnStyle = ButtonStyle.Primary; // Blue
+          altBtnDisabled = true;
+        }
+
+        container.addActionRowComponents(
+          new ActionRowBuilder<MessageActionRowComponentBuilder>()
+            .addComponents(
+              new ButtonBuilder()
+                .setStyle(mainBtnStyle)
+                .setLabel("Main")
+                .setDisabled(mainBtnDisabled)
+                .setCustomId(`accountmanager:main:${acc.vrcUserId}`),
+              new ButtonBuilder()
+                .setStyle(altBtnStyle)
+                .setLabel("Alt")
+                .setDisabled(altBtnDisabled)
+                .setCustomId(`accountmanager:alt:${acc.vrcUserId}`),
+              new ButtonBuilder()
+                .setStyle(ButtonStyle.Danger)
+                .setLabel("Unlink (Delete)")
+                .setCustomId(`accountmanager:delete:${acc.vrcUserId}`)
+            )
+        );
+      }
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle("🔧 VRChat Account Manager")
-      .setDescription("Select an account and action to perform:")
-      .setColor(Colors.Blue)
-      .setFooter({ text: "Bot Owner Management Tool" });
-
-    const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-
-    for (let i = 0; i < manageableAccounts.length; i += 4) {
-      const row = new ActionRowBuilder<ButtonBuilder>();
-
-      for (let j = i; j < Math.min(i + 4, manageableAccounts.length); j++) {
-        const acc = manageableAccounts[j];
-        const accountType = acc.accountType === "MAIN" ? "⭐" :
-                           acc.accountType === "ALT" ? "🔸" : "❓";
-
-        // Verify button
-        if (acc.accountType === "UNVERIFIED" || acc.accountType === "IN_VERIFICATION") {
-          row.addComponents(
-            new ButtonBuilder()
-              .setCustomId(`verify-account:${acc.vrcUserId}`)
-              .setLabel(`${accountType} Verify ${acc.vrchatUsername || acc.vrcUserId}`)
-              .setStyle(ButtonStyle.Success)
-          );
-        } else {
-          // Set as Main/Alt buttons for verified accounts
-          row.addComponents(
-            new ButtonBuilder()
-              .setCustomId(`set-main:${acc.vrcUserId}`)
-              .setLabel(`${accountType} Set Main`)
-              .setStyle(ButtonStyle.Primary),
-            new ButtonBuilder()
-              .setCustomId(`set-alt:${acc.vrcUserId}`)
-              .setLabel(`🔸 Set Alt`)
-              .setStyle(ButtonStyle.Secondary),
-            new ButtonBuilder()
-              .setCustomId(`unverify-account:${acc.vrcUserId}`)
-              .setLabel(`❌ Unverify`)
-              .setStyle(ButtonStyle.Danger)
-          );
-        }
+    // Show unverified accounts
+    if (unverifiedAccounts.length > 0) {
+      if (verifiedAccounts.length > 0) {
+        container.addSeparatorComponents(
+          new SeparatorBuilder().setSpacing(SeparatorSpacingSize.Small).setDivider(true)
+        );
       }
 
-      rows.push(row);
+      container.addTextDisplayComponents(
+        new TextDisplayBuilder().setContent("**⚠️ Unverified Accounts (Basic Access Only)**")
+      );
+
+      for (const acc of unverifiedAccounts) {
+        const profileLink = `<https://vrchat.com/home/user/${acc.vrcUserId}>`;
+        const displayName = acc.vrchatUsername || acc.vrcUserId;
+        const discordPing = `<@${discordId}>`;
+        
+        container.addTextDisplayComponents(
+          new TextDisplayBuilder().setContent(
+            `[${displayName}](${profileLink}) - **Can be taken over** - Linked to ${discordPing}`
+          )
+        );
+
+        // Only show delete button for unverified accounts
+        container.addActionRowComponents(
+          new ActionRowBuilder<MessageActionRowComponentBuilder>()
+            .addComponents(
+              new ButtonBuilder()
+                .setStyle(ButtonStyle.Secondary)
+                .setLabel("Main")
+                .setDisabled(true)
+                .setCustomId(`accountmanager:disabled:main`),
+              new ButtonBuilder()
+                .setStyle(ButtonStyle.Secondary)
+                .setLabel("Alt")
+                .setDisabled(true)
+                .setCustomId(`accountmanager:disabled:alt`),
+              new ButtonBuilder()
+                .setStyle(ButtonStyle.Danger)
+                .setLabel("Unlink (Delete)")
+                .setCustomId(`accountmanager:delete:${acc.vrcUserId}`)
+            )
+        );
+      }
     }
 
     await interaction.reply({
-      embeds: [embed],
-      components: rows,
-      flags: MessageFlags.Ephemeral
+      components: [container],
+      flags: [MessageFlags.Ephemeral, MessageFlags.IsComponentsV2]
     });
   }
 }
