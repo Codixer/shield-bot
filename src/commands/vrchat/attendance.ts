@@ -15,6 +15,9 @@ const attendanceManager = new AttendanceManager();
   integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
 })
 @SlashGroup({ name: "attendance", description: "Attendance tracking commands.", root: "vrchat" })
+@SlashGroup({ description: "Backup request commands", name: "backup", root: "vrchat" })
+@SlashGroup({ description: "Location tracking commands", name: "location", root: "vrchat" })
+@SlashGroup({ description: "Dispatch logging commands", name: "dispatch", root: "vrchat" })
 @SlashGroup("attendance", "vrchat")
 @Guard(VRChatLoginGuard)
 @Guard(AttendanceHostGuard)

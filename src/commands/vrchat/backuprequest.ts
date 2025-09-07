@@ -8,12 +8,11 @@ import { extractInstanceNumber, resolveWorldDisplay } from "../../utility/vrchat
 
 @Discord()
 @SlashGroup({
-  name: "vrchat",
-  description: "VRChat related commands.",
-  contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
-  integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
+  description: "Backup request commands",
+  name: "backup",
+  root: "vrchat"
 })
-@SlashGroup("vrchat")
+@SlashGroup("backup", "vrchat")
 @Guard(VRChatLoginGuard)
 @Guard(ShieldMemberGuard)
 export default class BackupRequestCommand {

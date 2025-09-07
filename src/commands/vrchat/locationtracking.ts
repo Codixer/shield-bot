@@ -7,12 +7,11 @@ import { getUserById } from "../../utility/vrchat.js";
 
 @Discord()
 @SlashGroup({
-  name: "vrchat",
-  description: "VRChat related commands.",
-  contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
-  integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
+  description: "Location tracking commands",
+  name: "location",
+  root: "vrchat"
 })
-@SlashGroup("vrchat")
+@SlashGroup("location", "vrchat")
 @Guard(VRChatLoginGuard)
 @Guard(BotOwnerGuard)
 export class VRChatLocationTrackingCommand {

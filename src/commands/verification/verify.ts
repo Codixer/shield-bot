@@ -11,9 +11,19 @@ config();
 
 @SlashGroup({
   name: "verify",
-  description: "VRChat related commands.",
+  description: "VRChat verification commands.",
   contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
   integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
+})
+@SlashGroup({
+  description: "Verification status commands",
+  name: "status",
+  root: "verify"
+})
+@SlashGroup({
+  description: "Account management commands",
+  name: "account",
+  root: "verify"
 })
 @SlashGroup("verify")
 @Guard(VRChatLoginGuard)

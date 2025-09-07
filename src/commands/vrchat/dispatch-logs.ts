@@ -8,12 +8,11 @@ import { extractInstanceNumber, resolveWorldDisplay } from "../../utility/vrchat
 
 @Discord()
 @SlashGroup({
-  name: "vrchat",
-  description: "VRChat related commands.",
-  contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
-  integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
+  description: "Dispatch logging commands",
+  name: "dispatch",
+  root: "vrchat"
 })
-@SlashGroup("vrchat")
+@SlashGroup("dispatch", "vrchat")
 @Guard(VRChatLoginGuard)
 @Guard(ShieldMemberGuard)
 export default class DispatchLogsCommand {

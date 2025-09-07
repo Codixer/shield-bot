@@ -5,12 +5,11 @@ import { getVRChatAccountStatus } from "../../utility/vrchat/user.js";
 
 @Discord()
 @SlashGroup({
-  name: "verify",
-  description: "VRChat related commands.",
-  contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
-  integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
+  description: "Verification status commands",
+  name: "status",
+  root: "verify"
 })
-@SlashGroup("verify")
+@SlashGroup("status", "verify")
 @Guard(VRChatLoginGuard)
 export class VRChatStatusCommand {
   @Slash({
