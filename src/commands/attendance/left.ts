@@ -1,7 +1,7 @@
 import { Discord, Slash, SlashOption, Guard, SlashGroup } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, InteractionContextType, ApplicationIntegrationType } from "discord.js";
-import { AttendanceManager } from "../../../managers/attendance/attendanceManager.js";
-import { VRChatLoginGuard, AttendanceHostGuard } from "../../../utility/guards.js";
+import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
+import { VRChatLoginGuard, AttendanceHostGuard } from "../../utility/guards.js";
 
 const attendanceManager = new AttendanceManager();
 
@@ -15,13 +15,13 @@ const attendanceManager = new AttendanceManager();
 @SlashGroup("attendance")
 @Guard(VRChatLoginGuard)
 @Guard(AttendanceHostGuard)
-export class VRChatAttendanceCohostCommand {
+export class VRChatAttendanceLeftCommand {
 
   @Slash({
-    name: "cohost",
-    description: "Set user as cohost."
+    name: "left",
+    description: "Mark user as having left the event."
   })
-  async cohost(
+  async left(
     @SlashOption({ name: "user", description: "Discord User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     interaction: CommandInteraction
   ) {
@@ -36,10 +36,10 @@ export class VRChatAttendanceCohostCommand {
 
     const { eventId } = active;
     const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
-    await attendanceManager.setCohost(eventId, dbUser.id);
+    await attendanceManager.markUserAsLeft(eventId, dbUser.id);
 
     await interaction.reply({
-      content: `Set <@${user.id}> as cohost`,
+      content: `Marked <@${user.id}> as having left the event`,
       flags: MessageFlags.Ephemeral
     });
   }

@@ -31,9 +31,9 @@ model SquadMember {
   squadId   Int
   isLead    Boolean @default(false)
   isLate    Boolean @default(false)
-  lateNote  String?
   isSplit   Boolean @default(false)
   splitFrom String?
+  hasLeft   Boolean @default(false)
   squad     Squad   @relation(fields: [squadId], references: [id])
   user      User    @relation(fields: [userId], references: [id])
 

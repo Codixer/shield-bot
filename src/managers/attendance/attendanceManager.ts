@@ -22,6 +22,12 @@ export class AttendanceManager {
   }
 
   async removeUserFromEvent(eventId: number, userId: number) {
+    // Instead of deleting, mark as left to preserve attendance record
+    await this.markUserAsLeft(eventId, userId);
+  }
+
+  async forceRemoveUserFromEvent(eventId: number, userId: number) {
+    // This method completely removes the user from the event (original behavior)
     const squads = await prisma.squad.findMany({ where: { eventId } });
     for (const squad of squads) {
       await prisma.squadMember.deleteMany({ where: { squadId: squad.id, userId } });
@@ -34,7 +40,20 @@ export class AttendanceManager {
     for (const squad of squads) {
       await prisma.squadMember.deleteMany({ where: { squadId: squad.id, userId } });
     }
-    return this.addUserToSquad(eventId, userId, newSquadName);
+    const result = await this.addUserToSquad(eventId, userId, newSquadName);
+    
+    // Clear the left status when moving to a new squad
+    const member = await prisma.squadMember.findFirst({
+      where: { squad: { eventId, name: newSquadName }, userId },
+    });
+    if (member) {
+      await prisma.squadMember.update({ 
+        where: { id: member.id }, 
+        data: { hasLeft: false } 
+      });
+    }
+    
+    return result;
   }
 
   async markUserAsLead(eventId: number, userId: number) {
@@ -46,12 +65,12 @@ export class AttendanceManager {
     }
   }
 
-  async markUserAsLate(eventId: number, userId: number, note?: string) {
+  async markUserAsLate(eventId: number, userId: number) {
     const member = await prisma.squadMember.findFirst({
       where: { squad: { eventId }, userId },
     });
     if (member) {
-      await prisma.squadMember.update({ where: { id: member.id }, data: { isLate: true, lateNote: note } });
+      await prisma.squadMember.update({ where: { id: member.id }, data: { isLate: true } });
     }
   }
 
@@ -148,7 +167,66 @@ export class AttendanceManager {
     await prisma.squad.deleteMany({ where: { eventId } });
     // Delete all staff for this event
     await prisma.attendanceStaff.deleteMany({ where: { eventId } });
-    // Optionally, delete the event itself (uncomment if desired)
+    // Clear active event references
+    await prisma.activeAttendanceEvent.deleteMany({ where: { eventId } });
+    // Delete the event itself
     await prisma.attendanceEvent.delete({ where: { id: eventId } });
+  }
+
+  // Get events accessible to a user (host, cohost, or has participated)
+  async getUserEvents(userId: number) {
+    return prisma.attendanceEvent.findMany({
+      where: {
+        OR: [
+          { hostId: userId },
+          { cohostId: userId },
+          { 
+            staff: {
+              some: { userId }
+            }
+          },
+          {
+            squads: {
+              some: {
+                members: {
+                  some: { userId }
+                }
+              }
+            }
+          }
+        ]
+      },
+      include: {
+        host: true,
+        cohost: true
+      },
+      orderBy: {
+        date: 'desc'
+      }
+    });
+  }
+
+  // Get event by ID
+  async getEventById(eventId: number) {
+    return prisma.attendanceEvent.findUnique({
+      where: { id: eventId },
+      include: {
+        host: true,
+        cohost: true
+      }
+    });
+  }
+
+  // Mark user as left
+  async markUserAsLeft(eventId: number, userId: number) {
+    const member = await prisma.squadMember.findFirst({
+      where: { squad: { eventId }, userId },
+    });
+    if (member) {
+      await prisma.squadMember.update({ 
+        where: { id: member.id }, 
+        data: { hasLeft: true } 
+      });
+    }
   }
 }

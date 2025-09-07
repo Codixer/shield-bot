@@ -1,7 +1,7 @@
 import { Discord, Slash, SlashOption, Guard, SlashGroup } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, InteractionContextType, ApplicationIntegrationType } from "discord.js";
-import { AttendanceManager } from "../../../managers/attendance/attendanceManager.js";
-import { VRChatLoginGuard, AttendanceHostGuard } from "../../../utility/guards.js";
+import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
+import { VRChatLoginGuard, AttendanceHostGuard } from "../../utility/guards.js";
 
 const attendanceManager = new AttendanceManager();
 
@@ -15,14 +15,14 @@ const attendanceManager = new AttendanceManager();
 @SlashGroup("attendance")
 @Guard(VRChatLoginGuard)
 @Guard(AttendanceHostGuard)
-export class VRChatAttendanceRemoveCommand {
+export class VRChatAttendanceStaffCommand {
 
   @Slash({
-    name: "remove",
-    description: "Remove user from event."
+    name: "staff",
+    description: "Add user as staff."
   })
-  async remove(
-    @SlashOption({ name: "user", description: "User", type: ApplicationCommandOptionType.User, required: true }) user: any,
+  async staff(
+    @SlashOption({ name: "user", description: "Discord User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     interaction: CommandInteraction
   ) {
     const active = await attendanceManager.getActiveEventForInteraction(interaction);
@@ -35,10 +35,11 @@ export class VRChatAttendanceRemoveCommand {
     }
 
     const { eventId } = active;
-    await attendanceManager.removeUserFromEvent(eventId, user.id);
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
+    await attendanceManager.addStaff(eventId, dbUser.id);
 
     await interaction.reply({
-      content: `Removed <@${user.id}> from the event`,
+      content: `Added <@${user.id}> as staff`,
       flags: MessageFlags.Ephemeral
     });
   }

@@ -1,7 +1,7 @@
 import { Discord, Slash, SlashOption, Guard, SlashGroup } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, InteractionContextType, ApplicationIntegrationType } from "discord.js";
-import { AttendanceManager } from "../../../managers/attendance/attendanceManager.js";
-import { VRChatLoginGuard, AttendanceHostGuard } from "../../../utility/guards.js";
+import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
+import { VRChatLoginGuard, AttendanceHostGuard } from "../../utility/guards.js";
 
 const attendanceManager = new AttendanceManager();
 
@@ -15,13 +15,13 @@ const attendanceManager = new AttendanceManager();
 @SlashGroup("attendance")
 @Guard(VRChatLoginGuard)
 @Guard(AttendanceHostGuard)
-export class VRChatAttendanceStaffCommand {
+export class VRChatAttendanceLateCommand {
 
   @Slash({
-    name: "staff",
-    description: "Add user as staff."
+    name: "late",
+    description: "Mark user as late."
   })
-  async staff(
+  async late(
     @SlashOption({ name: "user", description: "Discord User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     interaction: CommandInteraction
   ) {
@@ -36,10 +36,10 @@ export class VRChatAttendanceStaffCommand {
 
     const { eventId } = active;
     const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
-    await attendanceManager.addStaff(eventId, dbUser.id);
+    await attendanceManager.markUserAsLate(eventId, dbUser.id);
 
     await interaction.reply({
-      content: `Added <@${user.id}> as staff`,
+      content: `Marked <@${user.id}> as late`,
       flags: MessageFlags.Ephemeral
     });
   }

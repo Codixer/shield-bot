@@ -1,7 +1,7 @@
 import { Discord, Slash, SlashOption, Guard, SlashGroup } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, InteractionContextType, ApplicationIntegrationType } from "discord.js";
-import { AttendanceManager } from "../../../managers/attendance/attendanceManager.js";
-import { VRChatLoginGuard, AttendanceHostGuard } from "../../../utility/guards.js";
+import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
+import { VRChatLoginGuard, AttendanceHostGuard } from "../../utility/guards.js";
 
 const attendanceManager = new AttendanceManager();
 
@@ -15,15 +15,14 @@ const attendanceManager = new AttendanceManager();
 @SlashGroup("attendance")
 @Guard(VRChatLoginGuard)
 @Guard(AttendanceHostGuard)
-export class VRChatAttendanceLateCommand {
+export class VRChatAttendanceCohostCommand {
 
   @Slash({
-    name: "late",
-    description: "Mark user as late."
+    name: "cohost",
+    description: "Set user as cohost."
   })
-  async late(
+  async cohost(
     @SlashOption({ name: "user", description: "Discord User", type: ApplicationCommandOptionType.User, required: true }) user: any,
-    @SlashOption({ name: "note", description: "Late note", type: ApplicationCommandOptionType.String, required: false }) note: string,
     interaction: CommandInteraction
   ) {
     const active = await attendanceManager.getActiveEventForInteraction(interaction);
@@ -37,10 +36,10 @@ export class VRChatAttendanceLateCommand {
 
     const { eventId } = active;
     const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
-    await attendanceManager.markUserAsLate(eventId, dbUser.id, note);
+    await attendanceManager.setCohost(eventId, dbUser.id);
 
     await interaction.reply({
-      content: `Marked <@${user.id}> as late${note ? ` with note: ${note}` : ''}`,
+      content: `Set <@${user.id}> as cohost`,
       flags: MessageFlags.Ephemeral
     });
   }
