@@ -38,7 +38,6 @@ export class PatrolTimerCommands {
     @SlashChoice({ name: "1000", value: "1000" })
     limit: string | undefined,
     @SlashOption({ name: "year", description: "Year", type: ApplicationCommandOptionType.String, required: false })
-    @SlashChoice({ name: "2024", value: "2024" })
     @SlashChoice({ name: "2025", value: "2025" })
     @SlashChoice({ name: "2026", value: "2026" })
     year: string | undefined,
