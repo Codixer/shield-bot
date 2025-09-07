@@ -30,12 +30,12 @@ function getAuthTokenFromCookie(cookie: string): string | null {
 export function startVRChatWebSocketListener() {
     const cookie = loadCookie();
     if (!cookie) {
-        console.error("No VRChat cookie found. Please log in first.");
+        console.error("[WS] No VRChat cookie found. Please log in first.");
         return;
     }
     const authToken = getAuthTokenFromCookie(cookie);
     if (!authToken) {
-        console.error("No auth token found in cookie.");
+        console.error("[WS] No auth token found in cookie.");
         return;
     }
     const wsUrl = `wss://pipeline.vrchat.cloud/?authToken=${authToken}`;
@@ -52,7 +52,7 @@ export function startVRChatWebSocketListener() {
         });
 
         ws.on("open", () => {
-            console.log("Connected to VRChat WebSocket");
+            console.log("[WS] Connected to VRChat WebSocket");
         });
 
         ws.on("message", async (data) => {
@@ -164,27 +164,27 @@ export function startVRChatWebSocketListener() {
                         console.debug("[VRChat WS]", msg);
                 }
             } catch (err) {
-                console.error("Failed to parse VRChat WS message:", err, data.toString());
+                console.error("[WS]     Failed to parse VRChat WS message:", err, data.toString());
             }
         });
 
         ws.on("close", (code, reason) => {
-            console.warn(`VRChat WebSocket closed: ${code} ${reason}`);
+            console.warn(`[WS] VRChat WebSocket closed: ${code} ${reason}`);
             if (shouldReconnect && !reconnectTimeout) {
                 reconnectTimeout = setTimeout(() => {
                     reconnectTimeout = null;
-                    console.log("Reconnecting to VRChat WebSocket...");
+                    console.log("[WS] Reconnecting to VRChat WebSocket...");
                     connect();
                 }, reconnectDelay);
             }
         });
 
         ws.on("error", (err) => {
-            console.error("VRChat WebSocket error:", err);
+            console.error("[WS] VRChat WebSocket error:", err);
             if (shouldReconnect && !reconnectTimeout) {
                 reconnectTimeout = setTimeout(() => {
                     reconnectTimeout = null;
-                    console.log("Reconnecting to VRChat WebSocket after error...");
+                    console.log("[WS] Reconnecting to VRChat WebSocket after error...");
                     connect();
                 }, reconnectDelay);
             }
