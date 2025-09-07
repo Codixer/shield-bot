@@ -16,7 +16,9 @@ const patrolTimer = new PatrolTimerManager(bot);
 @SlashGroup("settings")
 export class SettingsCommands {
 
-  @Slash({ name: "setup-patrol-category", description: "Set tracked voice category to your current voice channel's parent." })
+  // Patrol management subgroup
+  @SlashGroup("patrol")
+  @Slash({ name: "setup-category", description: "Set tracked voice category to your current voice channel's parent." })
   async setupPatrolCategory(interaction: CommandInteraction) {
     if (!interaction.guildId || !interaction.guild) return;
 
@@ -36,6 +38,8 @@ export class SettingsCommands {
     await interaction.reply({ content: `Tracked category set to: ${voice.parent?.name ?? voice.parentId}`, flags: MessageFlags.Ephemeral });
   }
 
+  // Role management subgroup
+  @SlashGroup("roles")
   @Slash({ name: "setup-host-attendance-role", description: "Set role allowed to manage attendance." })
   async setupHostAttendanceRole(
     @SlashOption({ name: "role", description: "Discord role", type: ApplicationCommandOptionType.Role, required: true }) role: Role,
@@ -58,6 +62,7 @@ export class SettingsCommands {
     await interaction.reply({ content: `Set host attendance role ID: ${role.id}`, flags: MessageFlags.Ephemeral });
   }
 
+  @SlashGroup("roles")
   @Slash({ name: "setup-shield-member-role", description: "Set role for shield members." })
   async setupShieldMemberRole(
     @SlashOption({ name: "role", description: "Discord role", type: ApplicationCommandOptionType.Role, required: true }) role: Role,
@@ -80,6 +85,7 @@ export class SettingsCommands {
     await interaction.reply({ content: `Set shield member role ID: ${role.id}`, flags: MessageFlags.Ephemeral });
   }
 
+  @SlashGroup("roles")
   @Slash({ name: "setup-staff-role", description: "Set role for staff members." })
   async setupStaffRole(
     @SlashOption({ name: "role", description: "Discord role", type: ApplicationCommandOptionType.Role, required: true }) role: Role,
@@ -102,6 +108,7 @@ export class SettingsCommands {
     await interaction.reply({ content: `Set staff role ID: ${role.id}`, flags: MessageFlags.Ephemeral });
   }
 
+  @SlashGroup("roles")
   @Slash({ name: "setup-trainer-role", description: "Set role for trainers." })
   async setupTrainerRole(
     @SlashOption({ name: "role", description: "Discord role", type: ApplicationCommandOptionType.Role, required: true }) role: Role,
@@ -124,6 +131,7 @@ export class SettingsCommands {
     await interaction.reply({ content: `Set trainer role ID: ${role.id}`, flags: MessageFlags.Ephemeral });
   }
 
+  @SlashGroup("roles")
   @Slash({ name: "setup-dev-guard-role", description: "Set role for dev guards." })
   async setupDevGuardRole(
     @SlashOption({ name: "role", description: "Discord role", type: ApplicationCommandOptionType.Role, required: true }) role: Role,
@@ -146,7 +154,8 @@ export class SettingsCommands {
     await interaction.reply({ content: `Set dev guard role ID: ${role.id}`, flags: MessageFlags.Ephemeral });
   }
 
-  @Slash({ name: "roles", description: "Show current role mappings for this server." })
+  @SlashGroup("roles")
+  @Slash({ name: "status", description: "Show current role mappings for this server." })
   async roles(interaction: CommandInteraction) {
     if (!interaction.guildId || !interaction.guild) return;
 
