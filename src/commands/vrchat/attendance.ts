@@ -1,7 +1,9 @@
-import { Discord, Slash, SlashOption, Guard, SlashGroup, SlashChoice } from "discordx";
-import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, InteractionContextType, ApplicationIntegrationType } from "discord.js";
+import { Discord, Slash, SlashOption, Guard, SlashGroup, SlashChoice, On } from "discordx";
+import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, InteractionContextType, ApplicationIntegrationType, AutocompleteInteraction, BaseInteraction } from "discord.js";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
 import { VRChatLoginGuard } from "../../utility/guards.js";
+import { AttendanceHostGuard } from "../../utility/guards.js";
+import { prisma } from "../../main.js";
 
 const attendanceManager = new AttendanceManager();
 
@@ -15,33 +17,46 @@ const attendanceManager = new AttendanceManager();
 @SlashGroup({ name: "attendance", description: "Attendance tracking commands.", root: "vrchat" })
 @SlashGroup("attendance", "vrchat")
 @Guard(VRChatLoginGuard)
+@Guard(AttendanceHostGuard)
 export class VRChatAttendanceCommand {
   @Slash({
     name: "add",
     description: "Add user to squad."
   })
   async add(
-    @SlashOption({ name: "user", description: "Discord User ID (string)", type: ApplicationCommandOptionType.String, required: true }) userId: string,
-    @SlashChoice({ name: "Adam", value: "814239808675119144" })
-    @SlashChoice({ name: "Baker", value: "814239954641223760" })
-    @SlashChoice({ name: "Coffee", value: "814240045405569038" })
-    @SlashChoice({ name: "Delta", value: "814240176317923391" })
-    @SlashChoice({ name: "Eagle", value: "814240290494742732" })
-    @SlashChoice({ name: "Fitness", value: "814240677004836925" })
-    @SlashChoice({ name: "Gamma", value: "814241070110998558" })
-    @SlashChoice({ name: "Mag", value: "1012880059415150642" })
-    @SlashChoice({ name: "EMT", value: "814932938961190953" })
-    @SlashChoice({ name: "TRU", value: "814933108658274365" })
-    @SlashChoice({ name: "AOC", value: "850458906697924608" })
-    @SlashOption({ name: "squad", description: "Squad (Adam, Baker, Coffee, etc)", type: ApplicationCommandOptionType.String, required: true }) squad: string,
-    interaction: CommandInteraction
+    @SlashOption({ name: "user", description: "Discord User", type: ApplicationCommandOptionType.User, required: true }) user: any,
+    @SlashOption({ name: "squad", description: "Squad", type: ApplicationCommandOptionType.String, required: true, autocomplete: true }) squad: string,
+    interaction: BaseInteraction
   ) {
-    const active = await attendanceManager.getActiveEventForInteraction(interaction);
+    if (interaction.isAutocomplete()) {
+      const autoInteraction = interaction as AutocompleteInteraction;
+      const focused = autoInteraction.options.getFocused(true);
+      if (focused.name === 'squad') {
+        if (!autoInteraction.guildId) return;
+        const settings = await prisma.guildSettings.findUnique({ where: { guildId: autoInteraction.guildId } });
+        const enrolled = (settings?.enrolledChannels as string[]) || [];
+        const guild = autoInteraction.guild;
+        if (!guild) return;
+        const choices = [];
+        for (const channelId of enrolled) {
+          const channel = guild.channels.cache.get(channelId);
+          if (channel && channel.name.toLowerCase().includes(focused.value.toLowerCase())) {
+            choices.push({ name: channel.name, value: channelId });
+          }
+        }
+        await autoInteraction.respond(choices.slice(0, 25));
+      }
+      return;
+    }
+    const cmdInteraction = interaction as CommandInteraction;
+    const active = await attendanceManager.getActiveEventForInteraction(cmdInteraction);
     if (!active) return;
-    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(userId);
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
     const { eventId } = active;
     await attendanceManager.addUserToSquad(eventId, dbUser.id, squad);
-    await interaction.reply({ content: `Added <@${userId}> to ${squad}`, flags: MessageFlags.Ephemeral });
+    const channel = cmdInteraction.guild?.channels.cache.get(squad);
+    const squadName = channel ? channel.name : squad;
+    await cmdInteraction.reply({ content: `Added <@${user.id}> to ${squadName}`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -64,26 +79,39 @@ export class VRChatAttendanceCommand {
     description: "Move user to squad."
   })
   async move(
-    @SlashOption({ name: "user", description: "Discord User ID (string)", type: ApplicationCommandOptionType.String, required: true }) userId: string,
-    @SlashChoice({ name: "Adam", value: "814239808675119144" })
-    @SlashChoice({ name: "Baker", value: "814239954641223760" })
-    @SlashChoice({ name: "Coffee", value: "814240045405569038" })
-    @SlashChoice({ name: "Delta", value: "814240176317923391" })
-    @SlashChoice({ name: "Eagle", value: "814240290494742732" })
-    @SlashChoice({ name: "Fitness", value: "814240677004836925" })
-    @SlashChoice({ name: "Gamma", value: "814241070110998558" })
-    @SlashChoice({ name: "Mag", value: "1012880059415150642" })
-    @SlashChoice({ name: "EMT", value: "814932938961190953" })
-    @SlashChoice({ name: "TRU", value: "814933108658274365" })
-    @SlashOption({ name: "squad", description: "Squad (Adam, Baker, Coffee, etc)", type: ApplicationCommandOptionType.String, required: true }) squad: string,
-    interaction: CommandInteraction
+    @SlashOption({ name: "user", description: "Discord User", type: ApplicationCommandOptionType.User, required: true }) user: any,
+    @SlashOption({ name: "squad", description: "Squad", type: ApplicationCommandOptionType.String, required: true, autocomplete: true }) squad: string,
+    interaction: BaseInteraction
   ) {
-    const active = await attendanceManager.getActiveEventForInteraction(interaction);
+    if (interaction.isAutocomplete()) {
+      const autoInteraction = interaction as AutocompleteInteraction;
+      const focused = autoInteraction.options.getFocused(true);
+      if (focused.name === 'squad') {
+        if (!autoInteraction.guildId) return;
+        const settings = await prisma.guildSettings.findUnique({ where: { guildId: autoInteraction.guildId } });
+        const enrolled = (settings?.enrolledChannels as string[]) || [];
+        const guild = autoInteraction.guild;
+        if (!guild) return;
+        const choices = [];
+        for (const channelId of enrolled) {
+          const channel = guild.channels.cache.get(channelId);
+          if (channel && channel.name.toLowerCase().includes(focused.value.toLowerCase())) {
+            choices.push({ name: channel.name, value: channelId });
+          }
+        }
+        await autoInteraction.respond(choices.slice(0, 25));
+      }
+      return;
+    }
+    const cmdInteraction = interaction as CommandInteraction;
+    const active = await attendanceManager.getActiveEventForInteraction(cmdInteraction);
     if (!active) return;
-    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(userId);
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
     const { eventId } = active;
     await attendanceManager.moveUserToSquad(eventId, dbUser.id, squad);
-    await interaction.reply({ content: `Moved <@${userId}> to ${squad}`, flags: MessageFlags.Ephemeral });
+    const channel = cmdInteraction.guild?.channels.cache.get(squad);
+    const squadName = channel ? channel.name : squad;
+    await cmdInteraction.reply({ content: `Moved <@${user.id}> to ${squadName}`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -91,23 +119,34 @@ export class VRChatAttendanceCommand {
     description: "Split user to squad."
   })
   async split(
-    @SlashOption({ name: "user", description: "Discord User ID (string)", type: ApplicationCommandOptionType.String, required: true }) userId: string,
-    @SlashChoice({ name: "Adam", value: "814239808675119144" })
-    @SlashChoice({ name: "Baker", value: "814239954641223760" })
-    @SlashChoice({ name: "Coffee", value: "814240045405569038" })
-    @SlashChoice({ name: "Delta", value: "814240176317923391" })
-    @SlashChoice({ name: "Eagle", value: "814240290494742732" })
-    @SlashChoice({ name: "Fitness", value: "814240677004836925" })
-    @SlashChoice({ name: "Gamma", value: "814241070110998558" })
-    @SlashChoice({ name: "Mag", value: "1012880059415150642" })
-    @SlashChoice({ name: "EMT", value: "814932938961190953" })
-    @SlashChoice({ name: "TRU", value: "814933108658274365" })
-    @SlashOption({ name: "squad", description: "Squad (Adam, Baker, Coffee, etc)", type: ApplicationCommandOptionType.String, required: true }) squad: string,
-    interaction: CommandInteraction
+    @SlashOption({ name: "user", description: "Discord User", type: ApplicationCommandOptionType.User, required: true }) user: any,
+    @SlashOption({ name: "squad", description: "Squad", type: ApplicationCommandOptionType.String, required: true, autocomplete: true }) squad: string,
+    interaction: BaseInteraction
   ) {
-    const active = await attendanceManager.getActiveEventForInteraction(interaction);
+    if (interaction.isAutocomplete()) {
+      const autoInteraction = interaction as AutocompleteInteraction;
+      const focused = autoInteraction.options.getFocused(true);
+      if (focused.name === 'squad') {
+        if (!autoInteraction.guildId) return;
+        const settings = await prisma.guildSettings.findUnique({ where: { guildId: autoInteraction.guildId } });
+        const enrolled = (settings?.enrolledChannels as string[]) || [];
+        const guild = autoInteraction.guild;
+        if (!guild) return;
+        const choices = [];
+        for (const channelId of enrolled) {
+          const channel = guild.channels.cache.get(channelId);
+          if (channel && channel.name.toLowerCase().includes(focused.value.toLowerCase())) {
+            choices.push({ name: channel.name, value: channelId });
+          }
+        }
+        await autoInteraction.respond(choices.slice(0, 25));
+      }
+      return;
+    }
+    const cmdInteraction = interaction as CommandInteraction;
+    const active = await attendanceManager.getActiveEventForInteraction(cmdInteraction);
     if (!active) return;
-    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(userId);
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
     const { eventId } = active;
     // Map channel IDs to names and numbers
     const squadMap: Record<string, { name: string, number?: string }> = {
@@ -134,9 +173,12 @@ export class VRChatAttendanceCommand {
       }
     }
     // Convert previousSquadId to readable name
-    const previousSquadName = previousSquadId ? (squadMap[previousSquadId]?.name || previousSquadId) : undefined;
-    await attendanceManager.markUserAsSplit(eventId, dbUser.id, squad, previousSquadName || "Unknown");
-    await interaction.reply({ content: `Split <@${userId}> to ${squad}${previousSquadName ? ` (Split from ${previousSquadName})` : ''}`, flags: MessageFlags.Ephemeral });
+    const previousChannel = previousSquadId ? cmdInteraction.guild?.channels.cache.get(previousSquadId) : null;
+    const previousSquadName = previousChannel ? previousChannel.name : (previousSquadId || "Unknown");
+    await attendanceManager.markUserAsSplit(eventId, dbUser.id, squad, previousSquadName);
+    const channel = cmdInteraction.guild?.channels.cache.get(squad);
+    const squadName = channel ? channel.name : squad;
+    await cmdInteraction.reply({ content: `Split <@${user.id}> to ${squadName}${previousSquadName ? ` (Split from ${previousSquadName})` : ''}`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -144,15 +186,15 @@ export class VRChatAttendanceCommand {
     description: "Mark user as lead."
   })
   async lead(
-    @SlashOption({ name: "userid", description: "Discord User ID", type: ApplicationCommandOptionType.String, required: true }) userId: string,
+    @SlashOption({ name: "user", description: "Discord User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     interaction: CommandInteraction
   ) {
     const active = await attendanceManager.getActiveEventForInteraction(interaction);
     if (!active) return;
-    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(userId);
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
     const { eventId } = active;
     await attendanceManager.markUserAsLead(eventId, dbUser.id);
-    await interaction.reply({ content: `Marked <@${userId}> as lead`, flags: MessageFlags.Ephemeral });
+    await interaction.reply({ content: `Marked <@${user.id}> as lead`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -160,16 +202,16 @@ export class VRChatAttendanceCommand {
     description: "Mark user as late."
   })
   async late(
-    @SlashOption({ name: "userid", description: "Discord User ID", type: ApplicationCommandOptionType.String, required: true }) userId: string,
+    @SlashOption({ name: "user", description: "Discord User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     @SlashOption({ name: "note", description: "Late note", type: ApplicationCommandOptionType.String, required: false }) note: string,
     interaction: CommandInteraction
   ) {
     const active = await attendanceManager.getActiveEventForInteraction(interaction);
     if (!active) return;
-    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(userId);
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
     const { eventId } = active;
     await attendanceManager.markUserAsLate(eventId, dbUser.id, note);
-    await interaction.reply({ content: `Marked <@${userId}> as late${note ? ` (${note})` : ''}`, flags: MessageFlags.Ephemeral });
+    await interaction.reply({ content: `Marked <@${user.id}> as late${note ? ` (${note})` : ''}`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -177,15 +219,15 @@ export class VRChatAttendanceCommand {
     description: "Add user as staff."
   })
   async staff(
-    @SlashOption({ name: "userid", description: "Discord User ID", type: ApplicationCommandOptionType.String, required: true }) userId: string,
+    @SlashOption({ name: "user", description: "Discord User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     interaction: CommandInteraction
   ) {
     const active = await attendanceManager.getActiveEventForInteraction(interaction);
     if (!active) return;
-    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(userId);
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
     const { eventId } = active;
     await attendanceManager.addStaff(eventId, dbUser.id);
-    await interaction.reply({ content: `Added <@${userId}> as staff`, flags: MessageFlags.Ephemeral });
+    await interaction.reply({ content: `Added <@${user.id}> as staff`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -193,15 +235,15 @@ export class VRChatAttendanceCommand {
     description: "Set user as cohost."
   })
   async cohost(
-    @SlashOption({ name: "userid", description: "Discord User ID", type: ApplicationCommandOptionType.String, required: true }) userId: string,
+    @SlashOption({ name: "user", description: "Discord User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     interaction: CommandInteraction
   ) {
     const active = await attendanceManager.getActiveEventForInteraction(interaction);
     if (!active) return;
-    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(userId);
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
     const { eventId } = active;
     await attendanceManager.setCohost(eventId, dbUser.id);
-    await interaction.reply({ content: `Set <@${userId}> as cohost`, flags: MessageFlags.Ephemeral });
+    await interaction.reply({ content: `Set <@${user.id}> as cohost`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -209,15 +251,15 @@ export class VRChatAttendanceCommand {
     description: "Mark user as left."
   })
   async leave(
-    @SlashOption({ name: "userid", description: "Discord User ID", type: ApplicationCommandOptionType.String, required: true }) userId: string,
+    @SlashOption({ name: "user", description: "Discord User", type: ApplicationCommandOptionType.User, required: true }) user: any,
     interaction: CommandInteraction
   ) {
     const active = await attendanceManager.getActiveEventForInteraction(interaction);
     if (!active) return;
-    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(userId);
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
     const { eventId } = active;
     await attendanceManager.removeUserFromEvent(eventId, dbUser.id);
-    await interaction.reply({ content: `Marked <@${userId}> as left`, flags: MessageFlags.Ephemeral });
+    await interaction.reply({ content: `Marked <@${user.id}> as left`, flags: MessageFlags.Ephemeral });
   }
 
   @Slash({
@@ -231,29 +273,15 @@ export class VRChatAttendanceCommand {
     if (!active) return;
     const { eventId } = active;
     const summary = await attendanceManager.getEventSummary(eventId);
-    // Map channel IDs to names and numbers
-    const squadMap: Record<string, { name: string, number?: string }> = {
-      "814239808675119144": { name: "Adam", number: "02" },
-      "814239954641223760": { name: "Baker", number: "16" },
-      "814240045405569038": { name: "Coffee", number: "24" },
-      "814240176317923391": { name: "Delta", number: "08" },
-      "814240290494742732": { name: "Eagle", number: "10" },
-      "814240677004836925": { name: "Fitness", number: "34" },
-      "814241070110998558": { name: "Gamma", number: "05" },
-      "1012880059415150642": { name: "MAG", number: "30" },
-      "814932938961190953": { name: "EMT" },
-      "814933108658274365": { name: "TRU" }
-    };
     const today = new Date();
     let text = `Attendance for ${today.toLocaleString('en-US', { month: 'long', day: 'numeric' })}\n\n`;
     text += `Host: ${summary?.host ? `<@${summary.host.discordId}>` : 'None'}\n`;
     text += `Co-Host: ${summary?.cohost ? `<@${summary.cohost.discordId}>` : 'None'}\n`;
     text += `Attending Staff: ${summary?.staff?.map((s: { user: { discordId: any; }; }) => `<@${s.user.discordId}>`).join(' ') || 'None'} \n\n`;
     for (const squad of summary?.squads || []) {
-      const squadInfo = squadMap[squad.name] || { name: squad.name };
-      let squadLine = squadInfo.name;
-      if (squadInfo.number) squadLine += ` - ${squadInfo.number}`;
-      text += `${squadLine}\n`;
+      const channel = interaction.guild?.channels.cache.get(squad.name);
+      const squadName = channel ? channel.name : squad.name;
+      text += `${squadName}\n`;
       for (const member of squad.members) {
         let line = `<@${member.user.discordId}>`;
         if (member.isLead) line += ' (Lead)';

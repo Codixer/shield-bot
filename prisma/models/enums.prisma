@@ -4,3 +4,13 @@ enum VRChatAccountType {
   UNVERIFIED
   IN_VERIFICATION
 }
+
+enum PermissionLevel {
+  BOT_OWNER
+  DEV_GUARD
+  STAFF
+  TRAINER
+  HOST_ATTENDANCE
+  SHIELD_MEMBER
+  USER
+}

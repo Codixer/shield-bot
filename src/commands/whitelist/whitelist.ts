@@ -1,7 +1,8 @@
 import { ApplicationCommandOptionType, CommandInteraction, EmbedBuilder, PermissionFlagsBits, AttachmentBuilder, ApplicationIntegrationType, InteractionContextType } from "discord.js";
-import { Discord, Slash, SlashGroup, SlashOption } from "discordx";
+import { Discord, Slash, SlashGroup, SlashOption, Guard } from "discordx";
 import { WhitelistManager } from "../../managers/whitelist/whitelistManager.js";
 import { searchUsers } from '../../utility/vrchat/user.js';
+import { DevGuardAndStaffGuard } from "../../utility/guards.js";
 
 const whitelistManager = new WhitelistManager();
 
@@ -11,6 +12,7 @@ const whitelistManager = new WhitelistManager();
   description: "VRChat whitelist management commands"
 })
 @SlashGroup("whitelist")
+@Guard(DevGuardAndStaffGuard)
 export class WhitelistCommands {
 
   @Slash({ description: "Setup Discord role mapping to whitelist permissions" })
@@ -31,11 +33,6 @@ export class WhitelistCommands {
     permissions: string,
     interaction: CommandInteraction
   ): Promise<void> {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
-      await interaction.reply({ content: "You don't have permission to manage the whitelist.", ephemeral: true });
-      return;
-    }
-
     try {
       const permissionList = permissions.split(',').map(p => p.trim()).filter(p => p);
       

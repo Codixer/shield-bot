@@ -2,6 +2,7 @@ import { CommandInteraction, MessageFlags, EmbedBuilder, ButtonBuilder, ButtonSt
 import { Discord, Guard, Slash, SlashGroup } from "discordx";
 import { prisma } from "../../main.js";
 import { VRChatLoginGuard } from "../../utility/guards.js";
+import { BotOwnerGuard } from "../../utility/guards.js";
 import { getUserById } from "../../utility/vrchat.js";
 
 @Discord()
@@ -13,6 +14,7 @@ import { getUserById } from "../../utility/vrchat.js";
 })
 @SlashGroup("vrchat")
 @Guard(VRChatLoginGuard)
+@Guard(BotOwnerGuard)
 export class VRChatLocationTrackingCommand {
 
     @Slash({
@@ -20,14 +22,6 @@ export class VRChatLocationTrackingCommand {
         description: "Toggle location tracking consent for your verified VRChat accounts.",
     })
     async locationTracking(interaction: CommandInteraction) {
-        // Only allow 173839105615069184 to use this command
-        if (interaction.user.id !== "173839105615069184") {
-            await interaction.reply({
-                content: "This command is restricted to the bot owner.",
-                flags: MessageFlags.Ephemeral
-            });
-            return;
-        }
         const discordId = interaction.user.id;
         // Get all verified VRChat accounts for this user
         const user = await prisma.user.findUnique({ where: { discordId }, include: { vrchatAccounts: true } });

@@ -2,8 +2,16 @@ model GuildSettings {
   id        Int      @id @default(autoincrement())
   guildId   String   @unique
   // Voice patrol settings
-  patrolBotuserRoleId     String?
   patrolChannelCategoryId String?
+  // Attendance settings
+  hostAttendanceRoleId    String?
+  enrolledChannels        Json?   // Array of channel IDs for attendance squads
+  // Shield member settings
+  shieldMemberRoleId      String?
+  // Staff settings
+  staffRoleId             String?
+  trainerRoleId           String?
+  devGuardRoleId          String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

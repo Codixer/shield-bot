@@ -1,6 +1,9 @@
-import { Discord, Slash, SlashGroup, SlashOption, SlashChoice } from "discordx";
+import { Discord, Slash, SlashGroup, SlashOption, SlashChoice, Guard } from "discordx";
 import { ApplicationCommandOptionType, ApplicationIntegrationType, ChannelType, CommandInteraction, GuildMember, InteractionContextType, MessageFlags, PermissionFlagsBits, Role, User } from "discord.js";
-import { patrolTimer, prisma } from "../../main.js";
+import { patrolTimer } from "../../main.js";
+import { PatrolPermissionGuard } from "../../utility/guards.js";
+import { userHasPermissionFromRoles, PermissionLevel } from "../../utility/permissionUtils.js";
+import { prisma } from "../../main.js";
 
 
 @Discord()
@@ -10,48 +13,11 @@ import { patrolTimer, prisma } from "../../main.js";
   integrationTypes: [ApplicationIntegrationType.GuildInstall]
 })
 @SlashGroup("patrol")
-
+@Guard(PatrolPermissionGuard)
 export class PatrolTimerCommands {
-  @Slash({ name: "setup-role", description: "Set role allowed to use patrol commands." })
-  async setupRole(
-    @SlashOption({ name: "role", description: "Discord role", type: ApplicationCommandOptionType.Role, required: true }) role: Role,
-    interaction: CommandInteraction
-  ) {
-    if (!interaction.guildId || !interaction.guild) return;
-    const member = interaction.member as GuildMember;
-    if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
-      await interaction.reply({ content: "Admin only.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-    await patrolTimer.setBotuserRole(interaction.guildId, role.id);
-    await interaction.reply({ content: `Set bot user role ID: ${role.id}`, flags: MessageFlags.Ephemeral });
-  }
-
-  @Slash({ name: "setup-category", description: "Set tracked voice category to your current voice channel's parent." })
-  async setupCategory(interaction: CommandInteraction) {
-    if (!interaction.guildId || !interaction.guild) return;
-    const member = interaction.member as GuildMember;
-    if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
-      await interaction.reply({ content: "Admin only.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-    const voice = member.voice?.channel;
-    if (!voice || voice.type !== ChannelType.GuildVoice || !voice.parentId) {
-      await interaction.reply({ content: "Join a voice channel inside the desired category first.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-    await patrolTimer.setCategory(interaction.guildId, voice.parentId);
-    await interaction.reply({ content: `Tracked category set to: ${voice.parent?.name ?? voice.parentId}`, flags: MessageFlags.Ephemeral });
-  }
-
   @Slash({ name: "current", description: "Show currently tracked users in memory." })
   async current(interaction: CommandInteraction) {
     if (!interaction.guildId || !interaction.guild) return;
-    const ok = await hasPatrolPermission(interaction.member as GuildMember, interaction.guildId);
-    if (!ok) {
-      await interaction.reply({ content: "You don't have permission to use this.", flags: MessageFlags.Ephemeral });
-      return;
-    }
     const list = await patrolTimer.getCurrentTrackedList(interaction.guildId);
     if (list.length === 0) {
       await interaction.reply({ content: "No users currently tracked.", flags: MessageFlags.Ephemeral });
@@ -94,11 +60,6 @@ export class PatrolTimerCommands {
     interaction: CommandInteraction
   ) {
     if (!interaction.guildId) return;
-    const ok = await hasPatrolPermission(interaction.member as GuildMember, interaction.guildId);
-    if (!ok) {
-      await interaction.reply({ content: "You don't have permission to use this.", flags: MessageFlags.Ephemeral });
-      return;
-    }
     const member = interaction.member as GuildMember;
     const now = new Date();
     let rows: any[];
@@ -146,11 +107,6 @@ export class PatrolTimerCommands {
     interaction: CommandInteraction
   ) {
     if (!interaction.guildId) return;
-    const ok = await hasPatrolPermission(interaction.member as GuildMember, interaction.guildId);
-    if (!ok) {
-      await interaction.reply({ content: "You don't have permission to use this.", flags: MessageFlags.Ephemeral });
-      return;
-    }
     const now = new Date();
     const y = year ? parseInt(year) : now.getUTCFullYear();
     const m = month ? parseInt(month) : (now.getUTCMonth() + 1);
@@ -176,10 +132,16 @@ export class PatrolTimerCommands {
   ) {
     if (!interaction.guildId) return;
     const member = interaction.member as GuildMember;
+
+    // Check administrator permission first (bypass)
     if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
-      await interaction.reply({ content: "Admin only.", flags: MessageFlags.Ephemeral });
-      return;
+      // Check role-based permission level
+      if (!(await userHasPermissionFromRoles(member, PermissionLevel.DEV_GUARD))) {
+        await interaction.reply({ content: "Admin only.", flags: MessageFlags.Ephemeral });
+        return;
+      }
     }
+
     const userId = user?.id;
     await patrolTimer.reset(interaction.guildId, userId);
     await interaction.reply({ content: userId ? `Reset time for <@${userId}>.` : "Reset all times.", flags: MessageFlags.Ephemeral });
@@ -189,10 +151,16 @@ export class PatrolTimerCommands {
   async wipe(interaction: CommandInteraction) {
     if (!interaction.guildId) return;
     const member = interaction.member as GuildMember;
+
+    // Check administrator permission first (bypass)
     if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
-      await interaction.reply({ content: "Admin only.", flags: MessageFlags.Ephemeral });
-      return;
+      // Check role-based permission level
+      if (!(await userHasPermissionFromRoles(member, PermissionLevel.DEV_GUARD))) {
+        await interaction.reply({ content: "Admin only.", flags: MessageFlags.Ephemeral });
+        return;
+      }
     }
+
     await patrolTimer.wipe(interaction.guildId);
     await interaction.reply({ content: "Wiped all patrol data for this guild.", flags: MessageFlags.Ephemeral });
   }
@@ -210,12 +178,4 @@ function msToReadable(ms: number) {
   if (minutes) parts.push(`${minutes}m`);
   if (seconds || parts.length === 0) parts.push(`${seconds}s`);
   return parts.join(" ");
-}
-
-async function hasPatrolPermission(member: GuildMember, guildId: string) {
-  if (member.permissions.has(PermissionFlagsBits.Administrator)) return true;
-  const settings = await (prisma as any).guildSettings.findUnique({ where: { guildId } });
-  const roleId = settings?.patrolBotuserRoleId as string | undefined;
-  if (!roleId) return false;
-  return member.roles.cache.has(roleId);
 }

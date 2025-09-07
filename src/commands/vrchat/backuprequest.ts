@@ -2,6 +2,7 @@ import { Discord, Slash, SlashOption, SlashChoice, Guard, SlashGroup } from "dis
 import { CommandInteraction, ApplicationCommandOptionType, ApplicationIntegrationType, ActionRowBuilder, ButtonBuilder, ButtonStyle, Message, MessageFlags, InteractionContextType, AutocompleteInteraction } from "discord.js";
 import { findFriendInstanceOrWorld, getFriendInstanceInfo, getInstanceInfoByShortName, getUserById, hasFriendLocationConsent } from "../../utility/vrchat.js";
 import { VRChatLoginGuard } from "../../utility/guards.js";
+import { ShieldMemberGuard } from "../../utility/guards.js";
 import { prisma } from "../../main.js";
 import { extractInstanceNumber, resolveWorldDisplay } from "../../utility/vrchat/tracking.js";
 
@@ -14,7 +15,7 @@ import { extractInstanceNumber, resolveWorldDisplay } from "../../utility/vrchat
 })
 @SlashGroup("vrchat")
 @Guard(VRChatLoginGuard)
-
+@Guard(ShieldMemberGuard)
 export default class BackupRequestCommand {
     @Slash({
         name: "backup-request",
