@@ -1,7 +1,7 @@
 import { Discord, Slash, SlashOption, Guard, SlashGroup } from "discordx";
 import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, InteractionContextType, ApplicationIntegrationType } from "discord.js";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
-import { VRChatLoginGuard, AttendanceHostGuard } from "../../utility/guards.js";
+import { AttendanceHostGuard } from "../../utility/guards.js";
 
 const attendanceManager = new AttendanceManager();
 
@@ -13,7 +13,6 @@ const attendanceManager = new AttendanceManager();
   integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
 })
 @SlashGroup("attendance")
-@Guard(VRChatLoginGuard)
 @Guard(AttendanceHostGuard)
 export class VRChatAttendanceLeftCommand {
 

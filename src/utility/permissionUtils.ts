@@ -80,23 +80,23 @@ export async function getUserPermissionLevelFromRoles(member: GuildMember): Prom
   }
 
   // Check roles in hierarchical order (highest first)
-  if (settings.devGuardRoleId && member.roles.cache.has(settings.devGuardRoleId)) {
+  if (settings.devGuardRoleIds && Array.isArray(settings.devGuardRoleIds) && (settings.devGuardRoleIds as string[]).some(roleId => member.roles.cache.has(roleId))) {
     return PermissionLevel.DEV_GUARD;
   }
 
-  if (settings.staffRoleId && member.roles.cache.has(settings.staffRoleId)) {
+  if (settings.staffRoleIds && Array.isArray(settings.staffRoleIds) && (settings.staffRoleIds as string[]).some(roleId => member.roles.cache.has(roleId))) {
     return PermissionLevel.STAFF;
   }
 
-  if (settings.trainerRoleId && member.roles.cache.has(settings.trainerRoleId)) {
+  if (settings.trainerRoleIds && Array.isArray(settings.trainerRoleIds) && (settings.trainerRoleIds as string[]).some(roleId => member.roles.cache.has(roleId))) {
     return PermissionLevel.TRAINER;
   }
 
-  if (settings.hostAttendanceRoleId && member.roles.cache.has(settings.hostAttendanceRoleId)) {
+  if (settings.hostAttendanceRoleIds && Array.isArray(settings.hostAttendanceRoleIds) && (settings.hostAttendanceRoleIds as string[]).some(roleId => member.roles.cache.has(roleId))) {
     return PermissionLevel.HOST_ATTENDANCE;
   }
 
-  if (settings.shieldMemberRoleId && member.roles.cache.has(settings.shieldMemberRoleId)) {
+  if (settings.shieldMemberRoleIds && Array.isArray(settings.shieldMemberRoleIds) && (settings.shieldMemberRoleIds as string[]).some(roleId => member.roles.cache.has(roleId))) {
     return PermissionLevel.SHIELD_MEMBER;
   }
 

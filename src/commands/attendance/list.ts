@@ -1,7 +1,6 @@
 import { Discord, Slash, Guard, SlashGroup } from "discordx";
 import { CommandInteraction, MessageFlags, EmbedBuilder, InteractionContextType, ApplicationIntegrationType } from "discord.js";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
-import { VRChatLoginGuard } from "../../utility/guards.js";
 
 const attendanceManager = new AttendanceManager();
 
@@ -13,7 +12,6 @@ const attendanceManager = new AttendanceManager();
   integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
 })
 @SlashGroup("attendance")
-@Guard(VRChatLoginGuard)
 export class VRChatAttendanceListCommand {
 
   @Slash({
