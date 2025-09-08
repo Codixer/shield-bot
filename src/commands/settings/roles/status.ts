@@ -14,8 +14,8 @@ import { prisma } from "../../../main.js";
   name: "roles",
   root: "settings"
 })
+@SlashGroup("settings", "roles")
 export class RoleSettingsCommands {
-
 
   @Slash({ name: "status", description: "Show current role mappings for this server." })
   async roles(interaction: CommandInteraction) {
