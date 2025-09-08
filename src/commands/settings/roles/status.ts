@@ -1,21 +1,11 @@
 import { Discord, Slash, SlashGroup } from "discordx";
-import { CommandInteraction, MessageFlags, InteractionContextType, ApplicationIntegrationType, EmbedBuilder } from "discord.js";
+import { CommandInteraction, MessageFlags, EmbedBuilder } from "discord.js";
 import { prisma } from "../../../main.js";
 
+// Only reference existing group path to avoid redefining options multiple times
 @Discord()
-@SlashGroup({
-  name: "settings",
-  description: "Bot configuration and settings commands",
-  contexts: [InteractionContextType.Guild],
-  integrationTypes: [ApplicationIntegrationType.GuildInstall]
-})
-@SlashGroup({
-  description: "Role settings",
-  name: "roles",
-  root: "settings"
-})
 @SlashGroup("settings", "roles")
-export class RoleSettingsCommands {
+export class RoleSettingsStatusCommand {
 
   @Slash({ name: "status", description: "Show current role mappings for this server." })
   async roles(interaction: CommandInteraction) {
@@ -52,8 +42,8 @@ export class RoleSettingsCommands {
         }).join(', ');
       };
 
-      roleMappings.push(`� **DEV_GUARD** - ${formatRoles(settings.devGuardRoleIds as string[])}`);
-      roleMappings.push(`� **STAFF** - ${formatRoles(settings.staffRoleIds as string[])}`);
+  roleMappings.push(`🔴 **DEV_GUARD** - ${formatRoles(settings.devGuardRoleIds as string[])}`);
+  roleMappings.push(`🟥 **STAFF** - ${formatRoles(settings.staffRoleIds as string[])}`);
       roleMappings.push(`🟠 **TRAINER** - ${formatRoles(settings.trainerRoleIds as string[])} *(Cannot access Host Attendance commands)*`);
       roleMappings.push(`🟢 **HOST_ATTENDANCE** - ${formatRoles(settings.hostAttendanceRoleIds as string[])} *(Cannot access Trainer commands)*`);
       roleMappings.push(`🔵 **SHIELD_MEMBER** - ${formatRoles(settings.shieldMemberRoleIds as string[])}`);
@@ -64,7 +54,7 @@ export class RoleSettingsCommands {
         inline: false
       });
 
-      embed.setFooter({ text: "Use /settings roles add-* and remove-* commands to configure roles" });
+  embed.setFooter({ text: "Use /settings roles add and /settings roles remove to configure roles" });
 
       await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 

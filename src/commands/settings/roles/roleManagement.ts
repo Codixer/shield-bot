@@ -1,21 +1,11 @@
 import { Discord, Slash, SlashGroup, SlashOption, SlashChoice } from "discordx";
-import { ApplicationCommandOptionType, CommandInteraction, PermissionFlagsBits, Role, MessageFlags, InteractionContextType, ApplicationIntegrationType } from "discord.js";
+import { ApplicationCommandOptionType, CommandInteraction, PermissionFlagsBits, Role, MessageFlags } from "discord.js";
 import { prisma } from "../../../main.js";
 
 @Discord()
-@SlashGroup({
-  name: "settings",
-  description: "Bot configuration and settings commands",
-  contexts: [InteractionContextType.Guild],
-  integrationTypes: [ApplicationIntegrationType.GuildInstall]
-})
-@SlashGroup({
-  description: "Role settings",
-  name: "roles",
-  root: "settings"
-})
+// Only reference existing group path to avoid duplicate option names across classes
 @SlashGroup("settings", "roles")
-export class RoleSettingsCommands {
+export class RoleSettingsManagementCommands {
 
   @Slash({ name: "add", description: "Add a role to a permission level" })
   async addRole(
