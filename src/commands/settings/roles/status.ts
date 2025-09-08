@@ -14,7 +14,6 @@ import { prisma } from "../../../main.js";
   name: "roles",
   root: "settings"
 })
-@SlashGroup("roles", "settings")
 export class RoleSettingsCommands {
 
 
