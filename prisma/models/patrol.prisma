@@ -3,7 +3,7 @@
 model VoicePatrolTime {
   id        Int      @id @default(autoincrement())
   guildId   String
-  userId    String   // Discord User ID
+  userId    String // Discord User ID
   user      User     @relation(fields: [userId], references: [discordId])
   totalMs   BigInt   @default(0)
   createdAt DateTime @default(now())
@@ -20,8 +20,8 @@ model VoicePatrolMonthlyTime {
   guildId   String
   userId    String
   user      User     @relation(fields: [userId], references: [discordId])
-  year      Int      // UTC year
-  month     Int      // 1-12, UTC month
+  year      Int // UTC year
+  month     Int // 1-12, UTC month
   totalMs   BigInt   @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

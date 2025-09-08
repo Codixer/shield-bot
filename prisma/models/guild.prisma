@@ -1,17 +1,17 @@
 model GuildSettings {
-  id        Int      @id @default(autoincrement())
-  guildId   String   @unique
+  id                      Int      @id @default(autoincrement())
+  guildId                 String   @unique
   // Voice patrol settings
   patrolChannelCategoryId String?
   // Attendance settings
-  hostAttendanceRoleIds    Json?   // Array of role IDs for host attendance
-  enrolledChannels        Json?   // Array of channel IDs for attendance squads
+  hostAttendanceRoleIds   Json? // Array of role IDs for host attendance
+  enrolledChannels        Json? // Array of channel IDs for attendance squads
   // Shield member settings
-  shieldMemberRoleIds      Json?   // Array of role IDs for shield members
+  shieldMemberRoleIds     Json? // Array of role IDs for shield members
   // Staff settings
-  staffRoleIds             Json?   // Array of role IDs for staff
-  trainerRoleIds           Json?   // Array of role IDs for trainers
-  devGuardRoleIds          Json?   // Array of role IDs for dev guards
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  staffRoleIds            Json? // Array of role IDs for staff
+  trainerRoleIds          Json? // Array of role IDs for trainers
+  devGuardRoleIds         Json? // Array of role IDs for dev guards
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 }

@@ -1,40 +1,39 @@
 model WhitelistEntry {
-  id              Int                     @id @default(autoincrement())
-  userId          Int                     @unique // Link to existing User model
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  id              Int                       @id @default(autoincrement())
+  userId          Int                       @unique // Link to existing User model
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
   roleAssignments WhitelistRoleAssignment[]
-  
-  user            User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("whitelist_entries")
 }
 
 model WhitelistRole {
-  id              Int                     @id @default(autoincrement())
-  name            String                  @unique
+  id              Int                       @id @default(autoincrement())
+  name            String                    @unique
   description     String?
-  discordRoleId   String?                 @unique // Optional Discord role binding
-  isDefault       Boolean                 @default(false)
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  discordRoleId   String?                   @unique // Optional Discord role binding
+  isDefault       Boolean                   @default(false)
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
   roleAssignments WhitelistRoleAssignment[]
-  
+
   @@map("whitelist_roles")
 }
 
 model WhitelistRoleAssignment {
-  id              Int                 @id @default(autoincrement())
-  whitelistId     Int
-  roleId          Int
-  assignedAt      DateTime            @default(now())
-  assignedBy      String?             // Discord ID of who assigned this role
-  expiresAt       DateTime?           // Optional expiration
-  
-  whitelist       WhitelistEntry      @relation(fields: [whitelistId], references: [id], onDelete: Cascade)
-  role            WhitelistRole       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  
+  id          Int       @id @default(autoincrement())
+  whitelistId Int
+  roleId      Int
+  assignedAt  DateTime  @default(now())
+  assignedBy  String? // Discord ID of who assigned this role
+  expiresAt   DateTime? // Optional expiration
+
+  whitelist WhitelistEntry @relation(fields: [whitelistId], references: [id], onDelete: Cascade)
+  role      WhitelistRole  @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
   @@unique([whitelistId, roleId])
   @@map("whitelist_role_assignments")
 }
-

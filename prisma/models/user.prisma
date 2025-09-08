@@ -1,9 +1,9 @@
 model User {
-  id                     Int                     @id @default(autoincrement())
-  discordId              String                  @unique
-  activeAttendanceEvent  ActiveAttendanceEvent?  @relation("UserActiveAttendanceEvent")
-  cohostAttendanceEvents AttendanceEvent[]       @relation("CohostAttendanceEvent")
-  hostAttendanceEvents   AttendanceEvent[]       @relation("HostAttendanceEvent")
+  id                     Int                      @id @default(autoincrement())
+  discordId              String                   @unique
+  activeAttendanceEvent  ActiveAttendanceEvent?   @relation("UserActiveAttendanceEvent")
+  cohostAttendanceEvents AttendanceEvent[]        @relation("CohostAttendanceEvent")
+  hostAttendanceEvents   AttendanceEvent[]        @relation("HostAttendanceEvent")
   attendanceStaff        AttendanceStaff[]
   friendLocationConsents FriendLocationConsent[]
   squadMemberships       SquadMember[]
@@ -14,14 +14,14 @@ model User {
 }
 
 model VRChatAccount {
-  id                   Int                        @id @default(autoincrement())
-  userId               Int
-  vrcUserId            String
-  accountType          VRChatAccountType          @default(IN_VERIFICATION)
-  verificationCode     String?
-  vrchatUsername       String?                    // Cached VRChat username
-  usernameUpdatedAt    DateTime?                  // Last time username was updated
-  user                 User                       @relation(fields: [userId], references: [id])
+  id                Int               @id @default(autoincrement())
+  userId            Int
+  vrcUserId         String
+  accountType       VRChatAccountType @default(IN_VERIFICATION)
+  verificationCode  String?
+  vrchatUsername    String? // Cached VRChat username
+  usernameUpdatedAt DateTime? // Last time username was updated
+  user              User              @relation(fields: [userId], references: [id])
 
   @@index([userId], map: "VRChatAccount_userId_fkey")
   @@index([vrcUserId], map: "VRChatAccount_vrcUserId_idx")
