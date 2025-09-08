@@ -1,5 +1,5 @@
 import { Discord, Slash, SlashOption, Guard, SlashGroup } from "discordx";
-import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, InteractionContextType, ApplicationIntegrationType } from "discord.js";
+import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, InteractionContextType, ApplicationIntegrationType, AutocompleteInteraction, BaseInteraction } from "discord.js";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
 import { AttendanceHostGuard } from "../../utility/guards.js";
 
@@ -21,15 +21,45 @@ export class VRChatAttendancePasteCommand {
     description: "Generate copyable attendance text in standard format."
   })
   async paste(
-    @SlashOption({ name: "event_id", description: "Specific event ID (defaults to active event)", type: ApplicationCommandOptionType.Integer, required: false }) eventId: number,
-    interaction: CommandInteraction
+    @SlashOption({ name: "event_id", description: "Specific event ID (defaults to active event)", type: ApplicationCommandOptionType.Integer, required: false, autocomplete: true }) eventId: number,
+    interaction: BaseInteraction
   ) {
+    // Autocomplete handling
+    if (interaction.isAutocomplete()) {
+      const autoInteraction = interaction as AutocompleteInteraction;
+      const focused = autoInteraction.options.getFocused(true);
+      if (focused.name === 'event_id') {
+        const user = await attendanceManager.findOrCreateUserByDiscordId(autoInteraction.user.id);
+        const events = await attendanceManager.getUserEvents(user.id);
+        const query = focused.value.toString().toLowerCase();
+        const choices = events
+          .filter((event: any) => {
+            const idStr = `${event.id}`;
+            const dateStr = event.date.toLocaleDateString();
+            const hostId = event.host?.discordId || '';
+            return !query || idStr.includes(query) || dateStr.toLowerCase().includes(query) || hostId.includes(query);
+          })
+          .slice(0, 25)
+          .map((event: any) => {
+            const dateStr = event.date.toLocaleDateString();
+            const hostId = event.host?.discordId ? event.host.discordId : 'Unknown Host';
+            return {
+              name: `${dateStr} (ID: ${event.id}) Host: ${hostId}${event.host?.discordId === autoInteraction.user.id ? ' - Yours' : ''}`.slice(0, 100),
+              value: event.id
+            };
+          });
+        await autoInteraction.respond(choices);
+      }
+      return;
+    }
+
+    const cmdInteraction = interaction as CommandInteraction;
     let targetEventId = eventId;
     
     if (!targetEventId) {
-      const active = await attendanceManager.getActiveEventForInteraction(interaction);
+      const active = await attendanceManager.getActiveEventForInteraction(cmdInteraction);
       if (!active) {
-        await interaction.reply({
+        await cmdInteraction.reply({
           content: "No active attendance event found. Please specify an event ID or set an active event.",
           flags: MessageFlags.Ephemeral
         });
@@ -40,7 +70,7 @@ export class VRChatAttendancePasteCommand {
 
     const eventSummary = await attendanceManager.getEventSummary(targetEventId);
     if (!eventSummary) {
-      await interaction.reply({
+      await cmdInteraction.reply({
         content: "Event not found.",
         flags: MessageFlags.Ephemeral
       });
@@ -56,13 +86,13 @@ export class VRChatAttendancePasteCommand {
     let text = `Attendance for ${formatDate}\n\n`;
     
     // Host and Co-Host
-    text += `Host: ${eventSummary.host ? `@${eventSummary.host.discordId}` : 'None'}\n`;
-    text += `Co-Host: ${eventSummary.cohost ? `@${eventSummary.cohost.discordId}` : 'None'}\n`;
-    
+    text += `Host: ${eventSummary.host ? `<@${eventSummary.host.discordId}>` : 'None'}\n`;
+    text += `Co-Host: ${eventSummary.cohost ? `<@${eventSummary.cohost.discordId}>` : 'None'}\n`;
+
     // Staff
     if (eventSummary.staff.length > 0) {
       const staffList = eventSummary.staff
-        .map(staff => `@${staff.user.discordId}`)
+        .map(staff => `<@${staff.user.discordId}>`)
         .join(' ');
       text += `Staff: ${staffList}\n`;
     }
@@ -71,7 +101,7 @@ export class VRChatAttendancePasteCommand {
 
     // Squads
     for (const squad of eventSummary.squads) {
-      const squadChannel = interaction.guild?.channels.cache.get(squad.name);
+  const squadChannel = cmdInteraction.guild?.channels.cache.get(squad.name);
       const squadDisplayName = squadChannel?.name || squad.name;
       
       text += `${squadDisplayName}:\n`;
@@ -82,8 +112,8 @@ export class VRChatAttendancePasteCommand {
       }
 
       for (const member of squad.members) {
-        let memberText = `@${member.user.discordId}`;
-        
+        let memberText = `<@${member.user.discordId}>`;
+
         const modifiers: string[] = [];
         if (member.isLead && !member.hasLeft) modifiers.push('(Lead)');
         if (member.isLate) modifiers.push('(Late)');
@@ -111,7 +141,7 @@ export class VRChatAttendancePasteCommand {
     }
 
     // Send the formatted text in a code block for easy copying
-    await interaction.reply({
+  await cmdInteraction.reply({
       content: `\`\`\`\n${text}\`\`\``,
       flags: MessageFlags.Ephemeral
     });

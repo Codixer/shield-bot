@@ -1,21 +1,17 @@
 import { Discord, Slash, SlashGroup, SlashOption, SlashChoice } from "discordx";
-import { ApplicationCommandOptionType, CommandInteraction, PermissionFlagsBits, Role, MessageFlags, InteractionContextType, ApplicationIntegrationType } from "discord.js";
+import { ApplicationCommandOptionType, CommandInteraction, PermissionFlagsBits, Role, MessageFlags, EmbedBuilder } from "discord.js";
 import { prisma } from "../../../main.js";
 
-
+// This class only defines the subgroup commands for settings -> roles
 @Discord()
-@SlashGroup({
-  name: "settings",
-  description: "Bot configuration and settings commands",
-  contexts: [InteractionContextType.Guild],
-  integrationTypes: [ApplicationIntegrationType.GuildInstall]
-})
+// Define subgroup metadata and attach
 @SlashGroup({
   description: "Role settings",
   name: "roles",
   root: "settings"
 })
-export class RoleSettingsManagementCommands {
+@SlashGroup("roles", "settings")
+export class SettingsRolesManagementSubGroup {
 
   @Slash({ name: "add", description: "Add a role to a permission level" })
   async addRole(
@@ -106,6 +102,63 @@ export class RoleSettingsManagementCommands {
     } catch (error) {
       console.error(`Error removing ${type} role:`, error);
       await interaction.reply({ content: "Failed to remove role. Please try again.", flags: MessageFlags.Ephemeral });
+    }
+  }
+
+  @Slash({ name: "status", description: "Show current role mappings for this server." })
+  async rolesStatus(interaction: CommandInteraction) {
+    if (!interaction.guildId || !interaction.guild) return;
+
+    try {
+      const settings = await prisma.guildSettings.findUnique({
+        where: { guildId: interaction.guildId }
+      });
+
+      if (!settings) {
+        await interaction.reply({
+          content: "❌ No settings found for this server. Please set up roles first using the setup commands.",
+          flags: MessageFlags.Ephemeral
+        });
+        return;
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle("🔧 Server Role Configuration")
+        .setColor(0x0099FF)
+        .setDescription("Current role mappings for permission levels:");
+
+      const roleMappings: string[] = [];
+      const formatRoles = (roleIds: string[] | null) => {
+        if (!roleIds || !Array.isArray(roleIds) || roleIds.length === 0) {
+          return "Not configured";
+        }
+        return roleIds.map(roleId => {
+          const role = interaction.guild!.roles.cache.get(roleId);
+          return role ? `<@&${role.id}>` : `Role ID: ${roleId}`;
+        }).join(', ');
+      };
+
+      roleMappings.push(`🔴 **DEV_GUARD** - ${formatRoles(settings.devGuardRoleIds as string[])}`);
+      roleMappings.push(`🟥 **STAFF** - ${formatRoles(settings.staffRoleIds as string[])}`);
+      roleMappings.push(`🟠 **TRAINER** - ${formatRoles(settings.trainerRoleIds as string[])} *(Cannot access Host Attendance commands)*`);
+      roleMappings.push(`🟢 **HOST_ATTENDANCE** - ${formatRoles(settings.hostAttendanceRoleIds as string[])} *(Cannot access Trainer commands)*`);
+      roleMappings.push(`🔵 **SHIELD_MEMBER** - ${formatRoles(settings.shieldMemberRoleIds as string[])}`);
+
+      embed.addFields({
+        name: "Role Mappings",
+        value: roleMappings.join('\n') || "No roles configured",
+        inline: false
+      });
+
+      embed.setFooter({ text: "Use /settings roles add and /settings roles remove to configure roles" });
+
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+    } catch (error) {
+      console.error("Error fetching role settings:", error);
+      await interaction.reply({
+        content: "❌ Failed to fetch role settings. Please try again.",
+        flags: MessageFlags.Ephemeral
+      });
     }
   }
 }

@@ -1,25 +1,22 @@
-import { Discord, Slash, SlashGroup } from "discordx";
-import { CommandInteraction, PermissionFlagsBits, MessageFlags, InteractionContextType, ApplicationIntegrationType } from "discord.js";
+import { Discord, Guard, Slash, SlashGroup } from "discordx";
+import { CommandInteraction, PermissionFlagsBits, MessageFlags } from "discord.js";
 import { prisma, bot } from "../../../main.js";
 import { PatrolTimerManager } from "../../../managers/patrol/patrolTimerManager.js";
+import { StaffGuard } from "../../../utility/guards.js";
 
 const patrolTimer = new PatrolTimerManager(bot);
 
 @Discord()
 @SlashGroup({
-  name: "settings",
-  description: "Bot configuration and settings commands",
-  contexts: [InteractionContextType.Guild],
-  integrationTypes: [ApplicationIntegrationType.GuildInstall]
-})
-@SlashGroup({
   description: "Patrol settings",
   name: "patrol",
   root: "settings"
 })
-export class PatrolSettingsCommands {
+@SlashGroup("patrol", "settings")
+@Guard(StaffGuard)
+export class SettingsPatrolSubGroup {
+  // Additional patrol setting commands can be added here as more functionality is needed
 
-  @SlashGroup("patrol", "settings")
   @Slash({ name: "setup-category", description: "Set tracked voice category to your current voice channel's parent." })
   async setupPatrolCategory(interaction: CommandInteraction) {
     if (!interaction.guildId || !interaction.guild) return;

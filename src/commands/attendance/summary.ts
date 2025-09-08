@@ -1,5 +1,5 @@
 import { Discord, Slash, SlashOption, Guard, SlashGroup } from "discordx";
-import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, EmbedBuilder, InteractionContextType, ApplicationIntegrationType } from "discord.js";
+import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, EmbedBuilder, InteractionContextType, ApplicationIntegrationType, AutocompleteInteraction, BaseInteraction } from "discord.js";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
 import { AttendanceHostGuard } from "../../utility/guards.js";
 
@@ -21,15 +21,45 @@ export class VRChatAttendanceSummaryCommand {
     description: "Show attendance summary for the active event."
   })
   async summary(
-    @SlashOption({ name: "event_id", description: "Specific event ID (defaults to active event)", type: ApplicationCommandOptionType.Integer, required: false }) eventId: number,
-    interaction: CommandInteraction
+    @SlashOption({ name: "event_id", description: "Specific event ID (defaults to active event)", type: ApplicationCommandOptionType.Integer, required: false, autocomplete: true }) eventId: number,
+    interaction: BaseInteraction
   ) {
+    // Autocomplete handling
+    if (interaction.isAutocomplete()) {
+      const autoInteraction = interaction as AutocompleteInteraction;
+      const focused = autoInteraction.options.getFocused(true);
+      if (focused.name === 'event_id') {
+        const user = await attendanceManager.findOrCreateUserByDiscordId(autoInteraction.user.id);
+        const events = await attendanceManager.getUserEvents(user.id);
+        const query = focused.value.toString().toLowerCase();
+        const choices = events
+          .filter((event: any) => {
+            const idStr = `${event.id}`;
+            const dateStr = event.date.toLocaleDateString();
+            const hostId = event.host?.discordId || '';
+            return !query || idStr.includes(query) || dateStr.toLowerCase().includes(query) || hostId.includes(query);
+          })
+          .slice(0, 25)
+          .map((event: any) => {
+            const dateStr = event.date.toLocaleDateString();
+            const hostId = event.host?.discordId ? event.host.discordId : 'Unknown Host';
+            return {
+              name: `${dateStr} (ID: ${event.id}) Host: ${hostId}${event.host?.discordId === autoInteraction.user.id ? ' - Yours' : ''}`.slice(0, 100),
+              value: event.id
+            };
+          });
+        await autoInteraction.respond(choices);
+      }
+      return;
+    }
+
+    const cmdInteraction = interaction as CommandInteraction;
     let targetEventId = eventId;
     
     if (!targetEventId) {
-      const active = await attendanceManager.getActiveEventForInteraction(interaction);
+      const active = await attendanceManager.getActiveEventForInteraction(cmdInteraction);
       if (!active) {
-        await interaction.reply({
+        await cmdInteraction.reply({
           content: "No active attendance event found. Please specify an event ID or set an active event.",
           flags: MessageFlags.Ephemeral
         });
@@ -40,7 +70,7 @@ export class VRChatAttendanceSummaryCommand {
 
     const eventSummary = await attendanceManager.getEventSummary(targetEventId);
     if (!eventSummary) {
-      await interaction.reply({
+      await cmdInteraction.reply({
         content: "Event not found.",
         flags: MessageFlags.Ephemeral
       });
@@ -71,7 +101,7 @@ export class VRChatAttendanceSummaryCommand {
 
     // Squads
     for (const squad of eventSummary.squads) {
-      const squadChannel = interaction.guild?.channels.cache.get(squad.name);
+  const squadChannel = cmdInteraction.guild?.channels.cache.get(squad.name);
       const squadDisplayName = squadChannel?.name || squad.name;
       
       description += `**${squadDisplayName}:**\n`;
@@ -118,7 +148,7 @@ export class VRChatAttendanceSummaryCommand {
       .setColor(0x00AE86)
       .setTimestamp();
 
-    await interaction.reply({
+  await cmdInteraction.reply({
       embeds: [embed]
     });
   }
