@@ -14,9 +14,9 @@ import { prisma } from "../../../main.js";
   name: "roles",
   root: "settings"
 })
+@SlashGroup("roles", "settings")
 export class RoleSettingsCommands {
 
-  @SlashGroup("roles", "settings")
   @Slash({ name: "add", description: "Add a role to a permission level" })
   async addRole(
     @SlashChoice("dev-guard", "staff", "trainer", "host-attendance", "shield-member")
@@ -61,7 +61,6 @@ export class RoleSettingsCommands {
     }
   }
 
-  @SlashGroup("roles", "settings")
   @Slash({ name: "remove", description: "Remove a role from a permission level" })
   async removeRole(
     @SlashChoice("dev-guard", "staff", "trainer", "host-attendance", "shield-member")
