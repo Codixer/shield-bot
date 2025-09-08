@@ -1,20 +1,8 @@
 import { Discord, Slash, SlashGroup } from "discordx";
-import { CommandInteraction, MessageFlags, EmbedBuilder, ApplicationIntegrationType, InteractionContextType } from "discord.js";
+import { CommandInteraction, MessageFlags, EmbedBuilder } from "discord.js";
 import { prisma } from "../../../main.js";
 
-// Only reference existing group path to avoid redefining options multiple times
 @Discord()
-@SlashGroup({
-  name: "settings",
-  description: "Bot configuration and settings commands",
-  contexts: [InteractionContextType.Guild],
-  integrationTypes: [ApplicationIntegrationType.GuildInstall]
-})
-@SlashGroup({
-  description: "Role settings",
-  name: "roles",
-  root: "settings"
-})
 @SlashGroup("settings", "roles")
 export class RoleSettingsStatusCommand {
 

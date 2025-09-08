@@ -15,7 +15,6 @@ import { prisma } from "../../../main.js";
   name: "roles",
   root: "settings"
 })
-@SlashGroup("settings", "roles")
 export class RoleSettingsManagementCommands {
 
   @Slash({ name: "add", description: "Add a role to a permission level" })
