@@ -48,5 +48,5 @@ export async function handleFriendOnline(content: any) {
             senderUserId: null,
         }
     });
-    console.log("[VRChat Friend Online] Upserted:", content);
+    console.log("[VRChat Friend Online] Upserted:", content.userId, instanceId, worldId);
 }

@@ -37,5 +37,5 @@ export async function handleFriendActive(content: any) {
             senderUserId: null,
         }
     });
-    console.log("[VRChat Friend Active] Upserted as offline:", content);
+    console.log("[VRChat Friend Active] Upserted as offline:", content.userId);
 }

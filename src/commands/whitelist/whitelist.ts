@@ -117,11 +117,6 @@ export class WhitelistCommands {
     discordRole: any,
     interaction: CommandInteraction
   ): Promise<void> {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
-      await interaction.reply({ content: "You don't have permission to manage the whitelist.", ephemeral: true });
-      return;
-    }
-
     try {
       const success = await whitelistManager.deleteRole(discordRole.name);
       
@@ -311,11 +306,6 @@ export class WhitelistCommands {
     user: any,
     interaction: CommandInteraction
   ): Promise<void> {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
-      await interaction.reply({ content: "You don't have permission to manage the whitelist.", ephemeral: true });
-      return;
-    }
-
     try {
       const member = await interaction.guild?.members.fetch(user.id);
       if (!member) {
@@ -478,11 +468,6 @@ export class WhitelistCommands {
 
   @Slash({ description: "Generate and download the encoded whitelist" })
   async generate(interaction: CommandInteraction): Promise<void> {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
-      await interaction.reply({ content: "You don't have permission to generate the whitelist.", ephemeral: true });
-      return;
-    }
-
     try {
       await interaction.deferReply();
 
@@ -527,10 +512,7 @@ export class WhitelistCommands {
 
   @Slash({ description: "Clean up expired role assignments" })
   async cleanup(interaction: CommandInteraction): Promise<void> {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
-      await interaction.reply({ content: "You don't have permission to clean up the whitelist.", ephemeral: true });
-      return;
-    }
+
 
     try {
       const cleanedCount = await whitelistManager.cleanupExpiredRoles();
@@ -552,11 +534,6 @@ export class WhitelistCommands {
 
   @Slash({ description: "Update GitHub repository with current whitelist data" })
   async updaterepo(interaction: CommandInteraction): Promise<void> {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
-      await interaction.reply({ content: "You don't have permission to update the repository.", ephemeral: true });
-      return;
-    }
-
     try {
       await interaction.deferReply();
       
@@ -587,11 +564,6 @@ export class WhitelistCommands {
     user: any,
     interaction: CommandInteraction
   ): Promise<void> {
-    if (!interaction.memberPermissions?.has(PermissionFlagsBits.ManageRoles)) {
-      await interaction.reply({ content: "You don't have permission to manage the whitelist.", ephemeral: true });
-      return;
-    }
-
     try {
       await interaction.deferReply();
       

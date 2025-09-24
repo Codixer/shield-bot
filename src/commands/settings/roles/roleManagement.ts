@@ -1,6 +1,7 @@
-import { Discord, Slash, SlashGroup, SlashOption, SlashChoice } from "discordx";
+import { Discord, Slash, SlashGroup, SlashOption, SlashChoice, Guard } from "discordx";
 import { ApplicationCommandOptionType, CommandInteraction, PermissionFlagsBits, Role, MessageFlags, EmbedBuilder } from "discord.js";
 import { prisma } from "../../../main.js";
+import { DevGuardAndStaffGuard } from "../../../utility/guards.js";
 
 // This class only defines the subgroup commands for settings -> roles
 @Discord()
@@ -11,6 +12,7 @@ import { prisma } from "../../../main.js";
   root: "settings"
 })
 @SlashGroup("roles", "settings")
+@Guard(DevGuardAndStaffGuard)
 export class SettingsRolesManagementSubGroup {
 
   @Slash({ name: "add", description: "Add a role to a permission level" })
@@ -21,12 +23,6 @@ export class SettingsRolesManagementSubGroup {
     interaction: CommandInteraction
   ) {
     if (!interaction.guildId || !interaction.guild) return;
-
-    const member = interaction.member as any;
-    if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
-      await interaction.reply({ content: "Admin only.", flags: MessageFlags.Ephemeral });
-      return;
-    }
 
     try {
       const settings = await prisma.guildSettings.findUnique({
@@ -65,12 +61,6 @@ export class SettingsRolesManagementSubGroup {
     interaction: CommandInteraction
   ) {
     if (!interaction.guildId || !interaction.guild) return;
-
-    const member = interaction.member as any;
-    if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
-      await interaction.reply({ content: "Admin only.", flags: MessageFlags.Ephemeral });
-      return;
-    }
 
     try {
       const settings = await prisma.guildSettings.findUnique({
