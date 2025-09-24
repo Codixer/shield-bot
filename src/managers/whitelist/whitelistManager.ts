@@ -277,9 +277,9 @@ export class WhitelistManager {
     const usersWithCurrentNames = [];
 
     for (const entry of entries) {
-      // Get all VRChat accounts for this user (MAIN, ALT, UNVERIFIED, and IN_VERIFICATION)
+      // Get all VRChat accounts for this user (MAIN, ALT, UNVERIFIED only)
       const validAccounts = entry.user.vrchatAccounts?.filter(acc => 
-        acc.accountType === 'MAIN' || acc.accountType === 'ALT' || acc.accountType === 'UNVERIFIED' || acc.accountType === 'IN_VERIFICATION'
+        acc.accountType === 'MAIN' || acc.accountType === 'ALT' || acc.accountType === 'UNVERIFIED'
       ) || [];
 
       if (validAccounts.length === 0) {
@@ -975,19 +975,39 @@ export class WhitelistManager {
    */
   async syncAndPublishAfterVerification(discordId: string, botOverride?: any): Promise<void> {
     const activeBot = botOverride ?? bot;
-    if (!activeBot?.guilds?.cache) {
+    const guildManager = activeBot?.guilds;
+    if (!guildManager) {
       console.warn(`[Whitelist] Discord client unavailable; skipping whitelist sync for ${discordId}`);
       return;
     }
+    const fallbackGuildId = '813926536457224212';
     try {
       // Find the Discord member across guilds
       let member: any = null;
-      for (const guild of activeBot.guilds.cache.values()) {
+      if (guildManager.cache) {
+        for (const guild of guildManager.cache.values()) {
+          try {
+            member = await guild.members.fetch(discordId);
+            if (member) break;
+          } catch {
+            // Not in this guild; continue searching
+          }
+        }
+      }
+
+      // Fallback: explicitly fetch the primary guild if member still not found
+      if (!member) {
         try {
-          member = await guild.members.fetch(discordId);
-          if (member) break;
-        } catch {
-          // Not in this guild; continue searching
+          const fallbackGuild = await guildManager.fetch(fallbackGuildId);
+          if (fallbackGuild) {
+            try {
+              member = await fallbackGuild.members.fetch(discordId);
+            } catch {
+              // Member not in fallback guild
+            }
+          }
+        } catch (fetchError) {
+          console.warn(`[Whitelist] Failed to fetch fallback guild ${fallbackGuildId}:`, fetchError);
         }
       }
 
