@@ -759,13 +759,13 @@ export class WhitelistManager {
       return;
     }
 
-    // Check if user has unverified or in-verification accounts
-    const hasUnverifiedOrInVerificationAccount = user.vrchatAccounts.some(acc => 
-      acc.accountType === 'UNVERIFIED' || acc.accountType === 'IN_VERIFICATION'
+    // Check if user has unverified accounts
+    const hasUnverifiedAccount = user.vrchatAccounts.some(acc => 
+      acc.accountType === 'UNVERIFIED'
     );
-    
-    if (!hasUnverifiedOrInVerificationAccount) {
-      return; // No unverified or in-verification accounts
+
+    if (!hasUnverifiedAccount) {
+      return; // No unverified accounts
     }
 
     // Ensure user has whitelist entry for basic access
@@ -775,7 +775,7 @@ export class WhitelistManager {
       create: { userId: user.id }
     });
 
-    console.log(`[Whitelist] Granted basic access to unverified/in-verification account for user ${discordId}`);
+    console.log(`[Whitelist] Granted basic access to unverified account for user ${discordId}`);
 
     // Now check if user has eligible Discord roles for full sync and publish
     try {
@@ -973,14 +973,16 @@ export class WhitelistManager {
   /**
    * Sync whitelist roles and publish after user verification
    */
-  async syncAndPublishAfterVerification(discordId: string, bot?: any): Promise<void> {
-    if (!bot) {
-  // bot is available via static import
+  async syncAndPublishAfterVerification(discordId: string, botOverride?: any): Promise<void> {
+    const activeBot = botOverride ?? bot;
+    if (!activeBot?.guilds?.cache) {
+      console.warn(`[Whitelist] Discord client unavailable; skipping whitelist sync for ${discordId}`);
+      return;
     }
     try {
       // Find the Discord member across guilds
       let member: any = null;
-      for (const guild of bot.guilds.cache.values()) {
+      for (const guild of activeBot.guilds.cache.values()) {
         try {
           member = await guild.members.fetch(discordId);
           if (member) break;
