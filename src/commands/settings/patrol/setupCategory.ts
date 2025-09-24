@@ -22,11 +22,6 @@ export class SettingsPatrolSubGroup {
     if (!interaction.guildId || !interaction.guild) return;
 
     const member = interaction.member as any;
-    if (!member.permissions.has(PermissionFlagsBits.Administrator)) {
-      await interaction.reply({ content: "Admin only.", flags: MessageFlags.Ephemeral });
-      return;
-    }
-
     const voice = member.voice?.channel;
     if (!voice || voice.type !== 2 || !voice.parentId) {
       await interaction.reply({ content: "Join a voice channel inside the desired category first.", flags: MessageFlags.Ephemeral });

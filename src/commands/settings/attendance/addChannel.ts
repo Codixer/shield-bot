@@ -10,7 +10,6 @@ import { prisma } from "../../../main.js";
   root: "settings"
 })
 @SlashGroup("attendance", "settings")
-@Guard(VRChatLoginGuard)
 @Guard(StaffGuard)
 export class SettingsAttendanceSubGroup {
 
