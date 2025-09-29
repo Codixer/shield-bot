@@ -73,7 +73,7 @@ export function startVRChatWebSocketListener() {
                     (content && (content.userId === botUserId || content.senderUserId === botUserId)) ||
                     (Array.isArray(content) && content.some(e => e.userId === botUserId || e.senderUserId === botUserId))
                 ) {
-                    console.debug("[VRChat WS] Ignoring event from bot user:", content);
+                    console.debug(`[VRChat WS] Ignoring ${msg.type} event from bot user`);
                     return;
                 }
                 switch (msg.type) {
