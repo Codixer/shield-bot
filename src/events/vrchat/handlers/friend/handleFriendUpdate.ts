@@ -6,10 +6,12 @@ const whitelistManager = new WhitelistManager();
 
 export async function handleFriendUpdate(content: any) {
     try {
-        console.log("[Friend Update]", content);
         
         const { userId, user } = content;
-        
+
+        // Log the received content for debugging
+        // console.log("[Friend Update] ", { userId, user });
+
         if (!userId || !user) {
             console.warn("[Friend Update] Missing userId or user data");
             return;
