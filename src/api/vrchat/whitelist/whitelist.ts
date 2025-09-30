@@ -7,22 +7,22 @@ const whitelistManager = new WhitelistManager();
 
 @Router()
 export class WhitelistAPI {
-
   // Get encoded whitelist (for VRChat clients)
   @Get("/api/vrchat/whitelist/encoded")
   async getEncodedWhitelist(ctx: Context) {
     try {
-      const encodedWhitelist = await whitelistManager.generateEncodedWhitelist();
-      
+      const encodedWhitelist =
+        await whitelistManager.generateEncodedWhitelist();
+
       ctx.body = {
         success: true,
-        data: encodedWhitelist
+        data: encodedWhitelist,
       };
     } catch (error: any) {
       ctx.status = 500;
       ctx.body = {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -32,16 +32,16 @@ export class WhitelistAPI {
   async getRawWhitelist(ctx: Context) {
     try {
       const content = await whitelistManager.generateWhitelistContent();
-      
+
       ctx.body = {
         success: true,
-        data: content
+        data: content,
       };
     } catch (error: any) {
       ctx.status = 500;
       ctx.body = {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -51,16 +51,16 @@ export class WhitelistAPI {
   async getStatistics(ctx: Context) {
     try {
       const stats = await whitelistManager.getStatistics();
-      
+
       ctx.body = {
         success: true,
-        data: stats
+        data: stats,
       };
     } catch (error: any) {
       ctx.status = 500;
       ctx.body = {
         success: false,
-        error: error.message
+        error: error.message,
       };
     }
   }

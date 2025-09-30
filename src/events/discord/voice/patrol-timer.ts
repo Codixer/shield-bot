@@ -10,4 +10,3 @@ export class PatrolTimerEvents {
     await patrolTimer.handleVoiceStateUpdate(oldState, newState);
   }
 }
-

@@ -1,5 +1,10 @@
 import { Discord, Slash, SlashGroup } from "discordx";
-import { CommandInteraction, MessageFlags, InteractionContextType, ApplicationIntegrationType } from "discord.js";
+import {
+  CommandInteraction,
+  MessageFlags,
+  InteractionContextType,
+  ApplicationIntegrationType,
+} from "discord.js";
 
 @Discord()
 // Root settings group definition
@@ -7,8 +12,7 @@ import { CommandInteraction, MessageFlags, InteractionContextType, ApplicationIn
   name: "settings",
   description: "Bot configuration and settings commands",
   contexts: [InteractionContextType.Guild],
-  integrationTypes: [ApplicationIntegrationType.GuildInstall]
+  integrationTypes: [ApplicationIntegrationType.GuildInstall],
 })
 // Assign subsequent slashes in this class to the root group
-export class SettingsRootGroup {
-}
+export class SettingsRootGroup {}

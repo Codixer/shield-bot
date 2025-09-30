@@ -12,9 +12,18 @@ export class AttendanceManager {
     });
   }
 
-  async addUserToSquad(eventId: number, userId: number | undefined, squadName: string) {
-    if (!userId) throw new Error("User ID is undefined. Make sure the user exists in the database.");
-    let squad = await prisma.squad.findFirst({ where: { eventId, name: squadName } });
+  async addUserToSquad(
+    eventId: number,
+    userId: number | undefined,
+    squadName: string,
+  ) {
+    if (!userId)
+      throw new Error(
+        "User ID is undefined. Make sure the user exists in the database.",
+      );
+    let squad = await prisma.squad.findFirst({
+      where: { eventId, name: squadName },
+    });
     if (!squad) {
       squad = await prisma.squad.create({ data: { eventId, name: squadName } });
     }
@@ -30,7 +39,9 @@ export class AttendanceManager {
     // This method completely removes the user from the event (original behavior)
     const squads = await prisma.squad.findMany({ where: { eventId } });
     for (const squad of squads) {
-      await prisma.squadMember.deleteMany({ where: { squadId: squad.id, userId } });
+      await prisma.squadMember.deleteMany({
+        where: { squadId: squad.id, userId },
+      });
     }
     await prisma.attendanceStaff.deleteMany({ where: { eventId, userId } });
   }
@@ -38,21 +49,23 @@ export class AttendanceManager {
   async moveUserToSquad(eventId: number, userId: number, newSquadName: string) {
     const squads = await prisma.squad.findMany({ where: { eventId } });
     for (const squad of squads) {
-      await prisma.squadMember.deleteMany({ where: { squadId: squad.id, userId } });
+      await prisma.squadMember.deleteMany({
+        where: { squadId: squad.id, userId },
+      });
     }
     const result = await this.addUserToSquad(eventId, userId, newSquadName);
-    
+
     // Clear the left status when moving to a new squad
     const member = await prisma.squadMember.findFirst({
       where: { squad: { eventId, name: newSquadName }, userId },
     });
     if (member) {
-      await prisma.squadMember.update({ 
-        where: { id: member.id }, 
-        data: { hasLeft: false } 
+      await prisma.squadMember.update({
+        where: { id: member.id },
+        data: { hasLeft: false },
       });
     }
-    
+
     return result;
   }
 
@@ -61,7 +74,10 @@ export class AttendanceManager {
       where: { squad: { eventId }, userId },
     });
     if (member) {
-      await prisma.squadMember.update({ where: { id: member.id }, data: { isLead: true } });
+      await prisma.squadMember.update({
+        where: { id: member.id },
+        data: { isLead: true },
+      });
     }
   }
 
@@ -70,23 +86,36 @@ export class AttendanceManager {
       where: { squad: { eventId }, userId },
     });
     if (member) {
-      await prisma.squadMember.update({ where: { id: member.id }, data: { isLate: true } });
+      await prisma.squadMember.update({
+        where: { id: member.id },
+        data: { isLate: true },
+      });
     }
   }
 
-  async markUserAsSplit(eventId: number, userId: number, newSquadName: string, splitFrom: string) {
+  async markUserAsSplit(
+    eventId: number,
+    userId: number,
+    newSquadName: string,
+    splitFrom: string,
+  ) {
     await this.moveUserToSquad(eventId, userId, newSquadName);
     const member = await prisma.squadMember.findFirst({
       where: { squad: { eventId, name: newSquadName }, userId },
     });
     if (member) {
-      await prisma.squadMember.update({ where: { id: member.id }, data: { isSplit: true, splitFrom } });
+      await prisma.squadMember.update({
+        where: { id: member.id },
+        data: { isSplit: true, splitFrom },
+      });
     }
   }
 
   async addStaff(eventId: number, userId: number) {
     // Find if a staff entry already exists for this event/user
-    const existing = await prisma.attendanceStaff.findFirst({ where: { eventId, userId } });
+    const existing = await prisma.attendanceStaff.findFirst({
+      where: { eventId, userId },
+    });
     if (existing) {
       return existing;
     }
@@ -94,7 +123,10 @@ export class AttendanceManager {
   }
 
   async setCohost(eventId: number, userId: number) {
-    return prisma.attendanceEvent.update({ where: { id: eventId }, data: { cohostId: userId } });
+    return prisma.attendanceEvent.update({
+      where: { id: eventId },
+      data: { cohostId: userId },
+    });
   }
 
   async getEventSummary(eventId: number) {
@@ -115,7 +147,8 @@ export class AttendanceManager {
 
   // Find or create a user by Discord ID
   async findOrCreateUserByDiscordId(discordId: string | undefined) {
-    if (!discordId) throw new Error("Discord ID is undefined. Cannot find or create user.");
+    if (!discordId)
+      throw new Error("Discord ID is undefined. Cannot find or create user.");
     let user = await prisma.user.findUnique({ where: { discordId } });
     if (!user) {
       user = await prisma.user.create({ data: { discordId } });
@@ -135,7 +168,9 @@ export class AttendanceManager {
 
   // Get the active event for a user (by userId)
   async getActiveEventIdForUser(userId: number) {
-    const active = await prisma.activeAttendanceEvent.findUnique({ where: { userId } });
+    const active = await prisma.activeAttendanceEvent.findUnique({
+      where: { userId },
+    });
     return active?.eventId;
   }
 
@@ -150,7 +185,11 @@ export class AttendanceManager {
     const user = await this.findOrCreateUserByDiscordId(discordId);
     const eventId = await this.getActiveEventIdForUser(user.id);
     if (!eventId) {
-      await interaction.reply({ content: "You do not have an active event. Use /vrchat attendance createevent first.", flags: 64 });
+      await interaction.reply({
+        content:
+          "You do not have an active event. Use /vrchat attendance createevent first.",
+        flags: 64,
+      });
       return null;
     }
     return { eventId, user };
@@ -180,29 +219,29 @@ export class AttendanceManager {
         OR: [
           { hostId: userId },
           { cohostId: userId },
-          { 
+          {
             staff: {
-              some: { userId }
-            }
+              some: { userId },
+            },
           },
           {
             squads: {
               some: {
                 members: {
-                  some: { userId }
-                }
-              }
-            }
-          }
-        ]
+                  some: { userId },
+                },
+              },
+            },
+          },
+        ],
       },
       include: {
         host: true,
-        cohost: true
+        cohost: true,
       },
       orderBy: {
-        date: 'desc'
-      }
+        date: "desc",
+      },
     });
   }
 
@@ -212,8 +251,8 @@ export class AttendanceManager {
       where: { id: eventId },
       include: {
         host: true,
-        cohost: true
-      }
+        cohost: true,
+      },
     });
   }
 
@@ -223,9 +262,9 @@ export class AttendanceManager {
       where: { squad: { eventId }, userId },
     });
     if (member) {
-      await prisma.squadMember.update({ 
-        where: { id: member.id }, 
-        data: { hasLeft: true } 
+      await prisma.squadMember.update({
+        where: { id: member.id },
+        data: { hasLeft: true },
       });
     }
   }

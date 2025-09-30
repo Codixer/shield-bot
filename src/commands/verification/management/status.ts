@@ -1,5 +1,16 @@
 import { Discord, Slash, SlashOption, Guard, SlashGroup } from "discordx";
-import { CommandInteraction, ApplicationCommandOptionType, MessageFlags, EmbedBuilder, Colors, AutocompleteInteraction, InteractionContextType, ApplicationIntegrationType, ButtonBuilder, ButtonStyle } from "discord.js";
+import {
+  CommandInteraction,
+  ApplicationCommandOptionType,
+  MessageFlags,
+  EmbedBuilder,
+  Colors,
+  AutocompleteInteraction,
+  InteractionContextType,
+  ApplicationIntegrationType,
+  ButtonBuilder,
+  ButtonStyle,
+} from "discord.js";
 import { VRChatLoginGuard } from "../../../utility/guards.js";
 import { getUserById, searchUsers } from "../../../utility/vrchat.js";
 import { prisma } from "../../../main.js";
@@ -8,13 +19,18 @@ import { prisma } from "../../../main.js";
 @SlashGroup({
   name: "verify",
   description: "VRChat verification commands.",
-  contexts: [InteractionContextType.Guild, InteractionContextType.PrivateChannel],
-  integrationTypes: [ApplicationIntegrationType.UserInstall, ApplicationIntegrationType.GuildInstall]
+  contexts: [
+    InteractionContextType.Guild,
+    InteractionContextType.PrivateChannel,
+  ],
+  integrationTypes: [
+    ApplicationIntegrationType.UserInstall,
+    ApplicationIntegrationType.GuildInstall,
+  ],
 })
 @SlashGroup("verify")
 @Guard(VRChatLoginGuard)
 export class VRChatVerifyStatusCommand {
-
   @Slash({
     name: "status",
     description: "Check verification status of a VRChat account.",
@@ -25,9 +41,10 @@ export class VRChatVerifyStatusCommand {
       description: "Search for a VRChat username or user ID",
       type: ApplicationCommandOptionType.String,
       required: true,
-      autocomplete: true
-    }) userIdOpt: string,
-    interaction: CommandInteraction | AutocompleteInteraction
+      autocomplete: true,
+    })
+    userIdOpt: string,
+    interaction: CommandInteraction | AutocompleteInteraction,
   ) {
     if (interaction.isAutocomplete()) {
       return this.autocompleteVerifyVrchatUser(interaction);
@@ -41,7 +58,7 @@ export class VRChatVerifyStatusCommand {
     if (!userId || typeof userId !== "string") {
       await interaction.reply({
         content: `No VRChat user ID provided. Please try again.`,
-        flags: MessageFlags.Ephemeral
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -56,7 +73,7 @@ export class VRChatVerifyStatusCommand {
     if (!userInfo) {
       await interaction.reply({
         content: `Could not fetch VRChat user details. Please try again or check the user ID.`,
-        flags: MessageFlags.Ephemeral
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -64,8 +81,8 @@ export class VRChatVerifyStatusCommand {
     // Check verification status in database
     const vrchatAccount = await prisma.vRChatAccount.findFirst({
       where: {
-        vrcUserId: userId
-      }
+        vrcUserId: userId,
+      },
     });
 
     let statusText = "Not verified";
@@ -73,7 +90,10 @@ export class VRChatVerifyStatusCommand {
     let statusEmoji = "❌";
 
     if (vrchatAccount) {
-      if (vrchatAccount.accountType === "MAIN" || vrchatAccount.accountType === "ALT") {
+      if (
+        vrchatAccount.accountType === "MAIN" ||
+        vrchatAccount.accountType === "ALT"
+      ) {
         statusText = "Verified";
         statusColor = Colors.Green;
         statusEmoji = "✅";
@@ -90,15 +110,22 @@ export class VRChatVerifyStatusCommand {
 
     const embed = new EmbedBuilder()
       .setTitle(`${statusEmoji} Verification Status`)
-      .setDescription(`**${userInfo.displayName}** (${userInfo.id})\n\n**Status:** ${statusText}`)
+      .setDescription(
+        `**${userInfo.displayName}** (${userInfo.id})\n\n**Status:** ${statusText}`,
+      )
       .setColor(statusColor)
-      .setImage(userInfo.profilePicOverride || userInfo.currentAvatarImageUrl || userInfo.currentAvatarThumbnailImageUrl || null)
+      .setImage(
+        userInfo.profilePicOverride ||
+          userInfo.currentAvatarImageUrl ||
+          userInfo.currentAvatarThumbnailImageUrl ||
+          null,
+      )
       .setThumbnail(userInfo.userIcon || userInfo.profilePicOverride || null)
       .setFooter({ text: "VRChat Verification Status" });
 
     await interaction.reply({
       embeds: [embed],
-      flags: MessageFlags.Ephemeral
+      flags: MessageFlags.Ephemeral,
     });
   }
 
@@ -111,7 +138,7 @@ export class VRChatVerifyStatusCommand {
       const users = await searchUsers({ search: query, n: 25 });
       const choices = users.map((user: any) => ({
         name: `${user.displayName} (${user.id})`,
-        value: user.id
+        value: user.id,
       }));
       return await interaction.respond(choices);
     } catch (e) {
