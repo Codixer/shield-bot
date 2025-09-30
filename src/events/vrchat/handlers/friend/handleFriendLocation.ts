@@ -19,7 +19,7 @@ export async function handleFriendLocation(content: any) {
     if (content.userId) {
         const consent = await hasFriendLocationConsent(content.userId);
         if (!consent) {
-            console.log(`[Friend Location] No consent: Not allowed to track ${content.userId}`);
+            // console.log(`[Friend Location] No consent: Not allowed to track ${content.userId}`);
             return;
         }
     }
@@ -50,5 +50,5 @@ export async function handleFriendLocation(content: any) {
             senderUserId: null,
         }
     });
-    console.log("[VRChat Friend Location] Upserted:", content);
+    console.log("[VRChat Friend Location] Upserted:", content.userId, instanceId, worldId);
 }

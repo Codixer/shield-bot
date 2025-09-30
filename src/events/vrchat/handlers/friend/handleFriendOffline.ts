@@ -15,7 +15,7 @@ export async function handleFriendOffline(content: any) {
     // Check if user has given consent for location tracking using utility method
     const consent = await hasFriendLocationConsent(content.userId);
     if (!consent) {
-        console.log(`[VRChat Friend Online] No consent for user: ${content.userId}`);
+        // console.log(`[VRChat Friend Online] No consent for user: ${content.userId}`);
         return;
     }
 
@@ -37,5 +37,5 @@ export async function handleFriendOffline(content: any) {
             senderUserId: null,
         }
     });
-    console.log("[VRChat Friend Offline] Upserted as offline:", content);
+    console.log("[VRChat Friend Offline] Upserted as offline:", content.userId);
 }

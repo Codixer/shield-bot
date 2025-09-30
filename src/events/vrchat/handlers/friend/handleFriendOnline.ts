@@ -18,7 +18,7 @@ export async function handleFriendOnline(content: any) {
     // Check if user has given consent for location tracking using utility method
     const consent = await hasFriendLocationConsent(content.userId);
     if (!consent) {
-        console.log(`[VRChat Friend Online] No consent for user: ${content.userId}`);
+        // console.log(`[VRChat Friend Online] No consent for user: ${content.userId}`);
         return;
     }
     // Extract instanceId and worldId
