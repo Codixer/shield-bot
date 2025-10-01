@@ -16,6 +16,7 @@ import { prisma } from "../../../../main.js";
 import { getUserById } from "../../../../utility/vrchat/user.js";
 import { unfriendUser } from "../../../../utility/vrchat/user.js";
 import { StaffGuard } from "../../../../utility/guards.js";
+import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
 
 @Discord()
 export class VRCStaffAccountManagerButtonHandler {
@@ -133,6 +134,16 @@ export class VRCStaffAccountManagerButtonHandler {
       data: { accountType: "MAIN" },
     });
 
+    // Update whitelist after status change
+    try {
+      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId);
+    } catch (error) {
+      console.error(
+        `[Staff Account Manager] Failed to sync whitelist for ${targetDiscordId}:`,
+        error,
+      );
+    }
+
     await this.updateStaffAccountManagerMessage(interaction, targetDiscordId);
   }
 
@@ -147,6 +158,16 @@ export class VRCStaffAccountManagerButtonHandler {
       where: { id: vrcAccount.id },
       data: { accountType: "ALT" },
     });
+
+    // Update whitelist after status change
+    try {
+      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId);
+    } catch (error) {
+      console.error(
+        `[Staff Account Manager] Failed to sync whitelist for ${targetDiscordId}:`,
+        error,
+      );
+    }
 
     await this.updateStaffAccountManagerMessage(interaction, targetDiscordId);
   }
@@ -178,6 +199,16 @@ export class VRCStaffAccountManagerButtonHandler {
       await prisma.friendLocationConsent.deleteMany({
         where: { ownerVrcUserId: vrcUserId },
       });
+
+      // Update whitelist after account deletion
+      try {
+        await whitelistManager.syncAndPublishAfterVerification(targetDiscordId);
+      } catch (whitelistError) {
+        console.error(
+          `[Staff Account Manager] Failed to sync whitelist after deletion for ${targetDiscordId}:`,
+          whitelistError,
+        );
+      }
 
       await this.updateStaffAccountManagerMessage(interaction, targetDiscordId);
     } catch (error) {

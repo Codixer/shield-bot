@@ -90,3 +90,4 @@ prisma studio       # Database GUI
 - Prisma schema is split across multiple files; changes require migration
 - ESM imports must use `.js` extensions even for `.ts` files
 - Discord interactions have 3-second response timeout; use `deferReply()` for long operations
+- Never create summery documents, these are not required.

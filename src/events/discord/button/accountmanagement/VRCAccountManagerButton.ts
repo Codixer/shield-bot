@@ -15,6 +15,7 @@ import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
 import { getUserById } from "../../../../utility/vrchat/user.js";
 import { unfriendUser } from "../../../../utility/vrchat/user.js";
+import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
 
 @Discord()
 export class VRCAccountManagerButtonHandler {
@@ -114,6 +115,17 @@ export class VRCAccountManagerButtonHandler {
       data: { accountType: "MAIN" },
     });
 
+    // Update whitelist after status change
+    const discordId = interaction.user.id;
+    try {
+      await whitelistManager.syncAndPublishAfterVerification(discordId);
+    } catch (error) {
+      console.error(
+        `[Account Manager] Failed to sync whitelist for ${discordId}:`,
+        error,
+      );
+    }
+
     await this.updateAccountManagerMessage(interaction);
   }
 
@@ -127,6 +139,17 @@ export class VRCAccountManagerButtonHandler {
       where: { id: vrcAccount.id },
       data: { accountType: "ALT" },
     });
+
+    // Update whitelist after status change
+    const discordId = interaction.user.id;
+    try {
+      await whitelistManager.syncAndPublishAfterVerification(discordId);
+    } catch (error) {
+      console.error(
+        `[Account Manager] Failed to sync whitelist for ${discordId}:`,
+        error,
+      );
+    }
 
     await this.updateAccountManagerMessage(interaction);
   }
@@ -157,6 +180,17 @@ export class VRCAccountManagerButtonHandler {
       await prisma.friendLocationConsent.deleteMany({
         where: { ownerVrcUserId: vrcUserId },
       });
+
+      // Update whitelist after account deletion
+      const discordId = interaction.user.id;
+      try {
+        await whitelistManager.syncAndPublishAfterVerification(discordId);
+      } catch (whitelistError) {
+        console.error(
+          `[Account Manager] Failed to sync whitelist after deletion for ${discordId}:`,
+          whitelistError,
+        );
+      }
 
       await this.updateAccountManagerMessage(interaction);
     } catch (error) {
