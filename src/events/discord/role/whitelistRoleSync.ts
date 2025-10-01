@@ -168,15 +168,16 @@ export class WhitelistRoleSync {
         // Use expected permissions for commit message (if removed, show none)
         const permsForMsg =
           action === "removed" ? new Set<string>() : expectedPermissions;
-        await whitelistManager.publishWhitelist(
-          this.buildCommitMessage(username, action, permsForMsg),
-        );
+        
+        // Queue for batched update instead of immediate publish
+        const msg = this.buildCommitMessage(username, action, permsForMsg);
+        whitelistManager.queueBatchedUpdate(newMember.id, msg);
         console.log(
-          `[Whitelist] GitHub repository updated after role change for ${newMember.displayName}`,
+          `[Whitelist] Queued GitHub repository update after role change for ${newMember.displayName}`,
         );
       } catch (repoError) {
         console.warn(
-          `[Whitelist] Failed to update GitHub repository after role change for ${newMember.displayName}:`,
+          `[Whitelist] Failed to queue GitHub repository update after role change for ${newMember.displayName}:`,
           repoError,
         );
       }
@@ -245,15 +246,16 @@ export class WhitelistRoleSync {
           member.displayName || member.user?.username || member.id;
         // Determine permissions user now should have
         const { permissions } = await this.getExpectedFromDiscordRoles(roleIds);
-        await whitelistManager.publishWhitelist(
-          this.buildCommitMessage(username, "added", permissions),
-        );
+        
+        // Queue for batched update instead of immediate publish
+        const msg = this.buildCommitMessage(username, "added", permissions);
+        whitelistManager.queueBatchedUpdate(member.id, msg);
         console.log(
-          `[Whitelist] GitHub repository updated after new member ${member.displayName} joined`,
+          `[Whitelist] Queued GitHub repository update after new member ${member.displayName} joined`,
         );
       } catch (repoError) {
         console.warn(
-          `[Whitelist] Failed to update GitHub repository after new member ${member.displayName} joined:`,
+          `[Whitelist] Failed to queue GitHub repository update after new member ${member.displayName} joined:`,
           repoError,
         );
       }
@@ -311,15 +313,16 @@ export class WhitelistRoleSync {
       // Publish whitelist with contextual commit message after removing user
       try {
         const username = memberName;
-        await whitelistManager.publishWhitelist(
-          `${username} was removed with the roles none`,
-        );
+        
+        // Queue for batched update instead of immediate publish
+        const msg = `${username} was removed with the roles none`;
+        whitelistManager.queueBatchedUpdate(member.id, msg);
         console.log(
-          `[Whitelist] GitHub repository updated after ${memberName} left server`,
+          `[Whitelist] Queued GitHub repository update after ${memberName} left server`,
         );
       } catch (repoError) {
         console.warn(
-          `[Whitelist] Failed to update GitHub repository after ${memberName} left server:`,
+          `[Whitelist] Failed to queue GitHub repository update after ${memberName} left server:`,
           repoError,
         );
       }
@@ -375,15 +378,16 @@ export class WhitelistRoleSync {
       // Publish whitelist with contextual commit message after removing banned user
       try {
         const username = userName;
-        await whitelistManager.publishWhitelist(
-          `${username} was removed with the roles none`,
-        );
+        
+        // Queue for batched update instead of immediate publish
+        const msg = `${username} was removed with the roles none`;
+        whitelistManager.queueBatchedUpdate(user.id, msg);
         console.log(
-          `[Whitelist] GitHub repository updated after ${userName} was banned`,
+          `[Whitelist] Queued GitHub repository update after ${userName} was banned`,
         );
       } catch (repoError) {
         console.warn(
-          `[Whitelist] Failed to update GitHub repository after ${userName} was banned:`,
+          `[Whitelist] Failed to queue GitHub repository update after ${userName} was banned:`,
           repoError,
         );
       }

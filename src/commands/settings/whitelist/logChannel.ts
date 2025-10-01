@@ -8,7 +8,7 @@ import { DevGuardAndStaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
 
 @Discord()
-@SlashGroup({ name: "whitelist", description: "Whitelist settings" })
+@SlashGroup({ name: "whitelist", description: "Whitelist settings", root: "settings" })
 @SlashGroup("whitelist", "settings")
 @Guard(DevGuardAndStaffGuard)
 export class WhitelistSettingsCommand {

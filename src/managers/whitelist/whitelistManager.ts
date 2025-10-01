@@ -4,6 +4,12 @@ import { prisma, bot } from "../../main.js";
 import { sendWhitelistLog } from "../../utility/vrchat/whitelistLogger.js";
 
 export class WhitelistManager {
+  // Batching mechanism for GitHub updates
+  private pendingUpdates: Set<string> = new Set();
+  private updateTimer: NodeJS.Timeout | null = null;
+  private readonly BATCH_DELAY_MS = 5000; // Wait 5 seconds after last change before updating
+  private lastPublishedContent: string | null = null;
+
   /**
    * Get a user from the database by Discord ID
    */
@@ -457,9 +463,83 @@ export class WhitelistManager {
   /**
    * Publish the whitelist to the configured GitHub repository.
    * Writes both encoded and decoded files in a single commit.
+   * Now checks if content changed before publishing to avoid unnecessary commits.
    */
-  async publishWhitelist(commitMessage?: string): Promise<any> {
-    return await this.updateRepositoryWithWhitelist(commitMessage);
+  async publishWhitelist(commitMessage?: string, force: boolean = false): Promise<any> {
+    // Generate content to check if it changed
+    const currentContent = await this.generateWhitelistContent();
+    
+    // Skip update if content hasn't changed (unless forced)
+    if (!force && this.lastPublishedContent !== null && currentContent === this.lastPublishedContent) {
+      console.log('[Whitelist] Content unchanged, skipping GitHub update');
+      return { updated: false, reason: 'Content unchanged' };
+    }
+
+    const result = await this.updateRepositoryWithWhitelist(commitMessage);
+    
+    // Store the published content for future comparisons
+    if (result.updated) {
+      this.lastPublishedContent = currentContent;
+    }
+    
+    return result;
+  }
+
+  /**
+   * Queue a user for batched whitelist update
+   * This collects changes and publishes once after a delay
+   */
+  queueBatchedUpdate(discordId: string, commitMessage?: string): void {
+    this.pendingUpdates.add(discordId);
+    
+    // Clear existing timer and start a new one
+    if (this.updateTimer) {
+      clearTimeout(this.updateTimer);
+    }
+    
+    this.updateTimer = setTimeout(async () => {
+      await this.processBatchedUpdates(commitMessage);
+    }, this.BATCH_DELAY_MS);
+  }
+
+  /**
+   * Process all pending batched updates
+   */
+  private async processBatchedUpdates(commitMessage?: string): Promise<void> {
+    if (this.pendingUpdates.size === 0) {
+      return;
+    }
+
+    const count = this.pendingUpdates.size;
+    const users = Array.from(this.pendingUpdates);
+    this.pendingUpdates.clear();
+    this.updateTimer = null;
+
+    console.log(`[Whitelist] Processing batched update for ${count} users`);
+
+    try {
+      // Generate a meaningful commit message if not provided
+      let message = commitMessage;
+      if (!message || message.trim().length === 0) {
+        if (count === 1) {
+          // Try to get the user's name for single updates
+          try {
+            const user = await this.getUserByDiscordId(users[0]);
+            const name = user?.vrchatAccounts?.[0]?.vrchatUsername || users[0];
+            message = `Updated whitelist for ${name}`;
+          } catch {
+            message = `Updated whitelist for 1 user`;
+          }
+        } else {
+          message = `Updated whitelist for ${count} users`;
+        }
+      }
+
+      // Publish with content change check
+      await this.publishWhitelist(message, false);
+    } catch (error) {
+      console.error('[Whitelist] Error processing batched updates:', error);
+    }
   }
 
   /**
@@ -1205,10 +1285,10 @@ export class WhitelistManager {
         );
       }
 
-      // Publish updated whitelist to the repository
-      await this.publishWhitelist(msg);
+      // Queue batched update instead of immediate publish
+      this.queueBatchedUpdate(discordId, msg);
       console.log(
-        `[Whitelist] Repository updated after verification for ${who}`,
+        `[Whitelist] Queued repository update after verification for ${who}`,
       );
     } catch (e) {
       console.warn(

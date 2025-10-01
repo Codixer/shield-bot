@@ -128,6 +128,12 @@ export class WhitelistCommands {
             );
           }
         }
+        
+        // Queue a single batched update after processing all members
+        if (membersWithRole.size > 0) {
+          const msg = `Role mapping updated for ${discordRole.name}: ${permissionList.join(", ")}`;
+          whitelistManager.queueBatchedUpdate('bulk-role-setup', msg);
+        }
       }
     } catch (error: any) {
       await interaction.reply({
@@ -211,6 +217,12 @@ export class WhitelistCommands {
           console.log(
             `[Whitelist] Role removal revalidation complete: ${accessUpdated} access changed, ${errors} errors`,
           );
+          
+          // Queue a single batched update after processing all members
+          if (accessUpdated > 0) {
+            const msg = `Role mapping removed for ${discordRole.name}`;
+            whitelistManager.queueBatchedUpdate('bulk-role-removal', msg);
+          }
         }
       } else {
         await interaction.reply({
@@ -693,6 +705,7 @@ export class WhitelistCommands {
       try {
         await whitelistManager.publishWhitelist(
           `manual generate: latest whitelist`,
+          true, // Force update even if content unchanged
         );
         repoUpdateSuccess = true;
       } catch (repoError: any) {
@@ -779,6 +792,7 @@ export class WhitelistCommands {
 
       await whitelistManager.publishWhitelist(
         `manual update: latest whitelist`,
+        true, // Force update even if content unchanged
       );
 
       const embed = new EmbedBuilder()
@@ -950,15 +964,14 @@ export class WhitelistCommands {
         // Update GitHub repository if any changes were made
         if (accessGranted > 0 || accessRevoked > 0) {
           try {
-            await whitelistManager.publishWhitelist(
-              `bulk validation: access changed (granted=${accessGranted > 0}, revoked=${accessRevoked > 0})`,
-            );
+            const msg = `Bulk validation: ${accessGranted} granted, ${accessRevoked} revoked`;
+            whitelistManager.queueBatchedUpdate('bulk-validation', msg);
             console.log(
-              `[Whitelist] GitHub repository updated after bulk validation`,
+              `[Whitelist] Queued GitHub repository update after bulk validation`,
             );
           } catch (gistError) {
             console.warn(
-              `[Whitelist] Failed to update GitHub repository after bulk validation:`,
+              `[Whitelist] Failed to queue GitHub repository update after bulk validation:`,
               gistError,
             );
           }

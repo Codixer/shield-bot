@@ -46,13 +46,15 @@ export async function handleFriendUpdate(content: any) {
           // If username changed, update whitelist repository
           if (usernameChanged) {
             try {
-              await whitelistManager.publishWhitelist();
+              const oldUsername = vrcAccount.vrchatUsername || 'unknown';
+              const msg = `Username updated: ${oldUsername} → ${currentUsername}`;
+              whitelistManager.queueBatchedUpdate(userId, msg);
               console.log(
-                `[Friend Update] Whitelist repository updated due to username change for ${userId}`,
+                `[Friend Update] Queued whitelist repository update due to username change for ${userId}`,
               );
             } catch (repoError) {
               console.warn(
-                `[Friend Update] Failed to update whitelist repository for ${userId}:`,
+                `[Friend Update] Failed to queue whitelist repository update for ${userId}:`,
                 repoError,
               );
             }
