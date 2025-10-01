@@ -63,6 +63,7 @@ export async function sendWhitelistLog(
     await channel.send({
       components: [container],
       flags: MessageFlags.IsComponentsV2,
+      allowedMentions: { users: [] },
     });
 
     console.log(

@@ -104,7 +104,8 @@ export class WhitelistCommands {
       // Trigger a resync for all members with this role
       const guild = interaction.guild;
       if (guild) {
-        const membersWithRole = guild.members.cache.filter((member) =>
+        const allMembers = await guild.members.fetch();
+        const membersWithRole = allMembers.filter((member) =>
           member.roles.cache.has(discordRole.id),
         );
 
@@ -169,7 +170,8 @@ export class WhitelistCommands {
         // Trigger a resync for all members who had this role
         const guild = interaction.guild;
         if (guild) {
-          const membersWithRole = guild.members.cache.filter((member) =>
+          const allMembers = await guild.members.fetch();
+          const membersWithRole = allMembers.filter((member) =>
             member.roles.cache.has(discordRole.id),
           );
 
