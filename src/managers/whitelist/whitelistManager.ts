@@ -1318,9 +1318,19 @@ export class WhitelistManager {
         },
       });
 
-      return (
-        user?.whitelistEntry?.roleAssignments?.map((a) => a.role.name) || []
-      );
+      // Extract VRChat roles from description field (comma-separated)
+      const roles = new Set<string>();
+      for (const assignment of user?.whitelistEntry?.roleAssignments || []) {
+        if (assignment.role.description) {
+          for (const role of String(assignment.role.description)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)) {
+            roles.add(role);
+          }
+        }
+      }
+      return Array.from(roles).sort();
     } catch (error) {
       console.error(
         `[Whitelist] Failed to get whitelist roles for ${discordId}:`,

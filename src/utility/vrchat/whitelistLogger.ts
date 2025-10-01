@@ -1,4 +1,4 @@
-import { TextDisplayBuilder, MessageFlags, Client } from "discord.js";
+import { TextDisplayBuilder, MessageFlags, Client, ContainerBuilder } from "discord.js";
 import { prisma } from "../../main.js";
 
 export interface WhitelistLogData {
@@ -50,12 +50,18 @@ export async function sendWhitelistLog(
     // Build the log message content
     const content = buildLogContent(data);
 
-    // Create the text display component
-    const textDisplay = new TextDisplayBuilder().setContent(content);
+    // Create the text display component with the content
+    const textDisplay = new TextDisplayBuilder()
+      .setContent(content);
+
+    // Create a container with yellow sidebar
+    const container = new ContainerBuilder()
+      .setAccentColor(0xffd700) // Yellow/gold color
+      .addTextDisplayComponents([textDisplay]);
 
     // Send the message with componentsv2
     await channel.send({
-      components: [textDisplay],
+      components: [container],
       flags: MessageFlags.IsComponentsV2,
     });
 
@@ -130,9 +136,19 @@ export async function getUserWhitelistRoles(
       },
     });
 
-    return (
-      user?.whitelistEntry?.roleAssignments?.map((a) => a.role.name) || []
-    );
+    // Extract VRChat roles from description field (comma-separated)
+    const roles = new Set<string>();
+    for (const assignment of user?.whitelistEntry?.roleAssignments || []) {
+      if (assignment.role.description) {
+        for (const role of String(assignment.role.description)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)) {
+          roles.add(role);
+        }
+      }
+    }
+    return Array.from(roles).sort();
   } catch (error) {
     console.error(
       `[WhitelistLogger] Failed to get whitelist roles for ${discordId}:`,
