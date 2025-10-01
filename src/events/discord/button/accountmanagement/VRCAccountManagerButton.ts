@@ -16,6 +16,7 @@ import { prisma } from "../../../../main.js";
 import { getUserById } from "../../../../utility/vrchat/user.js";
 import { unfriendUser } from "../../../../utility/vrchat/user.js";
 import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
+import { sendWhitelistLog, getUserWhitelistRoles } from "../../../../utility/vrchat/whitelistLogger.js";
 
 @Discord()
 export class VRCAccountManagerButtonHandler {
@@ -119,6 +120,27 @@ export class VRCAccountManagerButtonHandler {
     const discordId = interaction.user.id;
     try {
       await whitelistManager.syncAndPublishAfterVerification(discordId);
+      
+      // Send whitelist log for status change
+      if (interaction.guild) {
+        try {
+          const roles = await getUserWhitelistRoles(discordId);
+          await sendWhitelistLog(interaction.client, interaction.guild.id, {
+            discordId,
+            displayName: interaction.user.displayName || interaction.user.username,
+            vrchatUsername: vrcAccount.vrchatUsername || undefined,
+            vrcUserId: vrcUserId,
+            roles,
+            action: "modified",
+            accountType: "MAIN",
+          });
+        } catch (logError) {
+          console.warn(
+            `[Account Manager] Failed to send whitelist log for ${discordId}:`,
+            logError,
+          );
+        }
+      }
     } catch (error) {
       console.error(
         `[Account Manager] Failed to sync whitelist for ${discordId}:`,
@@ -144,6 +166,27 @@ export class VRCAccountManagerButtonHandler {
     const discordId = interaction.user.id;
     try {
       await whitelistManager.syncAndPublishAfterVerification(discordId);
+      
+      // Send whitelist log for status change
+      if (interaction.guild) {
+        try {
+          const roles = await getUserWhitelistRoles(discordId);
+          await sendWhitelistLog(interaction.client, interaction.guild.id, {
+            discordId,
+            displayName: interaction.user.displayName || interaction.user.username,
+            vrchatUsername: vrcAccount.vrchatUsername || undefined,
+            vrcUserId: vrcUserId,
+            roles,
+            action: "modified",
+            accountType: "ALT",
+          });
+        } catch (logError) {
+          console.warn(
+            `[Account Manager] Failed to send whitelist log for ${discordId}:`,
+            logError,
+          );
+        }
+      }
     } catch (error) {
       console.error(
         `[Account Manager] Failed to sync whitelist for ${discordId}:`,
@@ -181,10 +224,37 @@ export class VRCAccountManagerButtonHandler {
         where: { ownerVrcUserId: vrcUserId },
       });
 
-      // Update whitelist after account deletion
+      // Get roles and account type before whitelist update for logging
       const discordId = interaction.user.id;
+      let rolesBeforeDelete: string[] = [];
+      const accountTypeBeforeDelete = vrcAccount.accountType;
+      try {
+        rolesBeforeDelete = await getUserWhitelistRoles(discordId);
+      } catch {}
+
+      // Update whitelist after account deletion
       try {
         await whitelistManager.syncAndPublishAfterVerification(discordId);
+        
+        // Send whitelist log for removal
+        if (interaction.guild) {
+          try {
+            await sendWhitelistLog(interaction.client, interaction.guild.id, {
+              discordId,
+              displayName: interaction.user.displayName || interaction.user.username,
+              vrchatUsername: vrcAccount.vrchatUsername || undefined,
+              vrcUserId: vrcUserId,
+              roles: rolesBeforeDelete,
+              action: "removed",
+              accountType: accountTypeBeforeDelete,
+            });
+          } catch (logError) {
+            console.warn(
+              `[Account Manager] Failed to send whitelist log for ${discordId}:`,
+              logError,
+            );
+          }
+        }
       } catch (whitelistError) {
         console.error(
           `[Account Manager] Failed to sync whitelist after deletion for ${discordId}:`,
@@ -213,9 +283,15 @@ export class VRCAccountManagerButtonHandler {
     });
 
     if (!user || !user.vrchatAccounts || user.vrchatAccounts.length === 0) {
+      // Create a simple container with just text for the completion message
+      const emptyContainer = new ContainerBuilder().addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          "✅ All VRChat accounts have been unlinked.",
+        ),
+      );
       await interaction.update({
-        content: "✅ All VRChat accounts have been unlinked.",
-        components: [],
+        components: [emptyContainer],
+        flags: [MessageFlags.IsComponentsV2],
       });
       return;
     }
@@ -226,9 +302,15 @@ export class VRCAccountManagerButtonHandler {
     );
 
     if (verifiedAccounts.length === 0) {
+      // Create a simple container with just text for the completion message
+      const emptyContainer = new ContainerBuilder().addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          "✅ All verified VRChat accounts have been unlinked.",
+        ),
+      );
       await interaction.update({
-        content: "✅ All verified VRChat accounts have been unlinked.",
-        components: [],
+        components: [emptyContainer],
+        flags: [MessageFlags.IsComponentsV2],
       });
       return;
     }

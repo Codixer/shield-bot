@@ -17,6 +17,7 @@ import { getUserById } from "../../../../utility/vrchat/user.js";
 import { unfriendUser } from "../../../../utility/vrchat/user.js";
 import { StaffGuard } from "../../../../utility/guards.js";
 import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
+import { sendWhitelistLog, getUserWhitelistRoles } from "../../../../utility/vrchat/whitelistLogger.js";
 
 @Discord()
 export class VRCStaffAccountManagerButtonHandler {
@@ -137,6 +138,28 @@ export class VRCStaffAccountManagerButtonHandler {
     // Update whitelist after status change
     try {
       await whitelistManager.syncAndPublishAfterVerification(targetDiscordId);
+      
+      // Send whitelist log for status change
+      if (interaction.guild) {
+        try {
+          const targetUser = await interaction.client.users.fetch(targetDiscordId);
+          const roles = await getUserWhitelistRoles(targetDiscordId);
+          await sendWhitelistLog(interaction.client, interaction.guild.id, {
+            discordId: targetDiscordId,
+            displayName: targetUser.displayName || targetUser.username,
+            vrchatUsername: vrcAccount.vrchatUsername || undefined,
+            vrcUserId: vrcUserId,
+            roles,
+            action: "modified",
+            accountType: "MAIN",
+          });
+        } catch (logError) {
+          console.warn(
+            `[Staff Account Manager] Failed to send whitelist log for ${targetDiscordId}:`,
+            logError,
+          );
+        }
+      }
     } catch (error) {
       console.error(
         `[Staff Account Manager] Failed to sync whitelist for ${targetDiscordId}:`,
@@ -162,6 +185,28 @@ export class VRCStaffAccountManagerButtonHandler {
     // Update whitelist after status change
     try {
       await whitelistManager.syncAndPublishAfterVerification(targetDiscordId);
+      
+      // Send whitelist log for status change
+      if (interaction.guild) {
+        try {
+          const targetUser = await interaction.client.users.fetch(targetDiscordId);
+          const roles = await getUserWhitelistRoles(targetDiscordId);
+          await sendWhitelistLog(interaction.client, interaction.guild.id, {
+            discordId: targetDiscordId,
+            displayName: targetUser.displayName || targetUser.username,
+            vrchatUsername: vrcAccount.vrchatUsername || undefined,
+            vrcUserId: vrcUserId,
+            roles,
+            action: "modified",
+            accountType: "ALT",
+          });
+        } catch (logError) {
+          console.warn(
+            `[Staff Account Manager] Failed to send whitelist log for ${targetDiscordId}:`,
+            logError,
+          );
+        }
+      }
     } catch (error) {
       console.error(
         `[Staff Account Manager] Failed to sync whitelist for ${targetDiscordId}:`,
@@ -200,9 +245,37 @@ export class VRCStaffAccountManagerButtonHandler {
         where: { ownerVrcUserId: vrcUserId },
       });
 
+      // Get roles and account type before whitelist update for logging
+      let rolesBeforeDelete: string[] = [];
+      const accountTypeBeforeDelete = vrcAccount.accountType;
+      try {
+        rolesBeforeDelete = await getUserWhitelistRoles(targetDiscordId);
+      } catch {}
+
       // Update whitelist after account deletion
       try {
         await whitelistManager.syncAndPublishAfterVerification(targetDiscordId);
+        
+        // Send whitelist log for removal
+        if (interaction.guild) {
+          try {
+            const targetUser = await interaction.client.users.fetch(targetDiscordId);
+            await sendWhitelistLog(interaction.client, interaction.guild.id, {
+              discordId: targetDiscordId,
+              displayName: targetUser.displayName || targetUser.username,
+              vrchatUsername: vrcAccount.vrchatUsername || undefined,
+              vrcUserId: vrcUserId,
+              roles: rolesBeforeDelete,
+              action: "removed",
+              accountType: accountTypeBeforeDelete,
+            });
+          } catch (logError) {
+            console.warn(
+              `[Staff Account Manager] Failed to send whitelist log for ${targetDiscordId}:`,
+              logError,
+            );
+          }
+        }
       } catch (whitelistError) {
         console.error(
           `[Staff Account Manager] Failed to sync whitelist after deletion for ${targetDiscordId}:`,
@@ -232,9 +305,15 @@ export class VRCStaffAccountManagerButtonHandler {
     });
 
     if (!user || !user.vrchatAccounts || user.vrchatAccounts.length === 0) {
+      // Create a simple container with just text for the completion message
+      const emptyContainer = new ContainerBuilder().addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          "✅ All VRChat accounts have been unlinked from this user.",
+        ),
+      );
       await interaction.update({
-        content: "✅ All VRChat accounts have been unlinked from this user.",
-        components: [],
+        components: [emptyContainer],
+        flags: [MessageFlags.IsComponentsV2],
       });
       return;
     }
@@ -248,9 +327,15 @@ export class VRCStaffAccountManagerButtonHandler {
     );
 
     if (verifiedAccounts.length === 0 && unverifiedAccounts.length === 0) {
+      // Create a simple container with just text for the completion message
+      const emptyContainer = new ContainerBuilder().addTextDisplayComponents(
+        new TextDisplayBuilder().setContent(
+          "✅ All VRChat accounts have been unlinked from this user.",
+        ),
+      );
       await interaction.update({
-        content: "✅ All VRChat accounts have been unlinked from this user.",
-        components: [],
+        components: [emptyContainer],
+        flags: [MessageFlags.IsComponentsV2],
       });
       return;
     }

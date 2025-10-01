@@ -8,6 +8,7 @@ export interface WhitelistLogData {
   vrcUserId?: string;
   roles: string[];
   action: "verified" | "modified" | "removed";
+  accountType?: "MAIN" | "ALT" | "UNVERIFIED" | "IN_VERIFICATION";
 }
 
 /**
@@ -90,6 +91,12 @@ function buildLogContent(data: WhitelistLogData): string {
     vrchatDisplay = `[${vrchatDisplay}](${vrcLink})`;
   }
 
+  // Add account type badge if provided
+  if (data.accountType) {
+    const badge = getAccountTypeBadge(data.accountType);
+    vrchatDisplay = `${vrchatDisplay} ${badge}`;
+  }
+
   // Build roles list
   const rolesDisplay = data.roles.length
     ? data.roles.map((role) => `\`${escapeMarkdown(role)}\``).join(", ")
@@ -105,6 +112,24 @@ function buildLogContent(data: WhitelistLogData): string {
       return `${userMention} - Whitelist access removed for ${vrchatDisplay} (had roles: ${rolesDisplay}).`;
     default:
       return `${userMention} - Whitelist action for ${vrchatDisplay}: ${rolesDisplay}`;
+  }
+}
+
+/**
+ * Get a badge/emoji for the account type
+ */
+function getAccountTypeBadge(accountType: string): string {
+  switch (accountType) {
+    case "MAIN":
+      return "**[MAIN <:HappyExite:923018075073302579>]**";
+    case "ALT":
+      return "**[ALT <:Elixir:1357029222115446844>]**";
+    case "UNVERIFIED":
+      return "**[UNVERIFIED <a:homerdisapear:1324348827372621845>]**";
+    case "IN_VERIFICATION":
+      return "**[IN VERIFICATION <a:loading:867923149465980929>]**";
+    default:
+      return "";
   }
 }
 
