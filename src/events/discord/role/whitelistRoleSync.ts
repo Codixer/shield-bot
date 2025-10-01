@@ -308,23 +308,24 @@ export class WhitelistRoleSync {
             logError,
           );
         }
-      }
 
-      // Publish whitelist with contextual commit message after removing user
-      try {
-        const username = memberName;
-        
-        // Queue for batched update instead of immediate publish
-        const msg = `${username} was removed with the roles none`;
-        whitelistManager.queueBatchedUpdate(member.id, msg);
-        console.log(
-          `[Whitelist] Queued GitHub repository update after ${memberName} left server`,
-        );
-      } catch (repoError) {
-        console.warn(
-          `[Whitelist] Failed to queue GitHub repository update after ${memberName} left server:`,
-          repoError,
-        );
+        // Publish whitelist with contextual commit message after removing user
+        // Only queue if they actually had whitelist access
+        try {
+          const username = memberName;
+          
+          // Queue for batched update instead of immediate publish
+          const msg = `${username} was removed with the roles none`;
+          whitelistManager.queueBatchedUpdate(member.id, msg);
+          console.log(
+            `[Whitelist] Queued GitHub repository update after ${memberName} left server`,
+          );
+        } catch (repoError) {
+          console.warn(
+            `[Whitelist] Failed to queue GitHub repository update after ${memberName} left server:`,
+            repoError,
+          );
+        }
       }
     } catch (error) {
       const memberName =
