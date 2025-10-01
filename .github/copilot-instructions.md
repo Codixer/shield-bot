@@ -82,7 +82,7 @@ prisma studio       # Database GUI
 - **Verification Flow**: Account command → button interactions → friend request/status verification → database promotion
 - **Event Processing**: VRChat WebSocket events automatically trigger verification completions and whitelist updates
 - **API Server**: Koa server runs alongside Discord bot for web endpoints
-
+- **Imports**: ESM with `.js` extensions in imports, even for `.ts` files. Any methods should be imported to the top level. Never import inside functions.
 ## Common Gotchas
 
 - VRChat API requires user-agent headers and cookie-based authentication

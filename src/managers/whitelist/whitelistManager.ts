@@ -1,6 +1,7 @@
 import { getUserById } from "../../utility/vrchat.js";
 import { searchUsers } from "../../utility/vrchat/user.js";
 import { prisma, bot } from "../../main.js";
+import { sendWhitelistLog } from "../../utility/vrchat/whitelistLogger.js";
 
 export class WhitelistManager {
   /**
@@ -1168,6 +1169,10 @@ export class WhitelistManager {
       // Sync whitelist role assignments
       await this.syncUserRolesFromDiscord(discordId, roleIds);
 
+      // Get VRChat account info and whitelist roles for logging
+      const vrchatInfo = await this.getUserByDiscordId(discordId);
+      const whitelistRoles = await this.getUserWhitelistRoles(discordId);
+
       // Build permissions list from mapping descriptions
       const permSet = new Set<string>();
       for (const m of eligible) {
@@ -1183,6 +1188,23 @@ export class WhitelistManager {
       const who = member.displayName || member.user?.username || discordId;
       const msg = `${who} was added with the roles ${permissions.length ? permissions.join(", ") : "none"}`;
 
+      // Send whitelist log message
+      try {
+        await sendWhitelistLog(activeBot, member.guild.id, {
+          discordId,
+          displayName: who,
+          vrchatUsername: vrchatInfo?.vrchatAccounts?.[0]?.vrchatUsername || undefined,
+          vrcUserId: vrchatInfo?.vrchatAccounts?.[0]?.vrcUserId,
+          roles: whitelistRoles,
+          action: "verified",
+        });
+      } catch (logError) {
+        console.warn(
+          `[Whitelist] Failed to send verification log for ${who}:`,
+          logError,
+        );
+      }
+
       // Publish updated whitelist to the repository
       await this.publishWhitelist(msg);
       console.log(
@@ -1193,6 +1215,38 @@ export class WhitelistManager {
         `[Whitelist] Failed to sync/publish whitelist for verified user ${discordId}:`,
         e,
       );
+    }
+  }
+
+  /**
+   * Get user's whitelist roles
+   */
+  private async getUserWhitelistRoles(discordId: string): Promise<string[]> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { discordId },
+        include: {
+          whitelistEntry: {
+            include: {
+              roleAssignments: {
+                include: {
+                  role: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return (
+        user?.whitelistEntry?.roleAssignments?.map((a) => a.role.name) || []
+      );
+    } catch (error) {
+      console.error(
+        `[Whitelist] Failed to get whitelist roles for ${discordId}:`,
+        error,
+      );
+      return [];
     }
   }
 }

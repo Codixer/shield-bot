@@ -1,6 +1,7 @@
 import { Discord, On, ArgsOf } from "discordx";
 import { WhitelistManager } from "../../../managers/whitelist/whitelistManager.js";
 import { prisma } from "../../../main.js";
+import { sendWhitelistLog } from "../../../utility/vrchat/whitelistLogger.js";
 
 const whitelistManager = new WhitelistManager();
 
@@ -126,9 +127,33 @@ export class WhitelistRoleSync {
       // Sync user roles (this handles both granting and removing access based on current roles)
       await whitelistManager.syncUserRolesFromDiscord(newMember.id, newRoleIds);
 
+      // Get updated whitelist roles after sync
+      const updatedWhitelistRoles =
+        await this.getUserWhitelistRoles(newMember.id);
+
       console.log(
         `[Whitelist] Successfully updated whitelist for ${newMember.displayName}`,
       );
+
+      // Send whitelist log message
+      try {
+        const vrchatInfo = await whitelistManager.getUserByDiscordId(
+          newMember.id,
+        );
+        await sendWhitelistLog(newMember.client, newMember.guild.id, {
+          discordId: newMember.id,
+          displayName: newMember.displayName || newMember.user?.username || newMember.id,
+          vrchatUsername: vrchatInfo?.vrchatAccounts?.[0]?.vrchatUsername || undefined,
+          vrcUserId: vrchatInfo?.vrchatAccounts?.[0]?.vrcUserId,
+          roles: updatedWhitelistRoles,
+          action: updatedWhitelistRoles.length === 0 ? "removed" : "modified",
+        });
+      } catch (logError) {
+        console.warn(
+          `[Whitelist] Failed to send modification log for ${newMember.displayName}:`,
+          logError,
+        );
+      }
 
       // Publish whitelist with contextual commit message after role changes (use permissions, not Discord roles)
       try {
@@ -184,9 +209,35 @@ export class WhitelistRoleSync {
       // Sync their roles (this will grant access if they have qualifying roles)
       await whitelistManager.syncUserRolesFromDiscord(member.id, roleIds);
 
+      // Get updated whitelist roles after sync
+      const updatedWhitelistRoles = await this.getUserWhitelistRoles(member.id);
+
       console.log(
         `[Whitelist] Successfully processed new member ${member.displayName}`,
       );
+
+      // Send whitelist log message if they got whitelist access
+      if (updatedWhitelistRoles.length > 0) {
+        try {
+          const vrchatInfo = await whitelistManager.getUserByDiscordId(
+            member.id,
+          );
+          await sendWhitelistLog(member.client, member.guild.id, {
+            discordId: member.id,
+            displayName: member.displayName || member.user?.username || member.id,
+            vrchatUsername:
+              vrchatInfo?.vrchatAccounts?.[0]?.vrchatUsername || undefined,
+            vrcUserId: vrchatInfo?.vrchatAccounts?.[0]?.vrcUserId,
+            roles: updatedWhitelistRoles,
+            action: "verified",
+          });
+        } catch (logError) {
+          console.warn(
+            `[Whitelist] Failed to send verification log for new member ${member.displayName}:`,
+            logError,
+          );
+        }
+      }
 
       // Publish whitelist with contextual commit message after adding new member (use permissions)
       try {
@@ -228,8 +279,34 @@ export class WhitelistRoleSync {
         `[Whitelist] Member ${memberName} left/kicked/banned - removing from whitelist`,
       );
 
+      // Get their whitelist roles before removal for logging
+      const whitelistRoles = await this.getUserWhitelistRoles(member.id);
+
       // Always remove from whitelist when they leave the server (includes kicks/bans)
       await whitelistManager.removeUserFromWhitelistIfNoRoles(member.id);
+
+      // Send whitelist log message if they had whitelist access
+      if (whitelistRoles.length > 0) {
+        try {
+          const vrchatInfo = await whitelistManager.getUserByDiscordId(
+            member.id,
+          );
+          await sendWhitelistLog(member.client, member.guild.id, {
+            discordId: member.id,
+            displayName: memberName,
+            vrchatUsername:
+              vrchatInfo?.vrchatAccounts?.[0]?.vrchatUsername || undefined,
+            vrcUserId: vrchatInfo?.vrchatAccounts?.[0]?.vrcUserId,
+            roles: whitelistRoles,
+            action: "removed",
+          });
+        } catch (logError) {
+          console.warn(
+            `[Whitelist] Failed to send removal log for ${memberName}:`,
+            logError,
+          );
+        }
+      }
 
       // Publish whitelist with contextual commit message after removing user
       try {
@@ -268,8 +345,32 @@ export class WhitelistRoleSync {
         `[Whitelist] User ${userName} was banned - ensuring removal from whitelist`,
       );
 
+      // Get their whitelist roles before removal for logging
+      const whitelistRoles = await this.getUserWhitelistRoles(user.id);
+
       // Ensure banned user is removed from whitelist
       await whitelistManager.removeUserFromWhitelistIfNoRoles(user.id);
+
+      // Send whitelist log message if they had whitelist access
+      if (whitelistRoles.length > 0) {
+        try {
+          const vrchatInfo = await whitelistManager.getUserByDiscordId(user.id);
+          await sendWhitelistLog(ban.client, ban.guild.id, {
+            discordId: user.id,
+            displayName: userName,
+            vrchatUsername:
+              vrchatInfo?.vrchatAccounts?.[0]?.vrchatUsername || undefined,
+            vrcUserId: vrchatInfo?.vrchatAccounts?.[0]?.vrcUserId,
+            roles: whitelistRoles,
+            action: "removed",
+          });
+        } catch (logError) {
+          console.warn(
+            `[Whitelist] Failed to send removal log for banned user ${userName}:`,
+            logError,
+          );
+        }
+      }
 
       // Publish whitelist with contextual commit message after removing banned user
       try {
@@ -314,5 +415,34 @@ export class WhitelistRoleSync {
     });
 
     return user ? user.vrchatAccounts.length > 0 : false;
+  }
+
+  private async getUserWhitelistRoles(discordId: string): Promise<string[]> {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { discordId },
+        include: {
+          whitelistEntry: {
+            include: {
+              roleAssignments: {
+                include: {
+                  role: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return (
+        user?.whitelistEntry?.roleAssignments?.map((a) => a.role.name) || []
+      );
+    } catch (error) {
+      console.error(
+        `[WhitelistRoleSync] Failed to get whitelist roles for ${discordId}:`,
+        error,
+      );
+      return [];
+    }
   }
 }
