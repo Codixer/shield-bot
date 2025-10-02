@@ -879,17 +879,29 @@ export class WhitelistManager {
 
     const whitelistEntry = await prisma.whitelistEntry.findUnique({
       where: { userId: user.id },
-    });
-
-    // Remove ALL existing role assignments for this user to ensure clean state
-    await prisma.whitelistRoleAssignment.deleteMany({
-      where: {
-        whitelistId: whitelistEntry!.id,
+      include: {
+        roleAssignments: true,
       },
     });
 
-    // Add new role assignments for mapped roles
-    for (const role of mappedRoles) {
+    // Get current role assignments
+    const existingAssignments = whitelistEntry!.roleAssignments || [];
+    const existingRoleIds = new Set(existingAssignments.map((a) => a.roleId));
+    const newRoleIds = new Set(mappedRoles.map((r) => r.id));
+
+    // Remove assignments that are no longer valid (role no longer mapped to Discord roles)
+    const assignmentsToRemove = existingAssignments.filter(
+      (a) => !newRoleIds.has(a.roleId),
+    );
+    for (const assignment of assignmentsToRemove) {
+      await prisma.whitelistRoleAssignment.delete({
+        where: { id: assignment.id },
+      });
+    }
+
+    // Add new role assignments for mapped roles that don't exist yet
+    const rolesToAdd = mappedRoles.filter((r) => !existingRoleIds.has(r.id));
+    for (const role of rolesToAdd) {
       await prisma.whitelistRoleAssignment.create({
         data: {
           whitelistId: whitelistEntry!.id,
@@ -899,8 +911,20 @@ export class WhitelistManager {
       });
     }
 
+    // Get permission list for logging
+    const allPermissions = new Set<string>();
+    for (const role of mappedRoles) {
+      if (role.permissions) {
+        role.permissions
+          .split(",")
+          .map((p: string) => p.trim())
+          .filter(Boolean)
+          .forEach((p: string) => allPermissions.add(p));
+      }
+    }
+
     console.log(
-      `[Whitelist] User ${discordId} synced with ${mappedRoles.length} role(s): [${mappedRoles.map((r) => r.discordRoleId || r.id).join(", ")}]`,
+      `[Whitelist] User ${discordId} synced with ${mappedRoles.length} role(s) and permissions: [${Array.from(allPermissions).join(", ")}]`,
     );
   }
 
