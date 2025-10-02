@@ -2,6 +2,7 @@ import { getUserById } from '../../../../utility/vrchat.js';
 import { whitelistManager } from '../../../../managers/whitelist/whitelistManager.js';
 import { prisma, bot } from '../../../../main.js';
 import { EmbedBuilder, Colors } from 'discord.js';
+import { sendWhitelistLog, getUserWhitelistRoles } from '../../../../utility/vrchat/whitelistLogger.js';
 
 export async function handleFriendAdd(content: any) {
     // content should include the VRChat user ID of the new friend
@@ -40,7 +41,8 @@ export async function handleFriendAdd(content: any) {
             data: {
                 accountType: finalAccountType,
                 vrchatUsername,
-                usernameUpdatedAt: new Date()
+                usernameUpdatedAt: new Date(),
+                verificationGuildId: null, // Clear guild ID after verification is complete
             }
         });
 
@@ -59,6 +61,38 @@ export async function handleFriendAdd(content: any) {
             // For verified accounts, sync and publish with roles
             if (vrchatUsername) { // If username was fetched, it was verified
                 await whitelistManager.syncAndPublishAfterVerification(user.discordId);
+                
+                // Send whitelist verification log to the guild where verification was started
+                if (bot && bot.guilds && vrcAccount.verificationGuildId) {
+                    try {
+                        // Get the account type from the updated account
+                        const updatedAccount = await prisma.vRChatAccount.findFirst({
+                            where: { vrcUserId, userId: vrcAccount.userId }
+                        });
+                        
+                        // Fetch the guild where verification was initiated
+                        const guild = await bot.guilds.fetch(vrcAccount.verificationGuildId).catch(() => null);
+                        if (guild) {
+                            const member = await guild.members.fetch(user.discordId).catch(() => null);
+                            if (member) {
+                                const displayName = member.displayName || member.user?.username || user.discordId;
+                                const whitelistRoles = await getUserWhitelistRoles(user.discordId);
+                                
+                                await sendWhitelistLog(bot, guild.id, {
+                                    discordId: user.discordId,
+                                    displayName,
+                                    vrchatUsername,
+                                    vrcUserId,
+                                    roles: whitelistRoles,
+                                    action: "verified",
+                                    accountType: updatedAccount?.accountType,
+                                });
+                            }
+                        }
+                    } catch (logError) {
+                        console.warn(`[Friend Add] Failed to send whitelist log for ${user.discordId}:`, logError);
+                    }
+                }
             } else {
                 // For unverified binding, ensure basic access and sync if eligible
                 await whitelistManager.ensureUnverifiedAccountAccess(user.discordId);

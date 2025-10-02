@@ -262,8 +262,8 @@ export class WhitelistCommands {
           const discordRole = role.discordRoleId
             ? `<@&${role.discordRoleId}>`
             : "Not linked";
-          const permissions = role.description || "No permissions";
-          return `**${role.name}**\nDiscord: ${discordRole}\nPermissions: ${permissions}`;
+          const permissions = role.permissions || "No permissions";
+          return `**Role ID: ${role.id}**\nDiscord: ${discordRole}\nPermissions: ${permissions}\nGuild: ${role.guildId}`;
         })
         .join("\n\n");
 
@@ -860,7 +860,7 @@ export class WhitelistCommands {
         const userAfter = await whitelistManager.getUserByDiscordId(user.id);
         const hasAccessAfter = !!userAfter?.whitelistEntry;
         const rolesAfter =
-          userAfter?.whitelistEntry?.roleAssignments?.map((a) => a.role.name) ||
+          userAfter?.whitelistEntry?.roleAssignments?.map((a) => a.role.discordRoleId || a.role.id) ||
           [];
 
         const embed = new EmbedBuilder()

@@ -105,6 +105,7 @@ export class VRChatStatusVerifyButtonHandler {
         data: {
           accountType: finalAccountType,
           verificationCode: null,
+          verificationGuildId: null, // Clear guild ID after verification is complete
           vrchatUsername,
           usernameUpdatedAt: new Date(),
         },

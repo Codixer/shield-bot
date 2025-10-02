@@ -29,10 +29,11 @@ export class WhitelistRoleSync {
     for (const mapping of roleMappings) {
       if (!mapping.discordRoleId) continue;
       if (discordRoleIds.includes(mapping.discordRoleId)) {
-        roles.push(mapping.name);
-        const desc = mapping.description as string | null | undefined;
-        if (desc)
-          for (const p of desc
+        // Note: name field was removed, using discordRoleId as identifier
+        roles.push(mapping.discordRoleId);
+        const perms = mapping.permissions as string | null | undefined;
+        if (perms)
+          for (const p of perms
             .split(",")
             .map((s: string) => s.trim())
             .filter(Boolean))
@@ -439,11 +440,11 @@ export class WhitelistRoleSync {
         },
       });
 
-      // Extract VRChat roles from description field (comma-separated)
+      // Extract VRChat roles from permissions field (comma-separated)
       const roles = new Set<string>();
       for (const assignment of user?.whitelistEntry?.roleAssignments || []) {
-        if (assignment.role.description) {
-          for (const role of String(assignment.role.description)
+        if (assignment.role.permissions) {
+          for (const role of String(assignment.role.permissions)
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean)) {

@@ -165,8 +165,8 @@ export async function getUserWhitelistRoles(
     // Extract VRChat roles from description field (comma-separated)
     const roles = new Set<string>();
     for (const assignment of user?.whitelistEntry?.roleAssignments || []) {
-      if (assignment.role.description) {
-        for (const role of String(assignment.role.description)
+      if (assignment.role.permissions) {
+        for (const role of String(assignment.role.permissions)
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean)) {

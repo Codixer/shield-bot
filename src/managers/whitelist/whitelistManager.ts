@@ -159,26 +159,26 @@ export class WhitelistManager {
    * Create a new role
    */
   async createRole(
-    name: string,
-    description?: string,
+    guildId: string,
+    permissions?: string,
     discordRoleId?: string,
   ): Promise<any> {
     return await prisma.whitelistRole.create({
       data: {
-        name,
-        description,
+        guildId,
+        permissions,
         discordRoleId,
       },
     });
   }
 
   /**
-   * Delete a role
+   * Delete a role by ID
    */
-  async deleteRole(roleName: string): Promise<boolean> {
+  async deleteRole(roleId: number): Promise<boolean> {
     try {
       await prisma.whitelistRole.delete({
-        where: { name: roleName },
+        where: { id: roleId },
       });
       return true;
     } catch (error) {
@@ -191,7 +191,7 @@ export class WhitelistManager {
    */
   async assignRoleByDiscordId(
     discordId: string,
-    roleName: string,
+    roleId: number,
     assignedBy?: string,
     expiresAt?: Date,
   ): Promise<any> {
@@ -201,10 +201,10 @@ export class WhitelistManager {
     }
 
     const role = await prisma.whitelistRole.findUnique({
-      where: { name: roleName },
+      where: { id: roleId },
     });
     if (!role) {
-      throw new Error(`Role "${roleName}" not found`);
+      throw new Error(`Role with ID "${roleId}" not found`);
     }
 
     // Ensure user has a whitelist entry
@@ -253,14 +253,14 @@ export class WhitelistManager {
    */
   async removeRoleByDiscordId(
     discordId: string,
-    roleName: string,
+    roleId: number,
   ): Promise<boolean> {
     try {
       const user = await prisma.user.findUnique({ where: { discordId } });
       if (!user) return false;
 
       const role = await prisma.whitelistRole.findUnique({
-        where: { name: roleName },
+        where: { id: roleId },
       });
       if (!role) return false;
 
@@ -278,9 +278,9 @@ export class WhitelistManager {
   }
 
   /**
-   * Get all users in the whitelist
+   * Get all users in the whitelist, optionally filtered by guild
    */
-  async getWhitelistUsers(): Promise<any[]> {
+  async getWhitelistUsers(guildId?: string): Promise<any[]> {
     const entries = await prisma.whitelistEntry.findMany({
       include: {
         user: {
@@ -294,6 +294,11 @@ export class WhitelistManager {
           },
           where: {
             OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+            ...(guildId && {
+              role: {
+                guildId,
+              },
+            }),
           },
         },
       },
@@ -318,9 +323,9 @@ export class WhitelistManager {
       // Get unique permissions from all roles (deduplicated)
       const allPermissions = new Set<string>();
       for (const assignment of entry.roleAssignments) {
-        if (assignment.role.description) {
+        if (assignment.role.permissions) {
           // Split permissions by comma and add each one
-          const permissions = assignment.role.description
+          const permissions = assignment.role.permissions
             .split(",")
             .map((p: string) => p.trim());
           permissions.forEach((permission: string) => {
@@ -435,10 +440,10 @@ export class WhitelistManager {
   }
 
   /**
-   * Generate raw whitelist content
+   * Generate raw whitelist content, optionally filtered by guild
    */
-  async generateWhitelistContent(): Promise<string> {
-    const users = await this.getWhitelistUsers();
+  async generateWhitelistContent(guildId?: string): Promise<string> {
+    const users = await this.getWhitelistUsers(guildId);
 
     if (users.length === 0) {
       return "";
@@ -453,10 +458,10 @@ export class WhitelistManager {
   }
 
   /**
-   * Generate encoded whitelist for PowerShell consumption
+   * Generate encoded whitelist for PowerShell consumption, optionally filtered by guild
    */
-  async generateEncodedWhitelist(): Promise<string> {
-    const content = await this.generateWhitelistContent();
+  async generateEncodedWhitelist(guildId?: string): Promise<string> {
+    const content = await this.generateWhitelistContent(guildId);
     return this.xorEncode(content);
   }
 
@@ -895,7 +900,7 @@ export class WhitelistManager {
     }
 
     console.log(
-      `[Whitelist] User ${discordId} synced with roles: [${mappedRoles.map((r) => r.name).join(", ")}]`,
+      `[Whitelist] User ${discordId} synced with ${mappedRoles.length} role(s): [${mappedRoles.map((r) => r.discordRoleId || r.id).join(", ")}]`,
     );
   }
 
@@ -1007,8 +1012,8 @@ export class WhitelistManager {
 
     // Get current role assignments for logging
     const currentAssignments = user.whitelistEntry.roleAssignments || [];
-    const roleNames = currentAssignments.map(
-      (assignment) => assignment.role.name,
+    const roleIds = currentAssignments.map(
+      (assignment) => assignment.role.discordRoleId || assignment.role.id,
     );
 
     // Remove whitelist entry (this will cascade delete role assignments)
@@ -1017,7 +1022,7 @@ export class WhitelistManager {
     });
 
     console.log(
-      `[Whitelist] Removed user ${discordId} from whitelist - had roles: [${roleNames.join(", ")}]`,
+      `[Whitelist] Removed user ${discordId} from whitelist - had roles: [${roleIds.join(", ")}]`,
     );
   }
 
@@ -1026,13 +1031,14 @@ export class WhitelistManager {
    */
   async setupDiscordRoleMapping(
     discordRoleId: string,
-    roleName: string,
+    guildId: string,
     permissions: string[],
   ): Promise<any> {
-    // Check if role already exists
+    // Check if role already exists for this guild and discord role
     const existingRole = await prisma.whitelistRole.findFirst({
       where: {
-        OR: [{ name: roleName }, { discordRoleId: discordRoleId }],
+        guildId,
+        discordRoleId,
       },
     });
 
@@ -1041,32 +1047,31 @@ export class WhitelistManager {
       return await prisma.whitelistRole.update({
         where: { id: existingRole.id },
         data: {
-          name: roleName,
-          discordRoleId: discordRoleId,
-          description: permissions.join(", "),
+          permissions: permissions.join(", "),
         },
       });
     } else {
       // Create new role
       return await prisma.whitelistRole.create({
         data: {
-          name: roleName,
+          guildId,
           discordRoleId: discordRoleId,
-          description: permissions.join(", "),
+          permissions: permissions.join(", "),
         },
       });
     }
   }
 
   /**
-   * Get Discord role mappings
+   * Get Discord role mappings, optionally filtered by guild
    */
-  async getDiscordRoleMappings(): Promise<any[]> {
+  async getDiscordRoleMappings(guildId?: string): Promise<any[]> {
     return await prisma.whitelistRole.findMany({
       where: {
         discordRoleId: {
           not: null,
         },
+        ...(guildId && { guildId }),
       },
     });
   }
@@ -1074,12 +1079,13 @@ export class WhitelistManager {
   /**
    * Check if user should be whitelisted based on Discord roles
    */
-  async shouldUserBeWhitelisted(discordRoleIds: string[]): Promise<boolean> {
+  async shouldUserBeWhitelisted(discordRoleIds: string[], guildId?: string): Promise<boolean> {
     const mappedRoles = await prisma.whitelistRole.findMany({
       where: {
         discordRoleId: {
           in: discordRoleIds,
         },
+        ...(guildId && { guildId }),
       },
     });
 
@@ -1111,7 +1117,7 @@ export class WhitelistManager {
    */
   async assignRoleByVrcUserId(
     vrcUserId: string,
-    roleName: string,
+    roleId: number,
     assignedBy?: string,
     expiresAt?: Date,
   ): Promise<any> {
@@ -1121,7 +1127,7 @@ export class WhitelistManager {
     }
     return await this.assignRoleByDiscordId(
       user.discordId,
-      roleName,
+      roleId,
       assignedBy,
       expiresAt,
     );
@@ -1150,11 +1156,14 @@ export class WhitelistManager {
           const roles = roleNames.split(",").map((r) => r.trim());
           for (const roleName of roles) {
             try {
-              await this.assignRoleByDiscordId(
-                vrchatUsername.trim(),
-                roleName,
-                "Bulk Import",
-              );
+              // Note: This needs to be updated to use roleId instead of roleName
+              // TODO: Look up role by Discord role ID or other identifier
+              // await this.assignRoleByDiscordId(
+              //   vrchatUsername.trim(),
+              //   roleId,
+              //   "Bulk Import",
+              // );
+              console.warn(`[Bulk Import] Role assignment by name is deprecated: ${roleName}`);
             } catch (error) {
               // Ignore role assignment errors for now
             }
@@ -1253,11 +1262,11 @@ export class WhitelistManager {
       const vrchatInfo = await this.getUserByDiscordId(discordId);
       const whitelistRoles = await this.getUserWhitelistRoles(discordId);
 
-      // Build permissions list from mapping descriptions
+      // Build permissions list from mapping permissions
       const permSet = new Set<string>();
       for (const m of eligible) {
-        if (m.description) {
-          for (const p of String(m.description)
+        if (m.permissions) {
+          for (const p of String(m.permissions)
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean))
@@ -1268,22 +1277,8 @@ export class WhitelistManager {
       const who = member.displayName || member.user?.username || discordId;
       const msg = `${who} was added with the roles ${permissions.length ? permissions.join(", ") : "none"}`;
 
-      // Send whitelist log message
-      try {
-        await sendWhitelistLog(activeBot, member.guild.id, {
-          discordId,
-          displayName: who,
-          vrchatUsername: vrchatInfo?.vrchatAccounts?.[0]?.vrchatUsername || undefined,
-          vrcUserId: vrchatInfo?.vrchatAccounts?.[0]?.vrcUserId,
-          roles: whitelistRoles,
-          action: "verified",
-        });
-      } catch (logError) {
-        console.warn(
-          `[Whitelist] Failed to send verification log for ${who}:`,
-          logError,
-        );
-      }
+      // Note: Whitelist logging is handled by the specific callers (verification handlers, account managers)
+      // to ensure the correct context and action type (verified/removed) is logged
 
       // Queue batched update instead of immediate publish
       this.queueBatchedUpdate(discordId, msg);
@@ -1318,11 +1313,11 @@ export class WhitelistManager {
         },
       });
 
-      // Extract VRChat roles from description field (comma-separated)
+      // Extract VRChat roles from permissions field (comma-separated)
       const roles = new Set<string>();
       for (const assignment of user?.whitelistEntry?.roleAssignments || []) {
-        if (assignment.role.description) {
-          for (const role of String(assignment.role.description)
+        if (assignment.role.permissions) {
+          for (const role of String(assignment.role.permissions)
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean)) {

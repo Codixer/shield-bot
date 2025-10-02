@@ -158,6 +158,7 @@ export class VRChatVerifyButtonHandler {
           vrcUserId,
           userId: user.id,
           accountType: "IN_VERIFICATION",
+          verificationGuildId: interaction.guildId || undefined,
           vrchatUsername,
           usernameUpdatedAt: new Date(),
         },
@@ -168,6 +169,7 @@ export class VRChatVerifyButtonHandler {
         data: {
           userId: user.id,
           accountType: "IN_VERIFICATION",
+          verificationGuildId: interaction.guildId || undefined,
           vrchatUsername,
           usernameUpdatedAt: new Date(),
         },

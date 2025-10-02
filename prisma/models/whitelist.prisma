@@ -12,14 +12,16 @@ model WhitelistEntry {
 
 model WhitelistRole {
   id              Int                       @id @default(autoincrement())
-  name            String                    @unique
-  description     String?
-  discordRoleId   String?                   @unique // Optional Discord role binding
+  guildId         String                    @default("813926536457224212") // Guild this role belongs to
+  permissions     String? // Comma-separated VRChat permissions (e.g., "station,avatar,truavatar")
+  discordRoleId   String? // Optional Discord role binding
   isDefault       Boolean                   @default(false)
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
   roleAssignments WhitelistRoleAssignment[]
 
+  @@unique([guildId, discordRoleId])
+  @@index([guildId])
   @@map("whitelist_roles")
 }
 

@@ -19,6 +19,7 @@ model VRChatAccount {
   vrcUserId         String
   accountType       VRChatAccountType @default(IN_VERIFICATION)
   verificationCode  String?
+  verificationGuildId String? // Guild ID where verification was initiated
   vrchatUsername    String? // Cached VRChat username
   usernameUpdatedAt DateTime? // Last time username was updated
   user              User              @relation(fields: [userId], references: [id])
