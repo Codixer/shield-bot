@@ -75,7 +75,7 @@ export class WhitelistCommands {
 
       await whitelistManager.setupDiscordRoleMapping(
         discordRole.id,
-        discordRole.name,
+        interaction.guildId!,
         permissionList,
       );
 
