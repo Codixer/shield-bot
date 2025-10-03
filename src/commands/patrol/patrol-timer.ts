@@ -17,6 +17,7 @@ import {
   PermissionFlagsBits,
   Role,
   User,
+  AutocompleteInteraction,
 } from "discord.js";
 import { patrolTimer } from "../../main.js";
 import { PatrolPermissionGuard } from "../../utility/guards.js";
@@ -25,6 +26,21 @@ import {
   PermissionLevel,
 } from "../../utility/permissionUtils.js";
 import { prisma } from "../../main.js";
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 @Discord()
 @SlashGroup({
@@ -79,28 +95,26 @@ export class PatrolTimerCommands {
       description: "Year",
       type: ApplicationCommandOptionType.String,
       required: false,
+      autocomplete: function (
+        this: PatrolTimerCommands,
+        interaction: AutocompleteInteraction,
+      ) {
+        return this.autocompleteYear(interaction);
+      },
     })
-    @SlashChoice({ name: "2025", value: "2025" })
-    @SlashChoice({ name: "2026", value: "2026" })
     year: string | undefined,
     @SlashOption({
       name: "month",
       description: "Month",
       type: ApplicationCommandOptionType.String,
       required: false,
+      autocomplete: function (
+        this: PatrolTimerCommands,
+        interaction: AutocompleteInteraction,
+      ) {
+        return this.autocompleteMonth(interaction);
+      },
     })
-    @SlashChoice({ name: "January", value: "1" })
-    @SlashChoice({ name: "February", value: "2" })
-    @SlashChoice({ name: "March", value: "3" })
-    @SlashChoice({ name: "April", value: "4" })
-    @SlashChoice({ name: "May", value: "5" })
-    @SlashChoice({ name: "June", value: "6" })
-    @SlashChoice({ name: "July", value: "7" })
-    @SlashChoice({ name: "August", value: "8" })
-    @SlashChoice({ name: "September", value: "9" })
-    @SlashChoice({ name: "October", value: "10" })
-    @SlashChoice({ name: "November", value: "11" })
-    @SlashChoice({ name: "December", value: "12" })
     month: string | undefined,
     @SlashOption({
       name: "here",
@@ -166,28 +180,26 @@ export class PatrolTimerCommands {
       description: "Year",
       type: ApplicationCommandOptionType.String,
       required: false,
+      autocomplete: function (
+        this: PatrolTimerCommands,
+        interaction: AutocompleteInteraction,
+      ) {
+        return this.autocompleteYear(interaction);
+      },
     })
-    @SlashChoice({ name: "2025", value: "2025" })
-    @SlashChoice({ name: "2026", value: "2026" })
     year: string | undefined,
     @SlashOption({
       name: "month",
       description: "Month",
       type: ApplicationCommandOptionType.String,
       required: false,
+      autocomplete: function (
+        this: PatrolTimerCommands,
+        interaction: AutocompleteInteraction,
+      ) {
+        return this.autocompleteMonth(interaction);
+      },
     })
-    @SlashChoice({ name: "January", value: "1" })
-    @SlashChoice({ name: "February", value: "2" })
-    @SlashChoice({ name: "March", value: "3" })
-    @SlashChoice({ name: "April", value: "4" })
-    @SlashChoice({ name: "May", value: "5" })
-    @SlashChoice({ name: "June", value: "6" })
-    @SlashChoice({ name: "July", value: "7" })
-    @SlashChoice({ name: "August", value: "8" })
-    @SlashChoice({ name: "September", value: "9" })
-    @SlashChoice({ name: "October", value: "10" })
-    @SlashChoice({ name: "November", value: "11" })
-    @SlashChoice({ name: "December", value: "12" })
     month: string | undefined,
     interaction: CommandInteraction,
   ) {
@@ -284,6 +296,49 @@ export class PatrolTimerCommands {
       content: "Wiped all patrol data for this guild.",
       flags: MessageFlags.Ephemeral,
     });
+  }
+
+  // Autocomplete handlers
+  async autocompleteYear(interaction: AutocompleteInteraction) {
+    if (!interaction.guildId) {
+      await interaction.respond([]);
+      return;
+    }
+
+    const years = await (patrolTimer as any).getAvailableYears(
+      interaction.guildId,
+    );
+
+    const choices = years.map((y: any) => ({
+      name: `${y.year} — ${y.userCount} users, ${y.totalHours}h`,
+      value: y.year.toString(),
+    }));
+
+    await interaction.respond(choices.slice(0, 25));
+  }
+
+  async autocompleteMonth(interaction: AutocompleteInteraction) {
+    if (!interaction.guildId) {
+      await interaction.respond([]);
+      return;
+    }
+
+    // Get the focused option and the year if provided
+    const focusedOption = interaction.options.getFocused(true);
+    const yearOption = interaction.options.get("year");
+    const year = yearOption?.value ? parseInt(yearOption.value as string) : undefined;
+
+    const months = await (patrolTimer as any).getAvailableMonths(
+      interaction.guildId,
+      year,
+    );
+
+    const choices = months.map((m: any) => ({
+      name: `${MONTH_NAMES[m.month - 1]} ${m.year} — ${m.userCount} users, ${m.totalHours}h`,
+      value: m.month.toString(),
+    }));
+
+    await interaction.respond(choices.slice(0, 25));
   }
 }
 

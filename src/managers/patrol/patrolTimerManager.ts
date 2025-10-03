@@ -487,6 +487,120 @@ export class PatrolTimerManager {
     return base;
   }
 
+  /**
+   * Get all years that have patrol data for this guild.
+   * Returns array of objects with year, user count, and total hours.
+   */
+  async getAvailableYears(guildId: string): Promise<
+    Array<{
+      year: number;
+      userCount: number;
+      totalHours: number;
+    }>
+  > {
+    // Get all records for this guild
+    const records = await (prisma as any).voicePatrolMonthlyTime.findMany({
+      where: { guildId },
+      select: {
+        year: true,
+        userId: true,
+        totalMs: true,
+      },
+    });
+
+    // Group by year and aggregate
+    const yearMap = new Map<
+      number,
+      { userIds: Set<string>; totalMs: bigint }
+    >();
+
+    for (const record of records) {
+      if (!yearMap.has(record.year)) {
+        yearMap.set(record.year, {
+          userIds: new Set(),
+          totalMs: BigInt(0),
+        });
+      }
+      const yearData = yearMap.get(record.year)!;
+      yearData.userIds.add(record.userId);
+      yearData.totalMs += record.totalMs;
+    }
+
+    // Convert to array and sort by year descending
+    return Array.from(yearMap.entries())
+      .map(([year, data]) => ({
+        year,
+        userCount: data.userIds.size,
+        totalHours: Math.floor(Number(data.totalMs) / 1000 / 60 / 60),
+      }))
+      .sort((a, b) => b.year - a.year);
+  }
+
+  /**
+   * Get all months that have patrol data for this guild (optionally filtered by year).
+   * Returns array of objects with year, month, user count, and total hours.
+   */
+  async getAvailableMonths(
+    guildId: string,
+    year?: number,
+  ): Promise<
+    Array<{
+      year: number;
+      month: number;
+      userCount: number;
+      totalHours: number;
+    }>
+  > {
+    const where: any = { guildId };
+    if (year !== undefined) {
+      where.year = year;
+    }
+
+    const records = await (prisma as any).voicePatrolMonthlyTime.findMany({
+      where,
+      select: {
+        year: true,
+        month: true,
+        userId: true,
+        totalMs: true,
+      },
+    });
+
+    // Group by year+month and aggregate
+    const monthMap = new Map<
+      string,
+      { year: number; month: number; userIds: Set<string>; totalMs: bigint }
+    >();
+
+    for (const record of records) {
+      const key = `${record.year}-${record.month}`;
+      if (!monthMap.has(key)) {
+        monthMap.set(key, {
+          year: record.year,
+          month: record.month,
+          userIds: new Set(),
+          totalMs: BigInt(0),
+        });
+      }
+      const monthData = monthMap.get(key)!;
+      monthData.userIds.add(record.userId);
+      monthData.totalMs += record.totalMs;
+    }
+
+    // Convert to array and sort by year/month descending
+    return Array.from(monthMap.values())
+      .map((data) => ({
+        year: data.year,
+        month: data.month,
+        userCount: data.userIds.size,
+        totalHours: Math.floor(Number(data.totalMs) / 1000 / 60 / 60),
+      }))
+      .sort((a, b) => {
+        if (a.year !== b.year) return b.year - a.year;
+        return b.month - a.month;
+      });
+  }
+
   // Internals
   private async ensureUser(discordId: string) {
     try {
