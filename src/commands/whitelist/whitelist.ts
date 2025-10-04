@@ -156,7 +156,7 @@ export class WhitelistCommands {
     interaction: CommandInteraction,
   ): Promise<void> {
     try {
-      const success = await whitelistManager.deleteRole(discordRole.name);
+      const success = await whitelistManager.deleteRole(discordRole.id);
 
       if (success) {
         const embed = new EmbedBuilder()
