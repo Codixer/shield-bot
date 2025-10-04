@@ -156,7 +156,15 @@ export class WhitelistCommands {
     interaction: CommandInteraction,
   ): Promise<void> {
     try {
-      const success = await whitelistManager.deleteRole(discordRole.id);
+      if (!interaction.guild) {
+        await interaction.reply({
+          content: "❌ This command can only be used in a server.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const success = await whitelistManager.deleteRole(interaction.guild.id, discordRole.id);
 
       if (success) {
         const embed = new EmbedBuilder()
