@@ -74,10 +74,21 @@ export class VRChatAttendanceListCommand {
         const isActive = event.id === activeEventId ? " **(ACTIVE)**" : "";
         const isHost = event.hostId === user.id ? " 👑" : "";
         const isCohost = event.cohostId === user.id ? " 🤝" : "";
-        const hostId = event.host?.discordId || "Unknown";
+        
+        // Get host username
+        let hostName = "Unknown";
+        if (event.host?.discordId) {
+          try {
+            const hostUser = await interaction.guild?.members.fetch(event.host.discordId);
+            hostName = hostUser?.user.username || hostUser?.user.tag || event.host.discordId;
+          } catch {
+            // If we can't fetch the user, fall back to Discord ID
+            hostName = event.host.discordId;
+          }
+        }
 
         description += `**${formatDate}** (ID: ${event.id})${isActive}${isHost}${isCohost}\n`;
-        description += `  Host: <@${hostId}> | Attendees: ${attendeeCount}\n\n`;
+        description += `  Host: ${hostName} | Attendees: ${attendeeCount}\n\n`;
       }
 
       const embed = new EmbedBuilder()
