@@ -57,35 +57,45 @@ export class VRChatAttendanceDeleteCommand {
         );
         const events = await attendanceManager.getAllEvents();
 
-        const choices = events
-          .filter((event: any) => {
-            const eventStr = `${event.id}`;
-            const dateStr = event.date.toLocaleDateString();
-            return (
-              eventStr.includes(focused.value.toString()) ||
-              dateStr.includes(focused.value.toString())
-            );
-          })
-          .slice(0, 25)
-          .map((event: any) => {
-            // Calculate total attendees: unique users from squads + staff
-            const squadMemberIds = new Set(
-              event.squads.flatMap((squad: any) => 
-                squad.members.map((member: any) => member.userId)
-              )
-            );
-            const staffIds = new Set(event.staff.map((s: any) => s.userId));
-            const allAttendeeIds = new Set([...squadMemberIds, ...staffIds]);
-            const attendeeCount = allAttendeeIds.size;
+        const choices = await Promise.all(
+          events
+            .filter((event: any) => {
+              const eventStr = `${event.id}`;
+              const dateStr = event.date.toLocaleDateString();
+              return (
+                eventStr.includes(focused.value.toString()) ||
+                dateStr.includes(focused.value.toString())
+              );
+            })
+            .slice(0, 25)
+            .map(async (event: any) => {
+              // Calculate total attendees: unique users from squads + staff
+              const squadMemberIds = new Set(
+                event.squads.flatMap((squad: any) => 
+                  squad.members.map((member: any) => member.userId)
+                )
+              );
+              const staffIds = new Set(event.staff.map((s: any) => s.userId));
+              const allAttendeeIds = new Set([...squadMemberIds, ...staffIds]);
+              const attendeeCount = allAttendeeIds.size;
 
-            // Get host Discord ID for mention
-            const hostId = event.host?.discordId || "Unknown";
+              // Get host username
+              let hostName = "Unknown";
+              if (event.host?.discordId) {
+                try {
+                  const hostUser = await autoInteraction.guild?.members.fetch(event.host.discordId);
+                  hostName = hostUser?.user.username || hostUser?.user.tag || event.host.discordId;
+                } catch {
+                  hostName = event.host.discordId;
+                }
+              }
 
-            return {
-              name: `${event.date.toLocaleDateString()} (ID: ${event.id}) - ${attendeeCount} attendee${attendeeCount !== 1 ? 's' : ''} - Host: ${hostId}`,
-              value: event.id,
-            };
-          });
+              return {
+                name: `${event.date.toLocaleDateString()} (ID: ${event.id}) - ${attendeeCount} attendee${attendeeCount !== 1 ? 's' : ''} - Host: ${hostName}`,
+                value: event.id,
+              };
+            })
+        );
 
         await autoInteraction.respond(choices);
       }

@@ -69,7 +69,7 @@ export class VRChatVerifyAccountCommand {
     }
     if (!userInfo) {
       await interaction.reply({
-        content: `Could not fetch VRChat user details. Please try again or check the user ID.`,
+        content: `Could not fetch VRChat user details. Please try again or check the user ID.\n\n- Make sure you WAIT for the autocomplete to load results and SELECT it from the list.`,
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -83,9 +83,9 @@ export class VRChatVerifyAccountCommand {
       .setColor(Colors.Blue)
       .setImage(
         userInfo.profilePicOverride ||
-          userInfo.currentAvatarImageUrl ||
-          userInfo.currentAvatarThumbnailImageUrl ||
-          null,
+        userInfo.currentAvatarImageUrl ||
+        userInfo.currentAvatarThumbnailImageUrl ||
+        null,
       )
       .setThumbnail(userInfo.userIcon || userInfo.profilePicOverride || null)
       .setFooter({ text: "VRChat Account Binding" });
