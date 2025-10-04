@@ -7,12 +7,12 @@ import {
   InteractionContextType,
   ApplicationIntegrationType,
 } from "discord.js";
-import { prisma } from "../main.js";
+import { prisma } from "../../main.js";
 import {
   userHasPermissionFromRoles,
   getUserPermissionLevelFromRoles,
   PermissionLevel,
-} from "../utility/permissionUtils.js";
+} from "../../utility/permissionUtils.js";
 
 @Discord()
 @SlashGroup({

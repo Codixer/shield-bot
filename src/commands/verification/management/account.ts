@@ -20,10 +20,8 @@ import { getUserById, searchUsers } from "../../../utility/vrchat.js";
   description: "VRChat verification commands.",
   contexts: [
     InteractionContextType.Guild,
-    InteractionContextType.PrivateChannel,
   ],
   integrationTypes: [
-    ApplicationIntegrationType.UserInstall,
     ApplicationIntegrationType.GuildInstall,
   ],
 })

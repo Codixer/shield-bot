@@ -16,10 +16,8 @@ const attendanceManager = new AttendanceManager();
   description: "VRChat attendance tracking commands.",
   contexts: [
     InteractionContextType.Guild,
-    InteractionContextType.PrivateChannel,
   ],
   integrationTypes: [
-    ApplicationIntegrationType.UserInstall,
     ApplicationIntegrationType.GuildInstall,
   ],
 })

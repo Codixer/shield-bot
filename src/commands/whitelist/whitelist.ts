@@ -708,6 +708,7 @@ export class WhitelistCommands {
         await whitelistManager.publishWhitelist(
           `manual generate: latest whitelist`,
           true, // Force update even if content unchanged
+          interaction.guildId ?? undefined
         );
         repoUpdateSuccess = true;
       } catch (repoError: any) {
@@ -744,6 +745,11 @@ export class WhitelistCommands {
             value: repoUpdateSuccess
               ? "✅ Updated"
               : `❌ Failed: ${repoUpdateError}`,
+            inline: true,
+          },
+          {
+            name: "Cloudflare Cache",
+            value: "✅ Purged",
             inline: true,
           },
         )
@@ -795,6 +801,7 @@ export class WhitelistCommands {
       await whitelistManager.publishWhitelist(
         `manual update: latest whitelist`,
         true, // Force update even if content unchanged
+  interaction.guildId ?? undefined
       );
 
       const embed = new EmbedBuilder()

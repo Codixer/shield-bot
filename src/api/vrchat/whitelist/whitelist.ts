@@ -33,9 +33,22 @@ export class WhitelistAPI {
   async getEncodedWhitelist(ctx: Context) {
     try {
       const guildId = ctx.params.guildId;
-      const encodedWhitelist =
-        await whitelistManager.generateEncodedWhitelist(guildId);
+      const encodedWhitelist = await whitelistManager.generateEncodedWhitelist(guildId);
+      const etag = require("crypto").createHash("sha256").update(encodedWhitelist).digest("hex");
+      const lastModified = whitelistManager.lastUpdateTimestamp
+        ? new Date(whitelistManager.lastUpdateTimestamp).toUTCString()
+        : undefined;
 
+      if (
+        ctx.headers["if-none-match"] === etag ||
+        (lastModified && ctx.headers["if-modified-since"] === lastModified)
+      ) {
+        ctx.status = 304;
+        return;
+      }
+      ctx.set("Cache-Control", "public, max-age=3600");
+      ctx.set("ETag", etag);
+      if (lastModified) ctx.set("Last-Modified", lastModified);
       ctx.body = {
         success: true,
         data: encodedWhitelist,
@@ -75,7 +88,21 @@ export class WhitelistAPI {
     try {
       const guildId = ctx.params.guildId;
       const content = await whitelistManager.generateWhitelistContent(guildId);
+      const etag = require("crypto").createHash("sha256").update(content).digest("hex");
+      const lastModified = whitelistManager.lastUpdateTimestamp
+        ? new Date(whitelistManager.lastUpdateTimestamp).toUTCString()
+        : undefined;
 
+      if (
+        ctx.headers["if-none-match"] === etag ||
+        (lastModified && ctx.headers["if-modified-since"] === lastModified)
+      ) {
+        ctx.status = 304;
+        return;
+      }
+      ctx.set("Cache-Control", "public, max-age=3600");
+      ctx.set("ETag", etag);
+      if (lastModified) ctx.set("Last-Modified", lastModified);
       ctx.body = {
         success: true,
         data: content,

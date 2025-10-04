@@ -1,4 +1,5 @@
 import { getUserById } from "../../utility/vrchat.js";
+import { purgeCloudflareCache } from "../../utility/cloudflare/purgeCache.js";
 import { searchUsers } from "../../utility/vrchat/user.js";
 import { prisma, bot } from "../../main.js";
 import { sendWhitelistLog } from "../../utility/vrchat/whitelistLogger.js";
@@ -9,6 +10,10 @@ export class WhitelistManager {
   private updateTimer: NodeJS.Timeout | null = null;
   private readonly BATCH_DELAY_MS = 5000; // Wait 5 seconds after last change before updating
   private lastPublishedContent: string | null = null;
+  private _lastUpdateTimestamp: number | null = null;
+  public get lastUpdateTimestamp(): number | null {
+    return this._lastUpdateTimestamp;
+  }
 
   /**
    * Get a user from the database by Discord ID
@@ -470,10 +475,10 @@ export class WhitelistManager {
    * Writes both encoded and decoded files in a single commit.
    * Now checks if content changed before publishing to avoid unnecessary commits.
    */
-  async publishWhitelist(commitMessage?: string, force: boolean = false): Promise<any> {
+  async publishWhitelist(commitMessage?: string, force: boolean = false, guildId?: string): Promise<any> {
     // Generate content to check if it changed
     const currentContent = await this.generateWhitelistContent();
-    
+
     // Skip update if content hasn't changed (unless forced)
     if (!force && this.lastPublishedContent !== null && currentContent === this.lastPublishedContent) {
       console.log('[Whitelist] Content unchanged, skipping GitHub update');
@@ -481,12 +486,33 @@ export class WhitelistManager {
     }
 
     const result = await this.updateRepositoryWithWhitelist(commitMessage);
-    
+
     // Store the published content for future comparisons
     if (result.updated) {
       this.lastPublishedContent = currentContent;
+      this._lastUpdateTimestamp = Date.now();
+      // Purge Cloudflare cache for this guild's whitelist URLs
+      const zoneId = process.env.CLOUDFLARE_ZONE_ID ?? "";
+      const apiToken = process.env.CLOUDFLARE_API_TOKEN ?? "";
+      
+      if (zoneId && apiToken) {
+        try {
+          const targetGuildIds = guildId ? [guildId] : ["813926536457224212"];
+          for (const gid of targetGuildIds) {
+            const urls = [
+              `https://api.vrcshield.com/api/vrchat/${gid}/whitelist/encoded`,
+              `https://api.vrcshield.com/api/vrchat/${gid}/whitelist/raw`,
+            ];
+            await purgeCloudflareCache(zoneId, apiToken, urls);
+            console.log(`[Whitelist] Purged Cloudflare cache for guild ${gid}`);
+          }
+        } catch (err) {
+          console.warn(`[Whitelist] Cloudflare purge failed:`, err);
+        }
+      } else {
+        console.log(`[Whitelist] Cloudflare cache purge skipped - missing zone ID or API token`);
+      }
     }
-    
     return result;
   }
 
@@ -496,12 +522,12 @@ export class WhitelistManager {
    */
   queueBatchedUpdate(discordId: string, commitMessage?: string): void {
     this.pendingUpdates.add(discordId);
-    
+
     // Clear existing timer and start a new one
     if (this.updateTimer) {
       clearTimeout(this.updateTimer);
     }
-    
+
     this.updateTimer = setTimeout(async () => {
       await this.processBatchedUpdates(commitMessage);
     }, this.BATCH_DELAY_MS);
@@ -541,6 +567,7 @@ export class WhitelistManager {
       }
 
       // Publish with content change check
+      // If you have a way to determine the guildId for the batch, pass it here
       await this.publishWhitelist(message, false);
     } catch (error) {
       console.error('[Whitelist] Error processing batched updates:', error);

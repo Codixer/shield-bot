@@ -88,6 +88,79 @@ export async function userHasPermission(
   return hasPermission(userLevel, requiredPermission);
 }
 
+// Check if user has a specific role type (not just permissions inherited from higher roles)
+export async function userHasSpecificRole(
+  member: GuildMember,
+  roleType: PermissionLevel,
+): Promise<boolean> {
+  const botOwnerId = process.env.BOT_OWNER_ID;
+
+  // Check bot owner
+  if (roleType === PermissionLevel.BOT_OWNER) {
+    return member.id === botOwnerId;
+  }
+
+  // Get guild settings for role mappings
+  const settings = await prisma.guildSettings.findUnique({
+    where: { guildId: member.guild.id },
+  });
+
+  if (!settings) {
+    return false;
+  }
+
+  // Check each specific role type
+  switch (roleType) {
+    case PermissionLevel.DEV_GUARD:
+      return !!(
+        settings.devGuardRoleIds &&
+        Array.isArray(settings.devGuardRoleIds) &&
+        (settings.devGuardRoleIds as string[]).some((roleId) =>
+          member.roles.cache.has(roleId),
+        )
+      );
+
+    case PermissionLevel.STAFF:
+      return !!(
+        settings.staffRoleIds &&
+        Array.isArray(settings.staffRoleIds) &&
+        (settings.staffRoleIds as string[]).some((roleId) =>
+          member.roles.cache.has(roleId),
+        )
+      );
+
+    case PermissionLevel.TRAINER:
+      return !!(
+        settings.trainerRoleIds &&
+        Array.isArray(settings.trainerRoleIds) &&
+        (settings.trainerRoleIds as string[]).some((roleId) =>
+          member.roles.cache.has(roleId),
+        )
+      );
+
+    case PermissionLevel.HOST_ATTENDANCE:
+      return !!(
+        settings.hostAttendanceRoleIds &&
+        Array.isArray(settings.hostAttendanceRoleIds) &&
+        (settings.hostAttendanceRoleIds as string[]).some((roleId) =>
+          member.roles.cache.has(roleId),
+        )
+      );
+
+    case PermissionLevel.SHIELD_MEMBER:
+      return !!(
+        settings.shieldMemberRoleIds &&
+        Array.isArray(settings.shieldMemberRoleIds) &&
+        (settings.shieldMemberRoleIds as string[]).some((roleId) =>
+          member.roles.cache.has(roleId),
+        )
+      );
+
+    default:
+      return false;
+  }
+}
+
 // New function to get permission level based on Discord roles
 export async function getUserPermissionLevelFromRoles(
   member: GuildMember,

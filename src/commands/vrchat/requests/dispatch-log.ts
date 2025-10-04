@@ -35,10 +35,8 @@ import {
   description: "VRChat related commands.",
   contexts: [
     InteractionContextType.Guild,
-    InteractionContextType.PrivateChannel,
   ],
   integrationTypes: [
-    ApplicationIntegrationType.UserInstall,
     ApplicationIntegrationType.GuildInstall,
   ],
 })
