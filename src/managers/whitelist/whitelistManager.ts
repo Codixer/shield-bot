@@ -180,10 +180,15 @@ export class WhitelistManager {
   /**
    * Delete a role by ID
    */
-  async deleteRole(roleId: number): Promise<boolean> {
+  async deleteRole(guildId: string, discordRoleId: string): Promise<boolean> {
     try {
       await prisma.whitelistRole.delete({
-        where: { id: roleId },
+        where: { 
+          guildId_discordRoleId: {
+            guildId,
+            discordRoleId
+          }
+        },
       });
       return true;
     } catch (error) {
