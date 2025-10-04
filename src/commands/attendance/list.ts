@@ -6,6 +6,7 @@ import {
   InteractionContextType,
   ApplicationIntegrationType,
 } from "discord.js";
+import { Pagination } from "@discordx/pagination";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
 
 const attendanceManager = new AttendanceManager();
@@ -25,17 +26,17 @@ const attendanceManager = new AttendanceManager();
 export class VRChatAttendanceListCommand {
   @Slash({
     name: "list",
-    description: "List all events you have access to.",
+    description: "List all attendance events.",
   })
   async list(interaction: CommandInteraction) {
     const user = await attendanceManager.findOrCreateUserByDiscordId(
       interaction.user.id,
     );
-    const events = await attendanceManager.getUserEvents(user.id);
+    const events = await attendanceManager.getAllEvents();
 
     if (events.length === 0) {
       await interaction.reply({
-        content: "You have no attendance events.",
+        content: "There are no attendance events.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -45,32 +46,57 @@ export class VRChatAttendanceListCommand {
       user.id,
     );
 
-    let description = "";
-    for (const event of events) {
-      const formatDate = event.date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      });
+    // Create pages with 5 events per page
+    const eventsPerPage = 5;
+    const pages = [];
+    
+    for (let i = 0; i < events.length; i += eventsPerPage) {
+      const pageEvents = events.slice(i, i + eventsPerPage);
+      let description = "";
+      
+      for (const event of pageEvents) {
+        const formatDate = event.date.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+        });
 
-      const isActive = event.id === activeEventId ? " **(ACTIVE)**" : "";
-      const isHost = event.hostId === user.id ? " 👑" : "";
-      const isCohost = event.cohostId === user.id ? " 🤝" : "";
+        // Calculate total attendees
+        const squadMemberIds = new Set(
+          event.squads.flatMap((squad) => 
+            squad.members.map((member) => member.userId)
+          )
+        );
+        const staffIds = new Set(event.staff.map((s) => s.userId));
+        const allAttendeeIds = new Set([...squadMemberIds, ...staffIds]);
+        const attendeeCount = allAttendeeIds.size;
 
-      description += `**${formatDate}** (ID: ${event.id})${isActive}${isHost}${isCohost}\n`;
+        const isActive = event.id === activeEventId ? " **(ACTIVE)**" : "";
+        const isHost = event.hostId === user.id ? " 👑" : "";
+        const isCohost = event.cohostId === user.id ? " 🤝" : "";
+        const hostId = event.host?.discordId || "Unknown";
+
+        description += `**${formatDate}** (ID: ${event.id})${isActive}${isHost}${isCohost}\n`;
+        description += `  Host: <@${hostId}> | Attendees: ${attendeeCount}\n\n`;
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle("Attendance Events")
+        .setDescription(description)
+        .setColor(0x00ae86)
+        .setFooter({
+          text: `Page ${pages.length + 1} of ${Math.ceil(events.length / eventsPerPage)} | Use /attendance select <event_id> to switch active event`,
+        });
+
+      pages.push({ embeds: [embed] });
     }
 
-    const embed = new EmbedBuilder()
-      .setTitle("Your Attendance Events")
-      .setDescription(description)
-      .setColor(0x00ae86)
-      .setFooter({
-        text: "Use /attendance select <event_id> to switch active event",
-      });
-
-    await interaction.reply({
-      embeds: [embed],
-      flags: MessageFlags.Ephemeral,
+    // Create pagination
+    const pagination = new Pagination(interaction, pages, {
+      ephemeral: true,
+      time: 5 * 60 * 1000, // 5 minutes
     });
+
+    await pagination.send();
   }
 }

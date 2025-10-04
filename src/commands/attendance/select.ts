@@ -48,7 +48,7 @@ export class VRChatAttendanceSelectCommand {
         const user = await attendanceManager.findOrCreateUserByDiscordId(
           autoInteraction.user.id,
         );
-        const events = await attendanceManager.getUserEvents(user.id);
+        const events = await attendanceManager.getAllEvents();
 
         const choices = events
           .filter((event) => {
@@ -60,10 +60,25 @@ export class VRChatAttendanceSelectCommand {
             );
           })
           .slice(0, 25)
-          .map((event) => ({
-            name: `${event.date.toLocaleDateString()} (ID: ${event.id})${event.host?.discordId === autoInteraction.user.id ? " - Your Event" : ""}`,
-            value: event.id,
-          }));
+          .map((event) => {
+            // Calculate total attendees: unique users from squads + staff
+            const squadMemberIds = new Set(
+              event.squads.flatMap((squad) => 
+                squad.members.map((member) => member.userId)
+              )
+            );
+            const staffIds = new Set(event.staff.map((s) => s.userId));
+            const allAttendeeIds = new Set([...squadMemberIds, ...staffIds]);
+            const attendeeCount = allAttendeeIds.size;
+
+            // Get host Discord ID for mention
+            const hostId = event.host?.discordId || "Unknown";
+
+            return {
+              name: `${event.date.toLocaleDateString()} (ID: ${event.id}) - ${attendeeCount} attendee${attendeeCount !== 1 ? 's' : ''} - Host: ${hostId}`,
+              value: event.id,
+            };
+          });
 
         await autoInteraction.respond(choices);
       }

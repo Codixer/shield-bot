@@ -238,6 +238,31 @@ export class AttendanceManager {
       include: {
         host: true,
         cohost: true,
+        staff: true,
+        squads: {
+          include: {
+            members: true,
+          },
+        },
+      },
+      orderBy: {
+        date: "desc",
+      },
+    });
+  }
+
+  // Get all events (for selection/assistance by anyone)
+  async getAllEvents() {
+    return prisma.attendanceEvent.findMany({
+      include: {
+        host: true,
+        cohost: true,
+        staff: true,
+        squads: {
+          include: {
+            members: true,
+          },
+        },
       },
       orderBy: {
         date: "desc",

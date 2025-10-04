@@ -51,7 +51,7 @@ export class VRChatAttendanceSummaryCommand {
         const user = await attendanceManager.findOrCreateUserByDiscordId(
           autoInteraction.user.id,
         );
-        const events = await attendanceManager.getUserEvents(user.id);
+        const events = await attendanceManager.getAllEvents();
         const query = focused.value.toString().toLowerCase();
         const choices = events
           .filter((event: any) => {
@@ -68,11 +68,20 @@ export class VRChatAttendanceSummaryCommand {
           .slice(0, 25)
           .map((event: any) => {
             const dateStr = event.date.toLocaleDateString();
-            const hostId = event.host?.discordId
-              ? event.host.discordId
-              : "Unknown Host";
+            const hostId = event.host?.discordId || "Unknown";
+            
+            // Calculate total attendees
+            const squadMemberIds = new Set(
+              event.squads.flatMap((squad: any) => 
+                squad.members.map((member: any) => member.userId)
+              )
+            );
+            const staffIds = new Set(event.staff.map((s: any) => s.userId));
+            const allAttendeeIds = new Set([...squadMemberIds, ...staffIds]);
+            const attendeeCount = allAttendeeIds.size;
+            
             return {
-              name: `${dateStr} (ID: ${event.id}) Host: ${hostId}${event.host?.discordId === autoInteraction.user.id ? " - Yours" : ""}`.slice(
+              name: `${dateStr} (ID: ${event.id}) - ${attendeeCount} attendee${attendeeCount !== 1 ? 's' : ''} - Host: ${hostId}`.slice(
                 0,
                 100,
               ),

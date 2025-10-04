@@ -2,6 +2,7 @@ import { Get, Post, Delete, Router } from "@discordx/koa";
 import { Context } from "koa";
 import { WhitelistManager } from "../../../managers/whitelist/whitelistManager.js";
 import { prisma } from "../../../main.js";
+import crypto from "crypto";
 
 const whitelistManager = new WhitelistManager();
 
@@ -34,7 +35,7 @@ export class WhitelistAPI {
     try {
       const guildId = ctx.params.guildId;
       const encodedWhitelist = await whitelistManager.generateEncodedWhitelist(guildId);
-      const etag = require("crypto").createHash("sha256").update(encodedWhitelist).digest("hex");
+      const etag = crypto.createHash("sha256").update(encodedWhitelist).digest("hex");
       const lastModified = whitelistManager.lastUpdateTimestamp
         ? new Date(whitelistManager.lastUpdateTimestamp).toUTCString()
         : undefined;
@@ -88,7 +89,7 @@ export class WhitelistAPI {
     try {
       const guildId = ctx.params.guildId;
       const content = await whitelistManager.generateWhitelistContent(guildId);
-      const etag = require("crypto").createHash("sha256").update(content).digest("hex");
+      const etag = crypto.createHash("sha256").update(content).digest("hex");
       const lastModified = whitelistManager.lastUpdateTimestamp
         ? new Date(whitelistManager.lastUpdateTimestamp).toUTCString()
         : undefined;
