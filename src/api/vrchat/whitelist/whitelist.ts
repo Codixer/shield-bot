@@ -47,7 +47,7 @@ export class WhitelistAPI {
         ctx.status = 304;
         return;
       }
-      ctx.set("Cache-Control", "public, max-age=3600");
+      ctx.set("Cache-Control", "public, max-age=86400");
       ctx.set("ETag", etag);
       if (lastModified) ctx.set("Last-Modified", lastModified);
       ctx.body = {
@@ -101,7 +101,7 @@ export class WhitelistAPI {
         ctx.status = 304;
         return;
       }
-      ctx.set("Cache-Control", "public, max-age=3600");
+      ctx.set("Cache-Control", "public, max-age=86400");
       ctx.set("ETag", etag);
       if (lastModified) ctx.set("Last-Modified", lastModified);
       ctx.body = {
