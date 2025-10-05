@@ -15,7 +15,21 @@ export class WhitelistAPI {
       const defaultGuildId = "813926536457224212";
       const encodedWhitelist =
         await whitelistManager.generateEncodedWhitelist(defaultGuildId);
+      const etag = crypto.createHash("sha256").update(encodedWhitelist).digest("hex");
+      const lastModified = whitelistManager.lastUpdateTimestamp
+        ? new Date(whitelistManager.lastUpdateTimestamp).toUTCString()
+        : undefined;
 
+      if (
+        ctx.headers["if-none-match"] === etag ||
+        (lastModified && ctx.headers["if-modified-since"] === lastModified)
+      ) {
+        ctx.status = 304;
+        return;
+      }
+      ctx.set("Cache-Control", "public, max-age=86400");
+      ctx.set("ETag", etag);
+      if (lastModified) ctx.set("Last-Modified", lastModified);
       ctx.body = {
         success: true,
         data: encodedWhitelist,
@@ -69,7 +83,21 @@ export class WhitelistAPI {
     try {
       const defaultGuildId = "813926536457224212";
       const content = await whitelistManager.generateWhitelistContent(defaultGuildId);
+      const etag = crypto.createHash("sha256").update(content).digest("hex");
+      const lastModified = whitelistManager.lastUpdateTimestamp
+        ? new Date(whitelistManager.lastUpdateTimestamp).toUTCString()
+        : undefined;
 
+      if (
+        ctx.headers["if-none-match"] === etag ||
+        (lastModified && ctx.headers["if-modified-since"] === lastModified)
+      ) {
+        ctx.status = 304;
+        return;
+      }
+      ctx.set("Cache-Control", "public, max-age=86400");
+      ctx.set("ETag", etag);
+      if (lastModified) ctx.set("Last-Modified", lastModified);
       ctx.body = {
         success: true,
         data: content,
