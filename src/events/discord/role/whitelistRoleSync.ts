@@ -141,13 +141,15 @@ export class WhitelistRoleSync {
         const vrchatInfo = await whitelistManager.getUserByDiscordId(
           newMember.id,
         );
+        const primaryAccount = vrchatInfo?.vrchatAccounts?.[0];
         await sendWhitelistLog(newMember.client, newMember.guild.id, {
           discordId: newMember.id,
           displayName: newMember.displayName || newMember.user?.username || newMember.id,
-          vrchatUsername: vrchatInfo?.vrchatAccounts?.[0]?.vrchatUsername || undefined,
-          vrcUserId: vrchatInfo?.vrchatAccounts?.[0]?.vrcUserId,
+          vrchatUsername: primaryAccount?.vrchatUsername || undefined,
+          vrcUserId: primaryAccount?.vrcUserId,
           roles: updatedWhitelistRoles,
           action: updatedWhitelistRoles.length === 0 ? "removed" : "modified",
+          accountType: primaryAccount?.accountType,
         });
       } catch (logError) {
         console.warn(
@@ -224,14 +226,15 @@ export class WhitelistRoleSync {
           const vrchatInfo = await whitelistManager.getUserByDiscordId(
             member.id,
           );
+          const primaryAccount = vrchatInfo?.vrchatAccounts?.[0];
           await sendWhitelistLog(member.client, member.guild.id, {
             discordId: member.id,
             displayName: member.displayName || member.user?.username || member.id,
-            vrchatUsername:
-              vrchatInfo?.vrchatAccounts?.[0]?.vrchatUsername || undefined,
-            vrcUserId: vrchatInfo?.vrchatAccounts?.[0]?.vrcUserId,
+            vrchatUsername: primaryAccount?.vrchatUsername || undefined,
+            vrcUserId: primaryAccount?.vrcUserId,
             roles: updatedWhitelistRoles,
             action: "verified",
+            accountType: primaryAccount?.accountType,
           });
         } catch (logError) {
           console.warn(
@@ -294,14 +297,15 @@ export class WhitelistRoleSync {
           const vrchatInfo = await whitelistManager.getUserByDiscordId(
             member.id,
           );
+          const primaryAccount = vrchatInfo?.vrchatAccounts?.[0];
           await sendWhitelistLog(member.client, member.guild.id, {
             discordId: member.id,
             displayName: memberName,
-            vrchatUsername:
-              vrchatInfo?.vrchatAccounts?.[0]?.vrchatUsername || undefined,
-            vrcUserId: vrchatInfo?.vrchatAccounts?.[0]?.vrcUserId,
+            vrchatUsername: primaryAccount?.vrchatUsername || undefined,
+            vrcUserId: primaryAccount?.vrcUserId,
             roles: whitelistRoles,
             action: "removed",
+            accountType: primaryAccount?.accountType,
           });
         } catch (logError) {
           console.warn(
@@ -360,14 +364,15 @@ export class WhitelistRoleSync {
       if (whitelistRoles.length > 0) {
         try {
           const vrchatInfo = await whitelistManager.getUserByDiscordId(user.id);
+          const primaryAccount = vrchatInfo?.vrchatAccounts?.[0];
           await sendWhitelistLog(ban.client, ban.guild.id, {
             discordId: user.id,
             displayName: userName,
-            vrchatUsername:
-              vrchatInfo?.vrchatAccounts?.[0]?.vrchatUsername || undefined,
-            vrcUserId: vrchatInfo?.vrchatAccounts?.[0]?.vrcUserId,
+            vrchatUsername: primaryAccount?.vrchatUsername || undefined,
+            vrcUserId: primaryAccount?.vrcUserId,
             roles: whitelistRoles,
             action: "removed",
+            accountType: primaryAccount?.accountType,
           });
         } catch (logError) {
           console.warn(
