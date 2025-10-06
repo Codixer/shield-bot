@@ -140,8 +140,26 @@ export class VRChatAttendancePasteCommand {
 
     text += "\n";
 
+    // Sort squads by Discord category position
+    const sortedSquads = [...eventSummary.squads].sort((a, b) => {
+      const channelA = cmdInteraction.guild?.channels.cache.get(a.name);
+      const channelB = cmdInteraction.guild?.channels.cache.get(b.name);
+      
+      // If both channels exist and have position property, sort by position
+      if (channelA && channelB && 'position' in channelA && 'position' in channelB) {
+        return channelA.position - channelB.position;
+      }
+      
+      // If only one exists, put it first
+      if (channelA) return -1;
+      if (channelB) return 1;
+      
+      // If neither exists, maintain original order
+      return 0;
+    });
+
     // Squads
-    for (const squad of eventSummary.squads) {
+    for (const squad of sortedSquads) {
       const squadChannel = cmdInteraction.guild?.channels.cache.get(squad.name);
       const squadDisplayName = squadChannel?.name || squad.name;
 

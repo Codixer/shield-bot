@@ -5,6 +5,9 @@ import {
   InteractionContextType,
   ApplicationIntegrationType,
   ChannelType,
+  ActionRowBuilder,
+  StringSelectMenuBuilder,
+  EmbedBuilder,
 } from "discord.js";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
 import { AttendanceHostGuard } from "../../utility/guards.js";
@@ -56,6 +59,15 @@ export class VRChatAttendanceAutofillCommand {
     }
 
     const patrolCategoryId = settings.patrolChannelCategoryId;
+    const enrolledChannels = (settings?.enrolledChannels as string[]) || [];
+
+    if (enrolledChannels.length === 0) {
+      await interaction.editReply({
+        content:
+          "No enrolled channels configured. Please configure enrolled channels in the guild settings first.",
+      });
+      return;
+    }
 
     // Get all voice channels in the patrol category
     const guild = interaction.guild;
@@ -69,16 +81,17 @@ export class VRChatAttendanceAutofillCommand {
       return;
     }
 
-    // Get all voice channels in the category
+    // Get only enrolled voice channels in the category
     const voiceChannels = guild.channels.cache.filter(
       (channel) =>
         channel.parentId === patrolCategoryId &&
-        channel.type === ChannelType.GuildVoice,
+        channel.type === ChannelType.GuildVoice &&
+        enrolledChannels.includes(channel.id),
     );
 
     if (voiceChannels.size === 0) {
       await interaction.editReply({
-        content: "No voice channels found in the patrol category.",
+        content: "No enrolled voice channels found in the patrol category.",
       });
       return;
     }
@@ -95,6 +108,8 @@ export class VRChatAttendanceAutofillCommand {
       event = await attendanceManager.createEvent(new Date(), user.id);
       eventId = event.id;
       await attendanceManager.setActiveEventForUser(user.id, eventId);
+      // Reload to get relations
+      event = await attendanceManager.getEventById(eventId);
     } else {
       event = await attendanceManager.getEventById(eventId);
     }
@@ -207,10 +222,17 @@ export class VRChatAttendanceAutofillCommand {
       }
     }
 
-    // Mark users who left as "hasLeft"
+    // Mark users who left as "hasLeft" - but exclude manually added users (host, cohost)
     let leftCount = 0;
+    
+    // Get list of users who should be exempt from auto-left tracking
+    const exemptUserIds = new Set<string>();
+    if (event.host?.discordId) exemptUserIds.add(event.host.discordId);
+    if (event.cohost?.discordId) exemptUserIds.add(event.cohost.discordId);
+    
     for (const [discordId, squadName] of currentMemberSquads) {
-      if (!processedUsers.has(discordId)) {
+      // Skip marking as left if user is manually added (host/cohost)
+      if (!processedUsers.has(discordId) && !exemptUserIds.has(discordId)) {
         const dbUser = await attendanceManager.findOrCreateUserByDiscordId(
           discordId,
         );
@@ -233,10 +255,105 @@ export class VRChatAttendanceAutofillCommand {
       `👤 Staff: ${staffCount} members marked as staff`,
       `❌ Left: ${leftCount} members`,
       `📊 Total in event: ${processedUsers.size} members`,
+      "",
+      `**Use the select menus below to assign squad leads:**`,
     ].join("\n");
 
+    // Get updated squads with members for lead selection
+    const updatedSquads = await prisma.squad.findMany({
+      where: { eventId },
+      include: {
+        members: {
+          include: { user: true },
+        },
+      },
+    });
+
+    // Sort squads by Discord category position
+    const sortedSquads = [...updatedSquads].sort((a, b) => {
+      const channelA = interaction.guild?.channels.cache.get(a.name);
+      const channelB = interaction.guild?.channels.cache.get(b.name);
+      
+      // If both channels exist and have position property, sort by position
+      if (channelA && channelB && 'position' in channelA && 'position' in channelB) {
+        return channelA.position - channelB.position;
+      }
+      
+      // If only one exists, put it first
+      if (channelA) return -1;
+      if (channelB) return 1;
+      
+      // If neither exists, maintain original order
+      return 0;
+    });
+
+    // Create select menus for each squad (max 5 per message due to Discord limits)
+    const components: ActionRowBuilder<StringSelectMenuBuilder>[] = [];
+    const squadsWithMembers = sortedSquads.filter(
+      (squad) => squad.members.length > 0 && !squad.members.every((m) => m.hasLeft)
+    );
+
+    for (const squad of squadsWithMembers.slice(0, 5)) {
+      const squadChannel = interaction.guild?.channels.cache.get(squad.name);
+      const squadDisplayName = squadChannel?.name || squad.name;
+
+      // Get active members (not marked as left)
+      const activeMembers = squad.members.filter((m) => !m.hasLeft);
+
+      if (activeMembers.length === 0) continue;
+
+      // Build options with Discord user mentions
+      const options = await Promise.all(
+        activeMembers.map(async (member) => {
+          let displayName = member.user.discordId;
+
+          try {
+            const guildMember = await interaction.guild?.members.fetch(
+              member.user.discordId,
+            );
+            displayName =
+              guildMember?.user.username ||
+              guildMember?.displayName ||
+              member.user.discordId;
+          } catch {
+            // If we can't fetch the user, use the Discord ID
+            displayName = member.user.discordId;
+          }
+
+          return {
+            label: displayName.substring(0, 100), // Discord limit
+            value: `${squad.id}:${member.userId}`,
+            description: member.isLead ? "Current Lead" : undefined,
+            default: member.isLead,
+          };
+        }),
+      );
+
+      const selectMenu = new StringSelectMenuBuilder()
+        .setCustomId(`autofill_lead_${eventId}_${squad.id}`)
+        .setPlaceholder(`Select lead(s) for ${squadDisplayName}`)
+        .setMinValues(0)
+        .setMaxValues(Math.min(activeMembers.length, 25)) // Allow multiple leads
+        .addOptions(options);
+
+      const row =
+        new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+          selectMenu,
+        );
+      components.push(row);
+    }
+
+    const embed = new EmbedBuilder()
+      .setTitle(`Attendance Autofill Complete`)
+      .setDescription(summary)
+      .setColor(0x00ae86)
+      .setFooter({
+        text: "Use the select menus below to assign squad leads",
+      });
+
     await interaction.editReply({
-      content: summary,
+      embeds: [embed],
+      components: components.length > 0 ? components : undefined,
     });
   }
 }

@@ -96,7 +96,14 @@ export class VRChatAttendanceSplitCommand {
       include: { squad: true },
     });
 
-    const previousSquadName = currentMember?.squad?.name || null;
+    const previousSquadChannelId = currentMember?.squad?.name || null;
+    
+    // Resolve previous squad channel name
+    let previousSquadName = previousSquadChannelId;
+    if (previousSquadChannelId) {
+      const previousSquadChannel = cmdInteraction.guild?.channels.cache.get(previousSquadChannelId);
+      previousSquadName = previousSquadChannel?.name || previousSquadChannelId;
+    }
 
     await attendanceManager.moveUserToSquad(eventId, dbUser.id, squad);
 
