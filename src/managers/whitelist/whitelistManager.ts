@@ -381,7 +381,7 @@ export class WhitelistManager {
           vrchatUsername,
           roles: Array.from(allPermissions), // These are the actual permissions (station, truavatar, etc.)
           roleNames: entry.roleAssignments.map(
-            (assignment: any) => assignment.role.name,
+            (assignment: any) => assignment.role.permissions,
           ), // These are the role names
           createdAt: entry.createdAt,
           accountType: vrchatAccount.accountType || "UNKNOWN",

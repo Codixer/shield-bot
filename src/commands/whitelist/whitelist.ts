@@ -352,31 +352,40 @@ export class WhitelistCommands {
       }
 
       if (userInfo.whitelistEntry) {
-        const permissions =
-          userInfo.whitelistEntry.roleAssignments
-            .filter(
-              (assignment: any) =>
-                !assignment.expiresAt || assignment.expiresAt > new Date(),
-            )
-            .map((assignment: any) => assignment.role.name)
-            .join(", ") || "None";
+        // Extract permissions from role assignments properly
+        const allActivePermissions = new Set<string>();
+        const allExpiredPermissions = new Set<string>();
+        
+        for (const assignment of userInfo.whitelistEntry.roleAssignments) {
+          if (assignment.role.permissions) {
+            const rolePermissions = assignment.role.permissions
+              .split(',')
+              .map((p: string) => p.trim())
+              .filter(Boolean);
+            
+            const isExpired = assignment.expiresAt && assignment.expiresAt <= new Date();
+            if (isExpired) {
+              rolePermissions.forEach((perm: string) => allExpiredPermissions.add(perm));
+            } else {
+              rolePermissions.forEach((perm: string) => allActivePermissions.add(perm));
+            }
+          }
+        }
+        
+        const permissions = allActivePermissions.size > 0 
+          ? Array.from(allActivePermissions).sort().join(", ")
+          : "None";
 
         embed.addFields(
           { name: "Whitelist Status", value: "✅ Whitelisted", inline: true },
           { name: "Active Permissions", value: permissions, inline: true },
         );
 
-        const expiredRoles = userInfo.whitelistEntry.roleAssignments
-          .filter(
-            (assignment: any) =>
-              assignment.expiresAt && assignment.expiresAt <= new Date(),
-          )
-          .map((assignment: any) => assignment.role.name);
-
-        if (expiredRoles.length > 0) {
+        if (allExpiredPermissions.size > 0) {
+          const expiredPermissions = Array.from(allExpiredPermissions).sort().join(", ");
           embed.addFields({
             name: "Expired Permissions",
-            value: expiredRoles.join(", "),
+            value: expiredPermissions,
             inline: true,
           });
         }
@@ -429,10 +438,23 @@ export class WhitelistCommands {
         await whitelistManager.syncUserRolesFromDiscord(user.id, roleIds);
 
         const userInfo = await whitelistManager.getUserByDiscordId(user.id);
-        const permissions =
-          userInfo?.whitelistEntry?.roleAssignments
-            ?.map((assignment: any) => assignment.role.name)
-            ?.join(", ") || "None";
+        
+        // Extract permissions from role assignments properly
+        const allPermissions = new Set<string>();
+        for (const assignment of userInfo?.whitelistEntry?.roleAssignments || []) {
+          if (assignment.role.permissions) {
+            // Split comma-separated permissions and add to set
+            const rolePermissions = assignment.role.permissions
+              .split(',')
+              .map((p: string) => p.trim())
+              .filter(Boolean);
+            rolePermissions.forEach((perm: string) => allPermissions.add(perm));
+          }
+        }
+        
+        const permissions = allPermissions.size > 0 
+          ? Array.from(allPermissions).sort().join(", ")
+          : "None";
 
         const embed = new EmbedBuilder()
           .setTitle("✅ User Synced")
@@ -606,18 +628,26 @@ export class WhitelistCommands {
         return;
       }
 
-      const activeRoles =
-        user.whitelistEntry?.roleAssignments
-          ?.filter(
-            (assignment: any) =>
-              !assignment.expiresAt || assignment.expiresAt > new Date(),
-          )
-          ?.map((assignment: any) => {
+      // Extract permissions properly with expiry info
+      const activeRoles: string[] = [];
+      for (const assignment of user.whitelistEntry?.roleAssignments || []) {
+        if (!assignment.expiresAt || assignment.expiresAt > new Date()) {
+          if (assignment.role.permissions) {
+            const rolePermissions = assignment.role.permissions
+              .split(',')
+              .map((p: string) => p.trim())
+              .filter(Boolean);
+            
             const expiry = assignment.expiresAt
               ? ` (expires ${assignment.expiresAt.toDateString()})`
               : "";
-            return `${assignment.role.name}${expiry}`;
-          }) || [];
+            
+            rolePermissions.forEach((perm: string) => {
+              activeRoles.push(`${perm}${expiry}`);
+            });
+          }
+        }
+      }
 
       const vrchatAccounts =
         user.vrchatAccounts

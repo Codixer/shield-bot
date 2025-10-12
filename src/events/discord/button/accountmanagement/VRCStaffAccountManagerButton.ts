@@ -256,19 +256,25 @@ export class VRCStaffAccountManagerButtonHandler {
       try {
         await whitelistManager.syncAndPublishAfterVerification(targetDiscordId);
         
-        // Send whitelist log for removal
+        // Send whitelist log - check if user still has roles after deletion
         if (interaction.guild) {
           try {
-            const targetUser = await interaction.client.users.fetch(targetDiscordId);
-            await sendWhitelistLog(interaction.client, interaction.guild.id, {
-              discordId: targetDiscordId,
-              displayName: targetUser.displayName || targetUser.username,
-              vrchatUsername: vrcAccount.vrchatUsername || undefined,
-              vrcUserId: vrcUserId,
-              roles: rolesBeforeDelete,
-              action: "removed",
-              accountType: accountTypeBeforeDelete,
-            });
+            const rolesAfterDelete = await getUserWhitelistRoles(targetDiscordId);
+            const wasActuallyRemoved = rolesAfterDelete.length === 0 && rolesBeforeDelete.length > 0;
+            
+            // Only log if they actually lost whitelist access or still have it with different roles
+            if (wasActuallyRemoved || rolesAfterDelete.length > 0) {
+              const targetUser = await interaction.client.users.fetch(targetDiscordId);
+              await sendWhitelistLog(interaction.client, interaction.guild.id, {
+                discordId: targetDiscordId,
+                displayName: targetUser.displayName || targetUser.username,
+                vrchatUsername: vrcAccount.vrchatUsername || undefined,
+                vrcUserId: vrcUserId,
+                roles: wasActuallyRemoved ? rolesBeforeDelete : rolesAfterDelete,
+                action: wasActuallyRemoved ? "removed" : "modified",
+                accountType: accountTypeBeforeDelete,
+              });
+            }
           } catch (logError) {
             console.warn(
               `[Staff Account Manager] Failed to send whitelist log for ${targetDiscordId}:`,
