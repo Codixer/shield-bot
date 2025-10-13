@@ -56,13 +56,23 @@ export class PatrolTimerCommands {
     name: "current",
     description: "Show currently tracked users in memory.",
   })
-  async current(interaction: CommandInteraction) {
+  async current(
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeral: boolean = true,
+    interaction: CommandInteraction,
+  ) {
     if (!interaction.guildId || !interaction.guild) return;
     const list = await patrolTimer.getCurrentTrackedList(interaction.guildId);
+    
     if (list.length === 0) {
       await interaction.reply({
         content: "No users currently tracked.",
-        flags: MessageFlags.Ephemeral,
+        flags: ephemeral ? MessageFlags.Ephemeral : undefined,
       });
       return;
     }
@@ -71,7 +81,7 @@ export class PatrolTimerCommands {
     );
     await interaction.reply({
       content: lines.join("\n"),
-      flags: MessageFlags.Ephemeral,
+      flags: ephemeral ? MessageFlags.Ephemeral : undefined,
     });
   }
 
@@ -123,6 +133,13 @@ export class PatrolTimerCommands {
       required: false,
     })
     here: boolean | undefined,
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeral: boolean = true,
     interaction: CommandInteraction,
   ) {
     if (!interaction.guildId) return;
@@ -134,7 +151,7 @@ export class PatrolTimerCommands {
       if (!channelId) {
         await interaction.reply({
           content: "Join a voice channel first.",
-          flags: MessageFlags.Ephemeral,
+          flags: ephemeral ? MessageFlags.Ephemeral : undefined,
         });
         return;
       }
@@ -152,7 +169,7 @@ export class PatrolTimerCommands {
     if (rows.length === 0) {
       await interaction.reply({
         content: "No data.",
-        flags: MessageFlags.Ephemeral,
+        flags: ephemeral ? MessageFlags.Ephemeral : undefined,
       });
       return;
     }
@@ -162,7 +179,7 @@ export class PatrolTimerCommands {
     );
     await interaction.reply({
       content: lines.join("\n"),
-      flags: MessageFlags.Ephemeral,
+      flags: ephemeral ? MessageFlags.Ephemeral : undefined,
     });
   }
 
@@ -201,6 +218,13 @@ export class PatrolTimerCommands {
       },
     })
     month: string | undefined,
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeral: boolean = true,
     interaction: CommandInteraction,
   ) {
     if (!interaction.guildId) return;
@@ -210,7 +234,7 @@ export class PatrolTimerCommands {
     if (month && !(m >= 1 && m <= 12)) {
       await interaction.reply({
         content: "Invalid month.",
-        flags: MessageFlags.Ephemeral,
+        flags: ephemeral ? MessageFlags.Ephemeral : undefined,
       });
       return;
     }
@@ -229,7 +253,7 @@ export class PatrolTimerCommands {
     const period = ` for ${y}-${m.toString().padStart(2, "0")}`;
     await interaction.reply({
       content: `<@${userId}> — ${msToReadable(total)}${period}.`,
-      flags: MessageFlags.Ephemeral,
+      flags: ephemeral ? MessageFlags.Ephemeral : undefined,
     });
   }
 
@@ -242,6 +266,13 @@ export class PatrolTimerCommands {
       required: false,
     })
     user: User | undefined,
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeral: boolean = true,
     interaction: CommandInteraction,
   ) {
     if (!interaction.guildId) return;
@@ -255,7 +286,7 @@ export class PatrolTimerCommands {
       ) {
         await interaction.reply({
           content: "Admin only.",
-          flags: MessageFlags.Ephemeral,
+          flags: ephemeral ? MessageFlags.Ephemeral : undefined,
         });
         return;
       }
@@ -265,7 +296,7 @@ export class PatrolTimerCommands {
     await patrolTimer.reset(interaction.guildId, userId);
     await interaction.reply({
       content: userId ? `Reset time for <@${userId}>.` : "Reset all times.",
-      flags: MessageFlags.Ephemeral,
+      flags: ephemeral ? MessageFlags.Ephemeral : undefined,
     });
   }
 
@@ -273,7 +304,16 @@ export class PatrolTimerCommands {
     name: "wipe",
     description: "Wipe all patrol data for this guild (admin).",
   })
-  async wipe(interaction: CommandInteraction) {
+  async wipe(
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeral: boolean = true,
+    interaction: CommandInteraction,
+  ) {
     if (!interaction.guildId) return;
     const member = interaction.member as GuildMember;
 
@@ -285,7 +325,7 @@ export class PatrolTimerCommands {
       ) {
         await interaction.reply({
           content: "Admin only.",
-          flags: MessageFlags.Ephemeral,
+          flags: ephemeral ? MessageFlags.Ephemeral : undefined,
         });
         return;
       }
@@ -294,7 +334,7 @@ export class PatrolTimerCommands {
     await patrolTimer.wipe(interaction.guildId);
     await interaction.reply({
       content: "Wiped all patrol data for this guild.",
-      flags: MessageFlags.Ephemeral,
+      flags: ephemeral ? MessageFlags.Ephemeral : undefined,
     });
   }
 
