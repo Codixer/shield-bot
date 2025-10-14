@@ -24,39 +24,6 @@ export async function VRChatLoginGuard(
   );
 }
 
-export async function PatrolPermissionGuard(
-  interaction: Interaction,
-  _client: Client,
-  next: Next,
-): Promise<unknown> {
-  if (!interaction.guildId || !interaction.guild) {
-    return respondWithError(
-      interaction,
-      "This command can only be used in a server.",
-    );
-  }
-
-  const member = interaction.member as GuildMember;
-  if (!member) {
-    return respondWithError(interaction, "Unable to verify your permissions.");
-  }
-
-  // Check if user has Administrator permission (bypass)
-  if (member.permissions.has(PermissionFlagsBits.Administrator)) {
-    return next();
-  }
-
-  // Check if user has STAFF permission based on their roles
-  if (await userHasPermission(member, PermissionFlags.STAFF)) {
-    return next();
-  }
-
-  return respondWithError(
-    interaction,
-    "You don't have permission to use patrol commands. Staff access required.",
-  );
-}
-
 export async function AttendanceHostGuard(
   interaction: Interaction,
   _client: Client,
@@ -72,11 +39,6 @@ export async function AttendanceHostGuard(
   const member = interaction.member as GuildMember;
   if (!member) {
     return respondWithError(interaction, "Unable to verify your permissions.");
-  }
-
-  // Check if user has Administrator permission (bypass)
-  if (member.permissions.has(PermissionFlagsBits.Administrator)) {
-    return next();
   }
 
   // Check if user has HOST_ATTENDANCE permission based on their roles
@@ -105,11 +67,6 @@ export async function ShieldMemberGuard(
   const member = interaction.member as GuildMember;
   if (!member) {
     return respondWithError(interaction, "Unable to verify your permissions.");
-  }
-
-  // Check if user has Administrator permission (bypass)
-  if (member.permissions.has(PermissionFlagsBits.Administrator)) {
-    return next();
   }
 
   // Check if user has SHIELD_MEMBER permission based on their roles
@@ -177,11 +134,6 @@ export async function DevGuardGuard(
     return respondWithError(interaction, "Unable to verify your permissions.");
   }
 
-  // Check if user has Administrator permission (bypass)
-  if (member.permissions.has(PermissionFlagsBits.Administrator)) {
-    return next();
-  }
-
   // Check if user has DEV_GUARD permission based on their roles
   if (await userHasPermission(member, PermissionFlags.DEV_GUARD)) {
     return next();
@@ -208,11 +160,6 @@ export async function StaffGuard(
   const member = interaction.member as GuildMember;
   if (!member) {
     return respondWithError(interaction, "Unable to verify your permissions.");
-  }
-
-  // Check if user has Administrator permission (bypass)
-  if (member.permissions.has(PermissionFlagsBits.Administrator)) {
-    return next();
   }
 
   // Check if user has STAFF permission based on their roles
@@ -243,11 +190,6 @@ export async function DevGuardAndStaffGuard(
     return respondWithError(interaction, "Unable to verify your permissions.");
   }
 
-  // Check if user has Administrator permission (bypass)
-  if (member.permissions.has(PermissionFlagsBits.Administrator)) {
-    return next();
-  }
-
   // Check if user has DEV_GUARD permission based on their roles
   if (await userHasPermission(member, PermissionFlags.DEV_GUARD)) {
     return next();
@@ -274,11 +216,6 @@ export async function TrainerGuard(
   const member = interaction.member as GuildMember;
   if (!member) {
     return respondWithError(interaction, "Unable to verify your permissions.");
-  }
-
-  // Check if user has Administrator permission (bypass)
-  if (member.permissions.has(PermissionFlagsBits.Administrator)) {
-    return next();
   }
 
   // Check if user has TRAINER permission based on their roles
