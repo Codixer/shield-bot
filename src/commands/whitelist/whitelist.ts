@@ -487,48 +487,7 @@ export class WhitelistCommands {
     }
   }
 
-  @Slash({ description: "List all users in the whitelist" })
-  async listusers(interaction: CommandInteraction): Promise<void> {
-    try {
-      const whitelistEntries = await whitelistManager.getWhitelistUsers();
 
-      if (whitelistEntries.length === 0) {
-        await interaction.reply({
-          content: "❌ No users found in the whitelist.",
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const chunks = [];
-      for (let i = 0; i < whitelistEntries.length; i += 10) {
-        chunks.push(whitelistEntries.slice(i, i + 10));
-      }
-
-      const embed = new EmbedBuilder()
-        .setTitle("📋 Whitelist Users")
-        .setColor(0x0099ff)
-        .setFooter({
-          text: `Page 1 of ${chunks.length} • Total: ${whitelistEntries.length} users`,
-        });
-
-      const userList = chunks[0]
-        .map((entry: any) => {
-          const roles = entry.roles.join(", ") || "No roles";
-          return `**${entry.vrchatUsername}**\nRoles: ${roles}`;
-        })
-        .join("\n\n");
-
-      embed.setDescription(userList);
-
-      await interaction.reply({ embeds: [embed] });
-    } catch (error: any) {
-      await interaction.reply({
-        content: `❌ Failed to list users: ${error.message}`,
-        ephemeral: true,
-      });
-    }
-  }
 
   @Slash({
     name: "users",
@@ -869,12 +828,19 @@ export class WhitelistCommands {
   })
   async validateaccess(
     @SlashOption({
-      description: "Specific user to validate (optional)",
+      description: "Specific Discord user to validate (optional)",
       name: "user",
       required: false,
       type: ApplicationCommandOptionType.User,
     })
     user: any,
+    @SlashOption({
+      description: "VRChat username to validate (optional)",
+      name: "vrchat_username",
+      required: false,
+      type: ApplicationCommandOptionType.String,
+    })
+    vrchatUsername: string,
     interaction: CommandInteraction,
   ): Promise<void> {
     try {
@@ -885,6 +851,89 @@ export class WhitelistCommands {
         await interaction.editReply({
           content: "❌ This command can only be used in a server.",
         });
+        return;
+      }
+
+      // Handle VRChat username lookup
+      if (vrchatUsername && !user) {
+        const searchResults = await searchUsers({
+          search: vrchatUsername.trim(),
+          n: 1,
+        });
+
+        if (searchResults.length === 0) {
+          await interaction.editReply({
+            content: `❌ No VRChat user found with username: ${vrchatUsername}`,
+          });
+          return;
+        }
+
+        const vrcUser = searchResults[0];
+        const userInfo = await whitelistManager.getUserByVrcUserId(vrcUser.id);
+
+        if (!userInfo) {
+          await interaction.editReply({
+            content: `❌ VRChat user **${vrcUser.displayName}** is not in the database.`,
+          });
+          return;
+        }
+
+        // Look up the Discord user from the database
+        const discordUserId = userInfo.discordId;
+        const member = await guild.members.fetch(discordUserId).catch(() => null);
+
+        if (!member) {
+          await interaction.editReply({
+            content: `❌ VRChat user **${vrcUser.displayName}** (Discord: <@${discordUserId}>) is not in this server.`,
+          });
+          return;
+        }
+
+        // Validate this specific user
+        const roleIds = member.roles.cache.map((role) => role.id);
+        const userBefore = await whitelistManager.getUserByDiscordId(discordUserId);
+        const hadAccessBefore = !!userBefore?.whitelistEntry;
+
+        await whitelistManager.syncUserRolesFromDiscord(
+          discordUserId,
+          roleIds,
+          guild.id,
+        );
+
+        const userAfter = await whitelistManager.getUserByDiscordId(discordUserId);
+        const hasAccessAfter = !!userAfter?.whitelistEntry;
+        const rolesAfter =
+          userAfter?.whitelistEntry?.roleAssignments?.map((a) => a.role.discordRoleId || a.role.id) ||
+          [];
+
+        const embed = new EmbedBuilder()
+          .setTitle("✅ User Access Validation Complete")
+          .setColor(hasAccessAfter ? 0x00ff00 : 0xff0000)
+          .addFields(
+            { name: "VRChat Username", value: vrcUser.displayName, inline: true },
+            { name: "Discord User", value: `<@${discordUserId}>`, inline: true },
+            {
+              name: "Has Access",
+              value: hasAccessAfter ? "✅ Yes" : "❌ No",
+              inline: true,
+            },
+            {
+              name: "Changes Made",
+              value: hadAccessBefore !== hasAccessAfter ? "✅ Yes" : "❌ No",
+              inline: true,
+            },
+          )
+          .setTimestamp();
+
+        if (hasAccessAfter) {
+          embed.addFields({
+            name: "Current Roles",
+            value: rolesAfter.join(", ") || "None",
+            inline: false,
+          });
+        }
+
+        await interaction.editReply({ embeds: [embed] });
         return;
       }
 
@@ -953,6 +1002,7 @@ export class WhitelistCommands {
         let accessRevoked = 0;
         let errors = 0;
 
+        // Step 1: Validate all current guild members
         for (const [, member] of members) {
           try {
             const roleIds = member.roles.cache.map((role) => role.id);
@@ -994,13 +1044,49 @@ export class WhitelistCommands {
           }
         }
 
+        // Step 2: Check all whitelisted users and remove those not in the guild
+        const whitelistedUsers = await whitelistManager.getWhitelistUsers();
+        let usersNotInGuild = 0;
+
+        for (const whitelistEntry of whitelistedUsers) {
+          try {
+            if (!whitelistEntry.discordId) continue;
+
+            // Check if user is in the current guild members
+            const isInGuild = members.has(whitelistEntry.discordId);
+
+            if (!isInGuild) {
+              // User has whitelist access but is not in the guild - remove them
+              await whitelistManager.removeUserFromWhitelistIfNoRoles(
+                whitelistEntry.discordId,
+              );
+              usersNotInGuild++;
+              accessRevoked++;
+              console.log(
+                `[Whitelist] Removed ${whitelistEntry.vrchatUsername || whitelistEntry.discordId} - no longer in guild`,
+              );
+            }
+          } catch (error) {
+            console.error(
+              `[Whitelist] Error checking guild membership for ${whitelistEntry.vrchatUsername || whitelistEntry.discordId}:`,
+              error,
+            );
+            errors++;
+          }
+        }
+
         const embed = new EmbedBuilder()
           .setTitle("✅ Bulk Access Validation Complete")
           .setColor(0x00ff00)
           .addFields(
             {
-              name: "Users Validated",
+              name: "Guild Members Validated",
               value: validated.toString(),
+              inline: true,
+            },
+            {
+              name: "Users Not in Guild (Removed)",
+              value: usersNotInGuild.toString(),
               inline: true,
             },
             {
@@ -1016,7 +1102,7 @@ export class WhitelistCommands {
             { name: "Errors", value: errors.toString(), inline: true },
           )
           .setDescription(
-            `Validated whitelist access for ${validated} server members.`,
+            `Validated ${validated} guild members and checked ${whitelistedUsers.length} whitelisted users for guild membership.`,
           )
           .setTimestamp();
 
