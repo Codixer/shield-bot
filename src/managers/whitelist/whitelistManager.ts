@@ -874,7 +874,37 @@ export class WhitelistManager {
   async syncUserRolesFromDiscord(
     discordId: string,
     discordRoleIds: string[],
+    guildId?: string,
   ): Promise<void> {
+    // Ensure user exists in database first
+    const user = await prisma.user.findUnique({ 
+      where: { discordId },
+      include: {
+        vrchatAccounts: true,
+      },
+    });
+    
+    if (!user) {
+      console.log(
+        `[Whitelist] User ${discordId} not found in database, skipping sync`,
+      );
+      return;
+    }
+
+    // Check if user has any verified VRChat accounts (MAIN or ALT)
+    const hasVerifiedAccount = user.vrchatAccounts?.some(
+      (acc) => acc.accountType === "MAIN" || acc.accountType === "ALT"
+    ) ?? false;
+
+    if (!hasVerifiedAccount) {
+      // User is not verified, remove from whitelist if present
+      await this.removeUserFromWhitelistIfNoRoles(discordId);
+      console.log(
+        `[Whitelist] User ${discordId} has no verified VRChat accounts - removed from whitelist`,
+      );
+      return;
+    }
+
     // Get mapped roles for the user's Discord roles
     const mappedRoles = await prisma.whitelistRole.findMany({
       where: {
@@ -884,20 +914,24 @@ export class WhitelistManager {
       },
     });
 
-    if (mappedRoles.length === 0) {
+    // Filter mapped roles by guild if guildId is provided
+    let validMappedRoles = mappedRoles;
+    if (guildId) {
+      validMappedRoles = mappedRoles.filter(role => role.guildId === guildId);
+      
+      if (validMappedRoles.length < mappedRoles.length) {
+        const invalidCount = mappedRoles.length - validMappedRoles.length;
+        console.log(
+          `[Whitelist] User ${discordId} has ${invalidCount} role(s) from other guilds - filtering them out`,
+        );
+      }
+    }
+
+    if (validMappedRoles.length === 0) {
       // User has no qualifying roles, remove from whitelist if present
       await this.removeUserFromWhitelistIfNoRoles(discordId);
       console.log(
         `[Whitelist] User ${discordId} has no qualifying Discord roles - removed from whitelist`,
-      );
-      return;
-    }
-
-    // Ensure user exists in database
-    const user = await prisma.user.findUnique({ where: { discordId } });
-    if (!user) {
-      console.log(
-        `[Whitelist] User ${discordId} not found in database, skipping sync`,
       );
       return;
     }
@@ -919,7 +953,7 @@ export class WhitelistManager {
     // Get current role assignments
     const existingAssignments = whitelistEntry!.roleAssignments || [];
     const existingRoleIds = new Set(existingAssignments.map((a) => a.roleId));
-    const newRoleIds = new Set(mappedRoles.map((r) => r.id));
+    const newRoleIds = new Set(validMappedRoles.map((r) => r.id));
 
     // Remove assignments that are no longer valid (role no longer mapped to Discord roles)
     const assignmentsToRemove = existingAssignments.filter(
@@ -932,7 +966,7 @@ export class WhitelistManager {
     }
 
     // Add new role assignments for mapped roles that don't exist yet
-    const rolesToAdd = mappedRoles.filter((r) => !existingRoleIds.has(r.id));
+    const rolesToAdd = validMappedRoles.filter((r) => !existingRoleIds.has(r.id));
     for (const role of rolesToAdd) {
       await prisma.whitelistRoleAssignment.create({
         data: {
@@ -945,7 +979,7 @@ export class WhitelistManager {
 
     // Get permission list for logging
     const allPermissions = new Set<string>();
-    for (const role of mappedRoles) {
+    for (const role of validMappedRoles) {
       if (role.permissions) {
         role.permissions
           .split(",")
@@ -956,7 +990,7 @@ export class WhitelistManager {
     }
 
     console.log(
-      `[Whitelist] User ${discordId} synced with ${mappedRoles.length} role(s) and permissions: [${Array.from(allPermissions).join(", ")}]`,
+      `[Whitelist] User ${discordId} synced with ${validMappedRoles.length} role(s) and permissions: [${Array.from(allPermissions).join(", ")}]`,
     );
   }
 
@@ -1312,7 +1346,7 @@ export class WhitelistManager {
       }
 
       // Sync whitelist role assignments
-      await this.syncUserRolesFromDiscord(discordId, roleIds);
+      await this.syncUserRolesFromDiscord(discordId, roleIds, member.guild.id);
 
       // Get VRChat account info and whitelist roles for logging
       const vrchatInfo = await this.getUserByDiscordId(discordId);

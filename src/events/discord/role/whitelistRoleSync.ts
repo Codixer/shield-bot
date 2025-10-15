@@ -127,7 +127,11 @@ export class WhitelistRoleSync {
       );
 
       // Sync user roles (this handles both granting and removing access based on current roles)
-      await whitelistManager.syncUserRolesFromDiscord(newMember.id, newRoleIds);
+      await whitelistManager.syncUserRolesFromDiscord(
+        newMember.id,
+        newRoleIds,
+        newMember.guild.id,
+      );
 
       // Get updated whitelist roles after sync
       const updatedWhitelistRoles =
@@ -212,7 +216,11 @@ export class WhitelistRoleSync {
       }
 
       // Sync their roles (this will grant access if they have qualifying roles)
-      await whitelistManager.syncUserRolesFromDiscord(member.id, roleIds);
+      await whitelistManager.syncUserRolesFromDiscord(
+        member.id,
+        roleIds,
+        member.guild.id,
+      );
 
       // Get updated whitelist roles after sync
       const updatedWhitelistRoles = await this.getUserWhitelistRoles(member.id);

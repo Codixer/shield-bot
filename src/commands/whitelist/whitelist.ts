@@ -120,6 +120,7 @@ export class WhitelistCommands {
               await whitelistManager.syncUserRolesFromDiscord(
                 member.id,
                 roleIds,
+                interaction.guildId!,
               );
             }
           } catch (error) {
@@ -204,6 +205,7 @@ export class WhitelistCommands {
               await whitelistManager.syncUserRolesFromDiscord(
                 member.id,
                 roleIds,
+                interaction.guild!.id,
               );
 
               // Check their status after sync
@@ -435,7 +437,11 @@ export class WhitelistCommands {
         await whitelistManager.shouldUserBeWhitelisted(roleIds);
 
       if (shouldBeWhitelisted) {
-        await whitelistManager.syncUserRolesFromDiscord(user.id, roleIds);
+        await whitelistManager.syncUserRolesFromDiscord(
+          user.id,
+          roleIds,
+          interaction.guild!.id,
+        );
 
         const userInfo = await whitelistManager.getUserByDiscordId(user.id);
         
@@ -899,7 +905,11 @@ export class WhitelistCommands {
         const hadAccessBefore = !!userBefore?.whitelistEntry;
 
         // Sync their roles (this will add/remove access as needed)
-        await whitelistManager.syncUserRolesFromDiscord(user.id, roleIds);
+        await whitelistManager.syncUserRolesFromDiscord(
+          user.id,
+          roleIds,
+          guild.id,
+        );
 
         // Check their status after sync
         const userAfter = await whitelistManager.getUserByDiscordId(user.id);
@@ -954,7 +964,11 @@ export class WhitelistCommands {
             const hadAccessBefore = !!userBefore?.whitelistEntry;
 
             // Sync their roles
-            await whitelistManager.syncUserRolesFromDiscord(member.id, roleIds);
+            await whitelistManager.syncUserRolesFromDiscord(
+              member.id,
+              roleIds,
+              guild.id,
+            );
 
             // Check their status after sync
             const userAfter = await whitelistManager.getUserByDiscordId(
