@@ -170,8 +170,25 @@ export class AttendanceManager {
   async getActiveEventIdForUser(userId: number) {
     const active = await prisma.activeAttendanceEvent.findUnique({
       where: { userId },
+      include: { event: true },
     });
-    return active?.eventId;
+    
+    if (!active) {
+      return undefined;
+    }
+
+    // Check if the event is older than 4 hours
+    const eventDate = new Date(active.event.date);
+    const fourHoursAfterEvent = new Date(eventDate.getTime() + 4 * 60 * 60 * 1000);
+    const now = new Date();
+
+    if (now > fourHoursAfterEvent) {
+      // Auto-clear the active event if it's been more than 4 hours since the event date
+      await this.clearActiveEventForUser(userId);
+      return undefined;
+    }
+
+    return active.eventId;
   }
 
   // Clear the active event for a user (by userId)
