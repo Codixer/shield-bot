@@ -81,7 +81,7 @@ export class VRChatAttendanceAutofillCommand {
       return;
     }
 
-    // Get only enrolled voice channels in the category
+    // Get only enrolled voice channels in the category for squad tracking
     const voiceChannels = guild.channels.cache.filter(
       (channel) =>
         channel.parentId === patrolCategoryId &&
@@ -95,6 +95,14 @@ export class VRChatAttendanceAutofillCommand {
       });
       return;
     }
+
+    // Get ALL voice channels in ANY category for staff detection
+    const allCategoryVoiceChannels = guild.channels.cache.filter(
+      (channel) =>
+        channel.type === ChannelType.GuildVoice &&
+        channel.parentId && // Has a parent (is in a category)
+        guild.channels.cache.get(channel.parentId)?.type === ChannelType.GuildCategory
+    );
 
     // Check if user has an active event
     const user = await attendanceManager.findOrCreateUserByDiscordId(
@@ -119,6 +127,13 @@ export class VRChatAttendanceAutofillCommand {
         content: "Failed to get or create event.",
       });
       return;
+    }
+
+    // Check if host has staff role and add them as staff
+    const hostMember = await guild.members.fetch(interaction.user.id);
+    const isHostStaff = await userHasSpecificRole(hostMember, PermissionLevel.STAFF);
+    if (isHostStaff) {
+      await attendanceManager.addStaff(eventId, user.id);
     }
 
     // Get current squad members to track changes
@@ -148,6 +163,21 @@ export class VRChatAttendanceAutofillCommand {
     let splitCount = 0;
     let staffCount = 0;
 
+    // First pass: Process all category channels for staff detection
+    const staffMembersInCategories = new Set<string>();
+    for (const [channelId, channel] of allCategoryVoiceChannels) {
+      if (channel.type !== ChannelType.GuildVoice) continue;
+
+      const members = channel.members;
+      for (const [memberId, member] of members) {
+        const isStaff = await userHasSpecificRole(member, PermissionLevel.STAFF);
+        if (isStaff) {
+          staffMembersInCategories.add(memberId);
+        }
+      }
+    }
+
+    // Second pass: Process enrolled channels for squad tracking
     for (const [channelId, channel] of voiceChannels) {
       if (channel.type !== ChannelType.GuildVoice) continue;
 
@@ -164,7 +194,7 @@ export class VRChatAttendanceAutofillCommand {
         const previousSquad = currentMemberSquads.get(memberId);
 
         // Check if user has the specific STAFF role (not just dev with staff permissions)
-        const isStaff = await userHasSpecificRole(member, PermissionLevel.STAFF);
+        const isStaff = staffMembersInCategories.has(memberId);
 
         if (!previousSquad) {
           // New member - add them

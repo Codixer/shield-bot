@@ -130,12 +130,14 @@ export class VRChatAttendancePasteCommand {
     text += `Host: ${eventSummary.host ? `<@${eventSummary.host.discordId}>` : "None"}\n`;
     text += `Co-Host: ${eventSummary.cohost ? `<@${eventSummary.cohost.discordId}>` : "None"}\n`;
 
-    // Staff
+    // Attending Staff
     if (eventSummary.staff.length > 0) {
       const staffList = eventSummary.staff
         .map((staff) => `<@${staff.user.discordId}>`)
         .join(" ");
-      text += `Staff: ${staffList}\n`;
+      text += `Attending Staff: ${staffList}\n`;
+    } else {
+      text += `Attending Staff: None\n`;
     }
 
     text += "\n";
