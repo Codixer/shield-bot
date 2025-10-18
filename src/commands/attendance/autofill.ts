@@ -136,6 +136,17 @@ export class VRChatAttendanceAutofillCommand {
       await attendanceManager.addStaff(eventId, user.id);
     }
 
+    // Check if this is the first autofill for this event
+    const isFirstAutofill = !event.firstAutofillAt;
+    
+    // If this is the first autofill, record the timestamp
+    if (isFirstAutofill) {
+      await prisma.attendanceEvent.update({
+        where: { id: eventId },
+        data: { firstAutofillAt: new Date() },
+      });
+    }
+
     // Get current squad members to track changes
     const existingSquads = await prisma.squad.findMany({
       where: { eventId },
@@ -162,6 +173,7 @@ export class VRChatAttendanceAutofillCommand {
     let addedCount = 0;
     let splitCount = 0;
     let staffCount = 0;
+    let lateCount = 0;
 
     // First pass: Process all category channels for staff detection
     const staffMembersInCategories = new Set<string>();
@@ -200,6 +212,12 @@ export class VRChatAttendanceAutofillCommand {
           // New member - add them
           await attendanceManager.addUserToSquad(eventId, dbUser.id, channelId);
           addedCount++;
+
+          // Mark as late if this is not the first autofill (they joined after initial roll call)
+          if (!isFirstAutofill) {
+            await attendanceManager.markUserAsLate(eventId, dbUser.id);
+            lateCount++;
+          }
 
           // Mark as staff if they have staff permissions
           if (isStaff) {
@@ -283,6 +301,7 @@ export class VRChatAttendanceAutofillCommand {
       `✅ Added: ${addedCount} members`,
       `🔄 Split: ${splitCount} members`,
       `👤 Staff: ${staffCount} members marked as staff`,
+      `⏰ Late: ${lateCount} members marked as late`,
       `❌ Left: ${leftCount} members`,
       `📊 Total in event: ${processedUsers.size} members`,
       "",

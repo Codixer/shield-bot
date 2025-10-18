@@ -3,6 +3,7 @@ model AttendanceEvent {
   date                   DateTime
   hostId                 Int?
   cohostId               Int?
+  firstAutofillAt        DateTime?               // Track when the first autofill was run
   createdAt              DateTime                @default(now())
   updatedAt              DateTime                @updatedAt
   activeAttendanceEvents ActiveAttendanceEvent[]

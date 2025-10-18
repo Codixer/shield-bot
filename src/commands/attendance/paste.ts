@@ -178,8 +178,12 @@ export class VRChatAttendancePasteCommand {
         const modifiers: string[] = [];
         if (member.isLead && !member.hasLeft) modifiers.push("(Lead)");
         if (member.isLate) modifiers.push("(Late)");
-        if (member.isSplit && member.splitFrom)
-          modifiers.push(`(Split from ${member.splitFrom})`);
+        if (member.isSplit && member.splitFrom) {
+          // Try to get the channel name or mention from the splitFrom ID
+          const splitFromChannel = cmdInteraction.guild?.channels.cache.get(member.splitFrom);
+          const splitFromDisplay = splitFromChannel ? `<#${member.splitFrom}>` : member.splitFrom;
+          modifiers.push(`(Split from ${splitFromDisplay})`);
+        }
 
         if (member.hasLeft) {
           // For left users, show special formatting
