@@ -2,6 +2,7 @@ import { ButtonComponent, Discord, Guard } from "discordx";
 import { ButtonInteraction, GuildMember, MessageFlags } from "discord.js";
 import { patrolTimer } from "../../../../main.js";
 import { StaffGuard } from "../../../../utility/guards.js";
+import { userHasPermission, PermissionFlags } from "../../../../utility/permissionUtils.js";
 
 @Discord()
 export class PatrolButtonHandlers {
@@ -10,9 +11,17 @@ export class PatrolButtonHandlers {
   async handleWipeConfirm(interaction: ButtonInteraction) {
     if (!interaction.guildId) return;    
     const [_, userId, ephemeralStr] = interaction.customId.split(":");
+    
     // Check permissions again
-
-
+    const member = interaction.member as GuildMember;
+    if (!(await userHasPermission(member, PermissionFlags.STAFF))) {
+      await interaction.reply({
+        content: "❌ You don't have permission to wipe patrol data.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    
     // Perform the wipe for the specific user
     await patrolTimer.reset(interaction.guildId, userId);
 

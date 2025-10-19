@@ -444,6 +444,7 @@ export class PatrolTimerManager {
 
   async reset(guildId: string, userId?: string) {
     if (userId) {
+      // Clear database records
       await (prisma as any).voicePatrolTime.updateMany({
         where: { guildId, userId },
         data: { totalMs: BigInt(0) },
@@ -451,7 +452,19 @@ export class PatrolTimerManager {
       await (prisma as any).activeVoicePatrolSession.deleteMany({
         where: { guildId, userId },
       });
+      
+      // Clear in-memory tracking for this specific user
+      const guildMap = this.tracked.get(guildId);
+      if (guildMap) {
+        const tracked = guildMap.get(userId);
+        if (tracked) {
+          // Reset their start time to now instead of deleting,
+          // so they continue being tracked if still in channel
+          tracked.startedAt = new Date();
+        }
+      }
     } else {
+      // Clear database records for all users
       await (prisma as any).voicePatrolTime.updateMany({
         where: { guildId },
         data: { totalMs: BigInt(0) },
@@ -459,17 +472,18 @@ export class PatrolTimerManager {
       await (prisma as any).activeVoicePatrolSession.deleteMany({
         where: { guildId },
       });
+      
+      // Clear in-memory tracking for all users in this guild
+      const guildMap = this.tracked.get(guildId);
+      if (guildMap) {
+        const now = new Date();
+        for (const tracked of guildMap.values()) {
+          // Reset their start time to now instead of deleting,
+          // so they continue being tracked if still in channel
+          tracked.startedAt = now;
+        }
+      }
     }
-  }
-
-  async wipe(guildId: string) {
-    await (prisma as any).voicePatrolTime.deleteMany({ where: { guildId } });
-    await (prisma as any).voicePatrolMonthlyTime.deleteMany({
-      where: { guildId },
-    });
-    await (prisma as any).activeVoicePatrolSession.deleteMany({
-      where: { guildId },
-    });
   }
 
   async getUserTotal(guildId: string, userId: string) {
