@@ -6,9 +6,11 @@
  * and presents them in a user-friendly Discord embed format.
  * 
  * Features:
- * - Shows up to 3 most recent status entries
+ * - Shows up to 3 most recent status entries with FULL incident history
+ * - Displays all updates for each incident (investigating → monitoring → resolved)
  * - Color-coded status indicators (green for operational, red for issues)
  * - Emoji status indicators for different types of updates
+ * - Timestamps for each update when available
  * - Links to detailed incident reports
  * - Automatic detection of active vs resolved issues
  * 
@@ -120,59 +122,113 @@ export class VRChatStatusCommand {
 
       // Process each entry
       for (const entry of entries) {
-        // Parse the HTML content to extract the latest status update
-        let latestUpdate = "No details available.";
-        let statusType = "Update";
+        // Parse the HTML content to extract ALL status updates
+        const updates: { status: string; text: string; timestamp: string }[] = [];
         
-        // Extract the most recent update (first <p> tag with <strong>)
-        const updateMatch = entry.content.match(/<p[^>]*>[\s\S]*?<strong[^>]*>(.*?)<\/strong>([\s\S]*?)<\/p>/);
-        if (updateMatch) {
-          statusType = updateMatch[1].trim();
+        // Extract all <p> tags that contain status updates
+        const updateMatches = entry.content.matchAll(/<p[^>]*>[\s\S]*?<strong[^>]*>(.*?)<\/strong>([\s\S]*?)<\/p>/g);
+        
+        for (const updateMatch of updateMatches) {
+          const statusType = updateMatch[1].trim();
           let updateText = updateMatch[2].trim();
+          
+          // Extract timestamp from the update
+          const timestampMatch = updateText.match(/<small[^>]*>.*?<var[^>]*>(\d{1,2})<\/var>.*?<var[^>]*>(\d{2}:\d{2})<\/var>\s+UTC<\/small>/);
+          let timestamp = "";
+          if (timestampMatch) {
+            timestamp = `${timestampMatch[1]} UTC ${timestampMatch[2]}`;
+            // Remove the timestamp from the update text
+            updateText = updateText.replace(/<small[^>]*>.*?UTC<\/small><br\s*\/?>/g, "");
+          }
           
           // Clean up the update text - remove HTML tags and extract meaningful content
           updateText = updateText.replace(/<[^>]*>/g, ""); // Remove HTML tags
           updateText = updateText.replace(/\s+/g, " ").trim(); // Normalize whitespace
           
-          // Remove timestamp patterns at the beginning
-          updateText = updateText.replace(/^[A-Z][a-z]{2}\s+\d{1,2},\s+\d{2}:\d{2}\s+UTC\s*-?\s*/, "");
-          
-          if (updateText.length > 0) {
-            latestUpdate = updateText;
+          if (updateText.length > 0 && statusType.length > 0) {
+            updates.push({
+              status: statusType,
+              text: updateText,
+              timestamp: timestamp
+            });
           }
-        } else {
-          // Fallback: just get first text from content
+        }
+        
+        // If no structured updates found, try to extract any meaningful text
+        if (updates.length === 0) {
           const textMatch = entry.content.match(/>([^<]+)</);
           if (textMatch) {
-            latestUpdate = textMatch[1].trim();
+            updates.push({
+              status: "Update",
+              text: textMatch[1].trim(),
+              timestamp: ""
+            });
           }
         }
 
-        // Determine status emoji
+        // Determine status emoji based on the most recent (first) update
         let statusEmoji = "🔄";
-        const statusLower = statusType.toLowerCase();
-        if (statusLower.includes("resolved") || statusLower.includes("completed")) {
-          statusEmoji = "✅";
-        } else if (statusLower.includes("investigating") || statusLower.includes("identified")) {
-          statusEmoji = "🔍";
-        } else if (statusLower.includes("monitoring")) {
-          statusEmoji = "👀";
-        } else if (statusLower.includes("scheduled")) {
-          statusEmoji = "📅";
-        } else if (statusLower.includes("progress")) {
-          statusEmoji = "⚙️";
+        if (updates.length > 0) {
+          const latestStatus = updates[0].status.toLowerCase();
+          if (latestStatus.includes("resolved") || latestStatus.includes("completed")) {
+            statusEmoji = "✅";
+          } else if (latestStatus.includes("investigating") || latestStatus.includes("identified")) {
+            statusEmoji = "🔍";
+          } else if (latestStatus.includes("monitoring")) {
+            statusEmoji = "👀";
+          } else if (latestStatus.includes("scheduled")) {
+            statusEmoji = "📅";
+          } else if (latestStatus.includes("progress")) {
+            statusEmoji = "⚙️";
+          }
         }
 
         // Format the date
         const dateStr = entry.published ? new Date(entry.published).toLocaleDateString() : "Unknown date";
         
-        // Truncate content if too long
-        if (latestUpdate.length > 200) {
-          latestUpdate = latestUpdate.substring(0, 197) + "...";
+        // Build the field value with all updates
+        let fieldValue = "";
+        
+        if (updates.length > 0) {
+          // Show all updates, with most recent first
+          for (let i = 0; i < Math.min(updates.length, 4); i++) { // Limit to 4 updates to avoid hitting Discord limits
+            const update = updates[i];
+            let updateText = update.text;
+            
+            // Truncate individual updates if too long
+            if (updateText.length > 300) {
+              updateText = updateText.substring(0, 297) + "...";
+            }
+            
+            fieldValue += `**${update.status}**`;
+            if (update.timestamp) {
+              fieldValue += ` *(${update.timestamp})*`;
+            }
+            fieldValue += ` - ${updateText}`;
+            
+            if (i < Math.min(updates.length, 4) - 1) {
+              fieldValue += "\n\n";
+            }
+          }
+          
+          if (updates.length > 4) {
+            fieldValue += `\n\n*...and ${updates.length - 4} more updates*`;
+          }
+        } else {
+          fieldValue = "No detailed updates available.";
+        }
+        
+        fieldValue += `\n\n*Incident Date: ${dateStr}*${entry.link ? ` • [View Full Details](${entry.link})` : ""}`;
+
+        // Ensure field value doesn't exceed Discord's 1024 character limit
+        if (fieldValue.length > 1024) {
+          fieldValue = fieldValue.substring(0, 1000) + "...\n\n*[Truncated - View full details on status page]*";
+          if (entry.link) {
+            fieldValue += ` • [View Full Details](${entry.link})`;
+          }
         }
 
         const fieldName = `${statusEmoji} ${entry.title}`;
-        const fieldValue = `**${statusType}** - ${latestUpdate}\n*${dateStr}*${entry.link ? ` • [View Details](${entry.link})` : ""}`;
 
         embed.addFields({
           name: fieldName,
