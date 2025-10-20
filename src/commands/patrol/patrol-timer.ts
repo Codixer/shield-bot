@@ -280,10 +280,27 @@ export class PatrolTimerCommands {
       },
     })
     month: string | undefined,
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral (staff/dev only)",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeralOption: boolean | undefined,
     interaction: CommandInteraction,
   ) {
     if (!interaction.guildId) return;
     const member = interaction.member as GuildMember;
+
+    // Check if user is staff
+    const isStaff = await userHasPermissionFromRoles(member, PermissionLevel.STAFF);
+
+    // Determine if response should be ephemeral
+    // Staff can control it, others always get ephemeral
+    let shouldBeEphemeral = true;
+    if (isStaff && ephemeralOption !== undefined) {
+      shouldBeEphemeral = ephemeralOption;
+    }
 
     // Determine target user
     let targetUserId = user?.id;
@@ -349,7 +366,7 @@ export class PatrolTimerCommands {
 
     await interaction.reply({
       content: `<@${targetUserId}> — ${msToReadable(total)} ${timeDescription}.`,
-      flags: MessageFlags.Ephemeral,
+      flags: shouldBeEphemeral ? MessageFlags.Ephemeral : undefined,
     });
   }
 
