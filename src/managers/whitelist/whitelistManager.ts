@@ -507,6 +507,7 @@ export class WhitelistManager {
             const urls = [
               `https://api.vrcshield.com/api/vrchat/${gid}/whitelist/encoded`,
               `https://api.vrcshield.com/api/vrchat/${gid}/whitelist/raw`,
+              `https://api.vrcshield.com/api/vrchat/whitelist/encoded`
             ];
             await purgeCloudflareCache(zoneId, apiToken, urls);
             console.log(`[Whitelist] Purged Cloudflare cache for guild ${gid}`);

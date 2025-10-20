@@ -7,6 +7,7 @@ import {
 import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
 import { getUserById } from "../../../../utility/vrchat.js";
+import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
 
 @Discord()
 export class VRChatVerifyManagerButtonHandler {
@@ -117,6 +118,16 @@ export class VRChatVerifyManagerButtonHandler {
         data: { accountType: "MAIN" },
       });
 
+      // Update whitelist after verification
+      try {
+        await whitelistManager.syncAndPublishAfterVerification(discordId);
+      } catch (error) {
+        console.error(
+          `[Verification Manager] Failed to sync whitelist for ${discordId}:`,
+          error,
+        );
+      }
+
       // Get user info for display
       let userInfo = null;
       try {
@@ -175,6 +186,16 @@ export class VRChatVerifyManagerButtonHandler {
         where: { id: vrchatAccount.id },
         data: { accountType: "ALT" },
       });
+
+      // Update whitelist after verification
+      try {
+        await whitelistManager.syncAndPublishAfterVerification(discordId);
+      } catch (error) {
+        console.error(
+          `[Verification Manager] Failed to sync whitelist for ${discordId}:`,
+          error,
+        );
+      }
 
       // Get user info for display
       let userInfo = null;
