@@ -49,7 +49,20 @@ export function startVRChatWebSocketListener() {
   let ws: WebSocket | null = null;
   let reconnectTimeout: NodeJS.Timeout | null = null;
   let shouldReconnect = true;
-  const reconnectDelay = 5000; // 5 seconds
+  let reconnectAttempts = 0;
+  let baseReconnectDelay = 5000; // 5 seconds
+  let maxReconnectDelay = 15 * 60 * 1000; // 15 minutes
+  let maintenanceMode = false;
+
+  function getReconnectDelay(): number {
+    if (maintenanceMode) {
+      return maxReconnectDelay; // 15 minutes during maintenance
+    }
+    
+    // Exponential backoff: 5s, 10s, 20s, 40s, 80s, then cap at 15 minutes
+    const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttempts), maxReconnectDelay);
+    return delay;
+  }
 
   function connect() {
     ws = new WebSocket(wsUrl, {
@@ -60,6 +73,9 @@ export function startVRChatWebSocketListener() {
 
     ws.on("open", () => {
       console.log("[WS] Connected to VRChat WebSocket");
+      // Reset reconnection state on successful connection
+      reconnectAttempts = 0;
+      maintenanceMode = false;
     });
 
     ws.on("message", async (data) => {
@@ -186,23 +202,46 @@ export function startVRChatWebSocketListener() {
 
     ws.on("close", (code, reason) => {
       console.warn(`[WS] VRChat WebSocket closed: ${code} ${reason}`);
+      
+      // Check if this is a maintenance-related closure
+      if (code === 1006 && maintenanceMode) {
+        console.log("[WS] Detected maintenance mode, using extended retry delay");
+      }
+      
       if (shouldReconnect && !reconnectTimeout) {
+        const delay = getReconnectDelay();
+        reconnectAttempts++;
+        
+        console.log(`[WS] Scheduling reconnection attempt ${reconnectAttempts} in ${delay / 1000}s ${maintenanceMode ? '(maintenance mode)' : ''}`);
+        
         reconnectTimeout = setTimeout(() => {
           reconnectTimeout = null;
           console.log("[WS] Reconnecting to VRChat WebSocket...");
           connect();
-        }, reconnectDelay);
+        }, delay);
       }
     });
 
     ws.on("error", (err) => {
       console.error("[WS] VRChat WebSocket error:", err);
+      
+      // Check if this is a 503 (Service Unavailable) error indicating maintenance
+      if (err.message && (err.message.includes("503") || err.message.includes("Unexpected server response: 503"))) {
+        console.log("[WS] Detected 503 error - VRChat appears to be in maintenance mode");
+        maintenanceMode = true;
+      }
+      
       if (shouldReconnect && !reconnectTimeout) {
+        const delay = getReconnectDelay();
+        reconnectAttempts++;
+        
+        console.log(`[WS] Scheduling reconnection attempt ${reconnectAttempts} in ${delay / 1000}s after error ${maintenanceMode ? '(maintenance mode)' : ''}`);
+        
         reconnectTimeout = setTimeout(() => {
           reconnectTimeout = null;
           console.log("[WS] Reconnecting to VRChat WebSocket after error...");
           connect();
-        }, reconnectDelay);
+        }, delay);
       }
     });
   }
