@@ -60,7 +60,7 @@ export class VRChatAvatarInviteButtonHandler {
       // Create instance
       const instance = await createInstance({
         worldId,
-        type: "friends",
+        type: "hidden",
         region: "us",
       });
 

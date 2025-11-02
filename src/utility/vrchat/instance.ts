@@ -1,5 +1,6 @@
 import { loadCookie, USER_AGENT } from "./index.js";
 import fetch from "node-fetch";
+import { getCurrentUser } from "./user.js";
 
 export async function createInstance({
   worldId,
@@ -23,8 +24,18 @@ export async function createInstance({
     region,
   };
 
-  if (ownerId && type !== "public") {
-    body.ownerId = ownerId;
+  // For non-public instances, ownerId is required
+  if (type !== "public") {
+    if (!ownerId) {
+      // Get the bot's own user ID if not provided
+      const currentUser = await getCurrentUser();
+      if (!currentUser || !currentUser.id) {
+        throw new Error("Failed to get current user ID for instance creation");
+      }
+      body.ownerId = currentUser.id;
+    } else {
+      body.ownerId = ownerId;
+    }
   }
 
   const response = await fetch(url, {
