@@ -7,11 +7,13 @@ export async function createInstance({
   type = "friends",
   region = "us",
   ownerId,
+  canRequestInvite = false,
 }: {
   worldId: string;
   type?: "public" | "hidden" | "friends" | "private" | "group";
   region?: "us" | "use" | "eu" | "jp";
   ownerId?: string;
+  canRequestInvite?: boolean;
 }) {
   const cookie = loadCookie();
   if (!cookie) throw new Error("Not authenticated. Please log in first.");
@@ -22,6 +24,7 @@ export async function createInstance({
     worldId,
     type,
     region,
+    canRequestInvite,
   };
 
   // For non-public instances, ownerId is required
