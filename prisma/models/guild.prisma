@@ -14,6 +14,8 @@ model GuildSettings {
   devGuardRoleIds         Json? // Array of role IDs for dev guards
   // Whitelist settings
   whitelistLogChannelId   String? // Channel ID for whitelist verification and modification logs
+  // VRChat instance settings
+  avatarWorldId           String? // VRChat world ID for avatar world invites (e.g., wrld_xxx)
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 }

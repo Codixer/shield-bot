@@ -28,3 +28,5 @@ export function loadCookie(): string | null {
   }
   return null;
 }
+
+export * from "./instance.js";
