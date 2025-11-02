@@ -67,20 +67,23 @@ export class VRChatAvatarInviteCommand {
     }
 
     const embed = new EmbedBuilder()
-      .setTitle("🌍 Request Avatar World Invite")
+      .setTitle("🌍 S.H.I.E.L.D. Avatar World Access")
       .setDescription(
-        `Click the button below to request an invite to this avatar world.\n\n` +
-        `**Requirements:**\n` +
+        `**For those who have just passed their cadet training!**\n\n` +
+        `You can now access our avatar world by clicking the button below to receive an invite.\n\n` +
+        `**⚠️ Important Rules:**\n` +
+        `• **Never** share or invite people who are not part of S.H.I.E.L.D.\n` +
+        `• **Never** give avatars away through cloning - turn cloning off!\n` +
+        `• The bot will open an **Invite Only** instance, make sure your status is 🟡 so people don't try joining you and the bot can invite you.\n\n` +
+        `**Requirements to use this button:**\n` +
         `• You must be verified with the bot (run \`/verify account\` in ${channel})\n` +
-        `• You must be friends with the bot on VRChat\n\n` +
-        `Once you meet these requirements, the bot will create an instance and send you an invite!`
+        `• You must be friends with the bot on VRChat`
       )
-      .setColor(Colors.Blue)
-      .setFooter({ text: "S.H.I.E.L.D. Bot - Instance System" });
+      .setColor(Colors.Blue);
 
     const button = new ButtonBuilder()
       .setCustomId(`avatar-invite-join:${guildSettings.avatarWorldId}`)
-      .setLabel("Request Invite to Avatar World")
+      .setLabel("Get Avatar World Invite")
       .setStyle(ButtonStyle.Primary)
       .setEmoji("🎭");
 

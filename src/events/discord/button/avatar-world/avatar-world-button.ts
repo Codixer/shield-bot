@@ -57,6 +57,25 @@ export class VRChatAvatarInviteButtonHandler {
         return;
       }
 
+      // Check if user's status is "ask me" (orange/invite me)
+      if (vrcUser.status !== "ask me") {
+        const statusEmoji = {
+          "active": "🟢",
+          "join me": "🟢", 
+          "ask me": "🟠",
+          "busy": "🔴",
+          "offline": "⚫"
+        }[vrcUser.status] || "❓";
+
+        await interaction.editReply({
+          content:
+            `❌ Your VRChat status must be set to **Ask Me** (🟠) to receive an invite.\n\n` +
+            `Your current status: **${vrcUser.status}** ${statusEmoji}\n\n` +
+            `Please change your status to "Ask Me" in VRChat and try again.`,
+        });
+        return;
+      }
+
       // Create instance
       const instance = await createInstance({
         worldId,
