@@ -519,130 +519,6 @@ export class PatrolTimerCommands {
   }
 
   @Slash({
-    name: "pause",
-    description: "Pause time tracking for a user or entire guild (staff only)",
-  })
-  @Guard(StaffGuard)
-  async pause(
-    @SlashOption({
-      name: "scope",
-      description: "Pause for entire guild or specific user",
-      type: ApplicationCommandOptionType.String,
-      required: true,
-    })
-    @SlashChoice({ name: "Guild", value: "guild" })
-    @SlashChoice({ name: "User", value: "user" })
-    scope: string,
-    @SlashOption({
-      name: "user",
-      description: "User to pause (required if scope is 'user')",
-      type: ApplicationCommandOptionType.User,
-      required: false,
-    })
-    user: User | undefined,
-    @SlashOption({
-      name: "ephemeral",
-      description: "Whether the response should be ephemeral",
-      type: ApplicationCommandOptionType.Boolean,
-      required: false,
-    })
-    ephemeral: boolean = true,
-    interaction: CommandInteraction,
-  ) {
-    if (!interaction.guildId) return;
-
-    if (scope === "guild") {
-      const success = await patrolTimer.pauseGuild(interaction.guildId);
-      if (!success) {
-        await interaction.reply({
-          content: "❌ Cannot pause guild time tracking while users have active timers. Please wait for all users to leave tracked voice channels first.",
-          flags: MessageFlags.Ephemeral,
-        });
-        return;
-      }
-      await interaction.reply({
-        content: "⏸️ Patrol time tracking paused for the entire guild. Time will not accumulate until unpaused.",
-        flags: ephemeral ? MessageFlags.Ephemeral : undefined,
-      });
-    } else if (scope === "user") {
-      if (!user) {
-        await interaction.reply({
-          content: "You must specify a user when pausing for a specific user.",
-          flags: MessageFlags.Ephemeral,
-        });
-        return;
-      }
-      const success = await patrolTimer.pauseUser(interaction.guildId, user.id);
-      if (!success) {
-        await interaction.reply({
-          content: `❌ Cannot pause time tracking for <@${user.id}> while they have an active timer. Please wait for them to leave the tracked voice channel first.`,
-          flags: MessageFlags.Ephemeral,
-        });
-        return;
-      }
-      await interaction.reply({
-        content: `⏸️ Patrol time tracking paused for <@${user.id}>. Their time will not accumulate until unpaused.`,
-        flags: ephemeral ? MessageFlags.Ephemeral : undefined,
-      });
-    }
-  }
-
-  @Slash({
-    name: "unpause",
-    description: "Resume time tracking for a user or entire guild (staff only)",
-  })
-  @Guard(StaffGuard)
-  async unpause(
-    @SlashOption({
-      name: "scope",
-      description: "Unpause for entire guild or specific user",
-      type: ApplicationCommandOptionType.String,
-      required: true,
-    })
-    @SlashChoice({ name: "Guild", value: "guild" })
-    @SlashChoice({ name: "User", value: "user" })
-    scope: string,
-    @SlashOption({
-      name: "user",
-      description: "User to unpause (required if scope is 'user')",
-      type: ApplicationCommandOptionType.User,
-      required: false,
-    })
-    user: User | undefined,
-    @SlashOption({
-      name: "ephemeral",
-      description: "Whether the response should be ephemeral",
-      type: ApplicationCommandOptionType.Boolean,
-      required: false,
-    })
-    ephemeral: boolean = true,
-    interaction: CommandInteraction,
-  ) {
-    if (!interaction.guildId) return;
-
-    if (scope === "guild") {
-      await patrolTimer.unpauseGuild(interaction.guildId);
-      await interaction.reply({
-        content: "▶️ Patrol time tracking resumed for the entire guild.",
-        flags: ephemeral ? MessageFlags.Ephemeral : undefined,
-      });
-    } else if (scope === "user") {
-      if (!user) {
-        await interaction.reply({
-          content: "You must specify a user when unpausing for a specific user.",
-          flags: MessageFlags.Ephemeral,
-        });
-        return;
-      }
-      await patrolTimer.unpauseUser(interaction.guildId, user.id);
-      await interaction.reply({
-        content: `▶️ Patrol time tracking resumed for <@${user.id}>.`,
-        flags: ephemeral ? MessageFlags.Ephemeral : undefined,
-      });
-    }
-  }
-
-  @Slash({
     name: "adjust",
     description: "Add or subtract time for a specific user (staff only)",
   })
@@ -662,6 +538,32 @@ export class PatrolTimerCommands {
       required: true,
     })
     time: string,
+    @SlashOption({
+      name: "year",
+      description: "Year to adjust (defaults to current year)",
+      type: ApplicationCommandOptionType.String,
+      required: false,
+      autocomplete: function (
+        this: PatrolTimerCommands,
+        interaction: AutocompleteInteraction,
+      ) {
+        return this.autocompleteYear(interaction);
+      },
+    })
+    year: string | undefined,
+    @SlashOption({
+      name: "month",
+      description: "Month to adjust (defaults to current month)",
+      type: ApplicationCommandOptionType.String,
+      required: false,
+      autocomplete: function (
+        this: PatrolTimerCommands,
+        interaction: AutocompleteInteraction,
+      ) {
+        return this.autocompleteMonth(interaction);
+      },
+    })
+    month: string | undefined,
     @SlashOption({
       name: "ephemeral",
       description: "Whether the response should be ephemeral",
@@ -694,13 +596,168 @@ export class PatrolTimerCommands {
       return;
     }
 
-    await patrolTimer.adjustUserTime(interaction.guildId, user.id, totalMs);
+    // Determine year and month
+    const now = new Date();
+    const targetYear = year ? parseInt(year) : now.getUTCFullYear();
+    const targetMonth = month ? parseInt(month) : now.getUTCMonth() + 1;
+
+    // Validate month
+    if (month && !(targetMonth >= 1 && targetMonth <= 12)) {
+      await interaction.reply({
+        content: "❌ Invalid month. Must be between 1 and 12.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    await patrolTimer.adjustUserTime(interaction.guildId, user.id, totalMs, targetYear, targetMonth);
 
     const action = totalMs > 0 ? "Added" : "Subtracted";
     const absMs = Math.abs(totalMs);
+    const timeStr = `${MONTH_NAMES[targetMonth - 1]} ${targetYear}`;
     
     await interaction.reply({
-      content: `${action} ${msToReadable(absMs)} ${totalMs > 0 ? "to" : "from"} <@${user.id}>'s patrol time.`,
+      content: `${action} ${msToReadable(absMs)} ${totalMs > 0 ? "to" : "from"} <@${user.id}>'s patrol time for ${timeStr}.`,
+      flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+    });
+  }
+}
+
+@Discord()
+@SlashGroup({
+  name: "pause",
+  description: "Pause patrol time tracking",
+  root: "patrol",
+})
+@SlashGroup("pause", "patrol")
+@Guard(StaffGuard)
+export class PatrolPauseCommands {
+  @Slash({
+    name: "guild",
+    description: "Pause time tracking for the entire guild",
+  })
+  async guild(
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeral: boolean = true,
+    interaction: CommandInteraction,
+  ) {
+    if (!interaction.guildId) return;
+
+    const success = await patrolTimer.pauseGuild(interaction.guildId);
+    if (!success) {
+      await interaction.reply({
+        content: "❌ Cannot pause guild time tracking while users have active timers. Please wait for all users to leave tracked voice channels first.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    await interaction.reply({
+      content: "⏸️ Patrol time tracking paused for the entire guild. Time will not accumulate until unpaused.",
+      flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+    });
+  }
+
+  @Slash({
+    name: "user",
+    description: "Pause time tracking for a specific user",
+  })
+  async user(
+    @SlashOption({
+      name: "user",
+      description: "User to pause",
+      type: ApplicationCommandOptionType.User,
+      required: true,
+    })
+    user: User,
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeral: boolean = true,
+    interaction: CommandInteraction,
+  ) {
+    if (!interaction.guildId) return;
+
+    const success = await patrolTimer.pauseUser(interaction.guildId, user.id);
+    if (!success) {
+      await interaction.reply({
+        content: `❌ Cannot pause time tracking for <@${user.id}> while they have an active timer. Please wait for them to leave the tracked voice channel first.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    await interaction.reply({
+      content: `⏸️ Patrol time tracking paused for <@${user.id}>. Their time will not accumulate until unpaused.`,
+      flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+    });
+  }
+}
+
+@Discord()
+@SlashGroup({
+  name: "unpause",
+  description: "Resume patrol time tracking",
+  root: "patrol",
+})
+@SlashGroup("unpause", "patrol")
+@Guard(StaffGuard)
+export class PatrolUnpauseCommands {
+  @Slash({
+    name: "guild",
+    description: "Resume time tracking for the entire guild",
+  })
+  async guild(
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeral: boolean = true,
+    interaction: CommandInteraction,
+  ) {
+    if (!interaction.guildId) return;
+
+    await patrolTimer.unpauseGuild(interaction.guildId);
+    await interaction.reply({
+      content: "▶️ Patrol time tracking resumed for the entire guild.",
+      flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+    });
+  }
+
+  @Slash({
+    name: "user",
+    description: "Resume time tracking for a specific user",
+  })
+  async user(
+    @SlashOption({
+      name: "user",
+      description: "User to unpause",
+      type: ApplicationCommandOptionType.User,
+      required: true,
+    })
+    user: User,
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeral: boolean = true,
+    interaction: CommandInteraction,
+  ) {
+    if (!interaction.guildId) return;
+
+    await patrolTimer.unpauseUser(interaction.guildId, user.id);
+    await interaction.reply({
+      content: `▶️ Patrol time tracking resumed for <@${user.id}>.`,
       flags: ephemeral ? MessageFlags.Ephemeral : undefined,
     });
   }

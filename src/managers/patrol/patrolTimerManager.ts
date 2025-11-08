@@ -623,9 +623,19 @@ export class PatrolTimerManager {
 
   /**
    * Adjust time for a specific user (add or subtract milliseconds).
+   * @param guildId - Guild ID
+   * @param userId - User ID
+   * @param deltaMs - Milliseconds to add (positive) or subtract (negative)
+   * @param year - Year to adjust (defaults to current year)
+   * @param month - Month to adjust (defaults to current month)
    */
-  async adjustUserTime(guildId: string, userId: string, deltaMs: number) {
+  async adjustUserTime(guildId: string, userId: string, deltaMs: number, year?: number, month?: number) {
     await this.ensureUser(userId);
+    
+    // Determine target year and month
+    const now = new Date();
+    const targetYear = year ?? now.getUTCFullYear();
+    const targetMonth = month ?? (now.getUTCMonth() + 1);
     
     // Update all-time total
     const row = await (prisma as any).voicePatrolTime.findUnique({
@@ -641,22 +651,18 @@ export class PatrolTimerManager {
       create: { guildId, userId, totalMs: BigInt(newTotal) },
     });
 
-    // Also adjust current month's total
-    const now = new Date();
-    const year = now.getUTCFullYear();
-    const month = now.getUTCMonth() + 1;
-    
+    // Also adjust specified month's total
     const monthRow = await (prisma as any).voicePatrolMonthlyTime.findUnique({
-      where: { guildId_userId_year_month: { guildId, userId, year, month } },
+      where: { guildId_userId_year_month: { guildId, userId, year: targetYear, month: targetMonth } },
     });
     
     const currentMonthTotal = monthRow?.totalMs ? Number(monthRow.totalMs) : 0;
     const newMonthTotal = Math.max(0, currentMonthTotal + deltaMs);
     
     await (prisma as any).voicePatrolMonthlyTime.upsert({
-      where: { guildId_userId_year_month: { guildId, userId, year, month } },
+      where: { guildId_userId_year_month: { guildId, userId, year: targetYear, month: targetMonth } },
       update: { totalMs: BigInt(newMonthTotal) },
-      create: { guildId, userId, year, month, totalMs: BigInt(newMonthTotal) },
+      create: { guildId, userId, year: targetYear, month: targetMonth, totalMs: BigInt(newMonthTotal) },
     });
   }
 
