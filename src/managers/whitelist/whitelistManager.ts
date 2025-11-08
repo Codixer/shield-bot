@@ -1042,12 +1042,39 @@ export class WhitelistManager {
     // Now check if user has eligible Discord roles for full sync and publish
     try {
       let member: any = null;
+      
+      // First try cache across all guilds (no API calls)
       for (const guild of bot.guilds.cache.values()) {
-        try {
-          member = await guild.members.fetch(discordId);
-          if (member) break;
-        } catch {
-          // Not in this guild; continue searching
+        member = guild.members.cache.get(discordId);
+        if (member) break;
+      }
+
+      // If not in cache, try to fetch from verification guild or first guild
+      if (!member) {
+        // Check if any account has a verification guild ID
+        const verificationGuildId = user.vrchatAccounts.find(acc => acc.verificationGuildId)?.verificationGuildId;
+        
+        if (verificationGuildId) {
+          try {
+            const guild = await bot.guilds.fetch(verificationGuildId).catch(() => null);
+            if (guild) {
+              member = await guild.members.fetch(discordId).catch(() => null);
+            }
+          } catch {
+            // Failed to fetch from verification guild
+          }
+        }
+        
+        // Fallback to first guild if still not found
+        if (!member) {
+          const guild = bot.guilds.cache.first();
+          if (guild) {
+            try {
+              member = await guild.members.fetch(discordId).catch(() => null);
+            } catch {
+              // User not found
+            }
+          }
         }
       }
 
