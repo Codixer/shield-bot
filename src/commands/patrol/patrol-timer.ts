@@ -517,6 +517,193 @@ export class PatrolTimerCommands {
 
     await interaction.respond(choices.slice(0, 25));
   }
+
+  @Slash({
+    name: "pause",
+    description: "Pause time tracking for a user or entire guild (staff only)",
+  })
+  @Guard(StaffGuard)
+  async pause(
+    @SlashOption({
+      name: "scope",
+      description: "Pause for entire guild or specific user",
+      type: ApplicationCommandOptionType.String,
+      required: true,
+    })
+    @SlashChoice({ name: "Guild", value: "guild" })
+    @SlashChoice({ name: "User", value: "user" })
+    scope: string,
+    @SlashOption({
+      name: "user",
+      description: "User to pause (required if scope is 'user')",
+      type: ApplicationCommandOptionType.User,
+      required: false,
+    })
+    user: User | undefined,
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeral: boolean = true,
+    interaction: CommandInteraction,
+  ) {
+    if (!interaction.guildId) return;
+
+    if (scope === "guild") {
+      const success = await patrolTimer.pauseGuild(interaction.guildId);
+      if (!success) {
+        await interaction.reply({
+          content: "❌ Cannot pause guild time tracking while users have active timers. Please wait for all users to leave tracked voice channels first.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+      await interaction.reply({
+        content: "⏸️ Patrol time tracking paused for the entire guild. Time will not accumulate until unpaused.",
+        flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+      });
+    } else if (scope === "user") {
+      if (!user) {
+        await interaction.reply({
+          content: "You must specify a user when pausing for a specific user.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+      const success = await patrolTimer.pauseUser(interaction.guildId, user.id);
+      if (!success) {
+        await interaction.reply({
+          content: `❌ Cannot pause time tracking for <@${user.id}> while they have an active timer. Please wait for them to leave the tracked voice channel first.`,
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+      await interaction.reply({
+        content: `⏸️ Patrol time tracking paused for <@${user.id}>. Their time will not accumulate until unpaused.`,
+        flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+      });
+    }
+  }
+
+  @Slash({
+    name: "unpause",
+    description: "Resume time tracking for a user or entire guild (staff only)",
+  })
+  @Guard(StaffGuard)
+  async unpause(
+    @SlashOption({
+      name: "scope",
+      description: "Unpause for entire guild or specific user",
+      type: ApplicationCommandOptionType.String,
+      required: true,
+    })
+    @SlashChoice({ name: "Guild", value: "guild" })
+    @SlashChoice({ name: "User", value: "user" })
+    scope: string,
+    @SlashOption({
+      name: "user",
+      description: "User to unpause (required if scope is 'user')",
+      type: ApplicationCommandOptionType.User,
+      required: false,
+    })
+    user: User | undefined,
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeral: boolean = true,
+    interaction: CommandInteraction,
+  ) {
+    if (!interaction.guildId) return;
+
+    if (scope === "guild") {
+      await patrolTimer.unpauseGuild(interaction.guildId);
+      await interaction.reply({
+        content: "▶️ Patrol time tracking resumed for the entire guild.",
+        flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+      });
+    } else if (scope === "user") {
+      if (!user) {
+        await interaction.reply({
+          content: "You must specify a user when unpausing for a specific user.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+      await patrolTimer.unpauseUser(interaction.guildId, user.id);
+      await interaction.reply({
+        content: `▶️ Patrol time tracking resumed for <@${user.id}>.`,
+        flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+      });
+    }
+  }
+
+  @Slash({
+    name: "adjust",
+    description: "Add or subtract time for a specific user (staff only)",
+  })
+  @Guard(StaffGuard)
+  async adjust(
+    @SlashOption({
+      name: "user",
+      description: "User to adjust time for",
+      type: ApplicationCommandOptionType.User,
+      required: true,
+    })
+    user: User,
+    @SlashOption({
+      name: "time",
+      description: "Time to adjust (e.g., +1h30m, -2h15m30s, +45m)",
+      type: ApplicationCommandOptionType.String,
+      required: true,
+    })
+    time: string,
+    @SlashOption({
+      name: "ephemeral",
+      description: "Whether the response should be ephemeral",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    ephemeral: boolean = true,
+    interaction: CommandInteraction,
+  ) {
+    if (!interaction.guildId) return;
+
+    // Parse the time string
+    const parseResult = parseTimeString(time);
+    
+    if (!parseResult.valid) {
+      await interaction.reply({
+        content: `❌ Invalid time format. Use format like: +1h30m, -2h15m30s, +45m\n\nSupported units: h (hours), m (minutes), s (seconds)\nExamples:\n• \`+1h\` - Add 1 hour\n• \`-30m\` - Subtract 30 minutes\n• \`+1h30m45s\` - Add 1 hour, 30 minutes, 45 seconds`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    const totalMs = parseResult.milliseconds;
+
+    if (totalMs === 0) {
+      await interaction.reply({
+        content: "❌ Time adjustment must be non-zero.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    await patrolTimer.adjustUserTime(interaction.guildId, user.id, totalMs);
+
+    const action = totalMs > 0 ? "Added" : "Subtracted";
+    const absMs = Math.abs(totalMs);
+    
+    await interaction.reply({
+      content: `${action} ${msToReadable(absMs)} ${totalMs > 0 ? "to" : "from"} <@${user.id}>'s patrol time.`,
+      flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+    });
+  }
 }
 
 function msToReadable(ms: number) {
@@ -531,4 +718,81 @@ function msToReadable(ms: number) {
   if (minutes) parts.push(`${minutes}m`);
   if (seconds || parts.length === 0) parts.push(`${seconds}s`);
   return parts.join(" ");
+}
+
+/**
+ * Parse a time string in format: +/-1h2m30s
+ * Returns object with valid flag and milliseconds value
+ */
+function parseTimeString(input: string): { valid: boolean; milliseconds: number } {
+  // Trim whitespace
+  const str = input.trim();
+  
+  if (str.length === 0) {
+    return { valid: false, milliseconds: 0 };
+  }
+
+  // Check for leading +/- sign
+  const isNegative = str[0] === '-';
+  const isPositive = str[0] === '+';
+  
+  if (!isNegative && !isPositive) {
+    return { valid: false, milliseconds: 0 };
+  }
+
+  // Remove the sign
+  const timeStr = str.slice(1);
+  
+  if (timeStr.length === 0) {
+    return { valid: false, milliseconds: 0 };
+  }
+
+  // Regex to match time components: 1h, 30m, 45s
+  const pattern = /(\d+(?:\.\d+)?)(h|m|s)/g;
+  const matches = [...timeStr.matchAll(pattern)];
+  
+  if (matches.length === 0) {
+    return { valid: false, milliseconds: 0 };
+  }
+
+  // Check if the entire string was matched (no invalid characters)
+  const matchedStr = matches.map(m => m[0]).join('');
+  if (matchedStr !== timeStr) {
+    return { valid: false, milliseconds: 0 };
+  }
+
+  let totalSeconds = 0;
+  const seen = new Set<string>();
+
+  for (const match of matches) {
+    const value = parseFloat(match[1]);
+    const unit = match[2];
+
+    // Check for duplicate units
+    if (seen.has(unit)) {
+      return { valid: false, milliseconds: 0 };
+    }
+    seen.add(unit);
+
+    // Check for invalid values
+    if (isNaN(value) || value < 0) {
+      return { valid: false, milliseconds: 0 };
+    }
+
+    switch (unit) {
+      case 'h':
+        totalSeconds += value * 3600;
+        break;
+      case 'm':
+        totalSeconds += value * 60;
+        break;
+      case 's':
+        totalSeconds += value;
+        break;
+    }
+  }
+
+  const milliseconds = totalSeconds * 1000 * (isNegative ? -1 : 1);
+  
+  return { valid: true, milliseconds };
 }

@@ -18,6 +18,10 @@ export class PatrolTimerManager {
   private client: Client;
   // guildId => Map<userId, TrackedUser>
   private tracked: Map<string, Map<string, TrackedUser>> = new Map();
+  // guildId => Set<userId> for paused users
+  private pausedUsers: Map<string, Set<string>> = new Map();
+  // guildId => boolean for guild-wide pause
+  private pausedGuilds: Set<string> = new Set();
 
   constructor(client: Client) {
     this.client = client;
@@ -190,10 +194,25 @@ export class PatrolTimerManager {
     if (!guildMap) return;
     const tracked = guildMap.get(member.id);
     if (!tracked) return;
+    
+    guildMap.delete(member.id);
+    
+    // Don't persist time if user is paused
+    if (this.isUserPaused(guildId, member.id)) {
+      // Delete persisted session
+      await (prisma as any).activeVoicePatrolSession
+        .deleteMany({
+          where: { guildId, userId: member.id },
+        })
+        .catch((err: any) =>
+          console.error("[PatrolTimer] Failed to delete session:", err),
+        );
+      return;
+    }
+    
     // If switching channels within same category, we still finalize from old channel
     const nowMs = Date.now();
     const delta = nowMs - tracked.startedAt.getTime();
-    guildMap.delete(member.id);
     if (delta < 3000) return; // ignore very short joins; parity with original impl
     // Delete persisted session
     await (prisma as any).activeVoicePatrolSession
@@ -279,10 +298,14 @@ export class PatrolTimerManager {
     const now = Date.now();
     const arr: Array<{ userId: string; ms: number; channelId: string }> = [];
     for (const tu of guildMap.values()) {
+      // Show 0ms if paused
+      const ms = this.isUserPaused(guildId, tu.userId) 
+        ? 0 
+        : now - tu.startedAt.getTime();
       arr.push({
         userId: tu.userId,
         channelId: tu.channelId,
-        ms: now - tu.startedAt.getTime(),
+        ms,
       });
     }
     return arr;
@@ -305,8 +328,11 @@ export class PatrolTimerManager {
     }
     if (guildMap) {
       for (const tu of guildMap.values()) {
-        const delta = now - tu.startedAt.getTime();
-        if (delta > 0) byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+        // Only add delta if user is not paused
+        if (!this.isUserPaused(guildId, tu.userId)) {
+          const delta = now - tu.startedAt.getTime();
+          if (delta > 0) byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+        }
       }
     }
 
@@ -357,9 +383,12 @@ export class PatrolTimerManager {
 
     if (guildMap) {
       for (const tu of guildMap.values()) {
-        const startMs = Math.max(tu.startedAt.getTime(), monthStart);
-        const delta = Math.max(0, nowMs - startMs);
-        if (delta > 0) byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+        // Only add delta if user is not paused
+        if (!this.isUserPaused(guildId, tu.userId)) {
+          const startMs = Math.max(tu.startedAt.getTime(), monthStart);
+          const delta = Math.max(0, nowMs - startMs);
+          if (delta > 0) byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+        }
       }
     }
 
@@ -385,11 +414,11 @@ export class PatrolTimerManager {
     });
     let base = row?.totalMs ? Number(row.totalMs) : 0;
 
-    // Add live delta for current month if user is currently tracked
+    // Add live delta for current month if user is currently tracked and not paused
     const now = new Date();
     const isCurrentMonth =
       now.getUTCFullYear() === year && now.getUTCMonth() + 1 === month;
-    if (isCurrentMonth) {
+    if (isCurrentMonth && !this.isUserPaused(guildId, userId)) {
       const guildMap = this.tracked.get(guildId);
       const tu = guildMap?.get(userId);
       if (tu) {
@@ -427,8 +456,11 @@ export class PatrolTimerManager {
       for (const tu of guildMap.values()) {
         if (tu.channelId !== channelId) continue; // only add deltas for this channel
         if (!ids.includes(tu.userId)) continue;
-        const delta = now - tu.startedAt.getTime();
-        if (delta > 0) byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+        // Only add delta if user is not paused
+        if (!this.isUserPaused(guild.id, tu.userId)) {
+          const delta = now - tu.startedAt.getTime();
+          if (delta > 0) byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+        }
       }
     }
 
@@ -491,14 +523,141 @@ export class PatrolTimerManager {
       where: { guildId_userId: { guildId, userId } },
     });
     let base = row?.totalMs ? Number(row.totalMs) : 0;
-    // Add live delta
-    const guildMap = this.tracked.get(guildId);
-    const tu = guildMap?.get(userId);
-    if (tu) {
-      const delta = Date.now() - tu.startedAt.getTime();
-      base += delta;
+    // Add live delta if user is not paused
+    if (!this.isUserPaused(guildId, userId)) {
+      const guildMap = this.tracked.get(guildId);
+      const tu = guildMap?.get(userId);
+      if (tu) {
+        const delta = Date.now() - tu.startedAt.getTime();
+        base += delta;
+      }
     }
     return base;
+  }
+
+  /**
+   * Pause time tracking for a specific user.
+   * Persists their current time and prevents further accumulation.
+   * Returns true if successful, false if user has active timer.
+   */
+  async pauseUser(guildId: string, userId: string): Promise<boolean> {
+    // Check if user is currently tracked (active timer)
+    const guildMap = this.tracked.get(guildId);
+    const tracked = guildMap?.get(userId);
+    if (tracked) {
+      return false; // Cannot pause while user has active timer
+    }
+
+    // Add to paused set
+    if (!this.pausedUsers.has(guildId)) {
+      this.pausedUsers.set(guildId, new Set());
+    }
+    this.pausedUsers.get(guildId)!.add(userId);
+    
+    return true;
+  }
+
+  /**
+   * Unpause time tracking for a specific user.
+   */
+  async unpauseUser(guildId: string, userId: string) {
+    const paused = this.pausedUsers.get(guildId);
+    if (paused) {
+      paused.delete(userId);
+    }
+
+    // Reset their start time if they're currently tracked
+    const guildMap = this.tracked.get(guildId);
+    const tracked = guildMap?.get(userId);
+    if (tracked) {
+      tracked.startedAt = new Date();
+    }
+  }
+
+  /**
+   * Pause time tracking for all users in the guild.
+   * Returns true if successful, false if any users have active timers.
+   */
+  async pauseGuild(guildId: string): Promise<boolean> {
+    // Check if any users are currently tracked (have active timers)
+    const guildMap = this.tracked.get(guildId);
+    if (guildMap && guildMap.size > 0) {
+      return false; // Cannot pause guild while users have active timers
+    }
+
+    this.pausedGuilds.add(guildId);
+    return true;
+  }
+
+  /**
+   * Unpause time tracking for all users in the guild.
+   */
+  async unpauseGuild(guildId: string) {
+    this.pausedGuilds.delete(guildId);
+
+    // Reset start times for all currently tracked users
+    const guildMap = this.tracked.get(guildId);
+    if (guildMap) {
+      const now = new Date();
+      for (const tracked of guildMap.values()) {
+        tracked.startedAt = now;
+      }
+    }
+  }
+
+  /**
+   * Check if a user is paused (either individually or guild-wide).
+   */
+  isUserPaused(guildId: string, userId: string): boolean {
+    if (this.pausedGuilds.has(guildId)) return true;
+    const paused = this.pausedUsers.get(guildId);
+    return paused ? paused.has(userId) : false;
+  }
+
+  /**
+   * Check if the entire guild is paused.
+   */
+  isGuildPaused(guildId: string): boolean {
+    return this.pausedGuilds.has(guildId);
+  }
+
+  /**
+   * Adjust time for a specific user (add or subtract milliseconds).
+   */
+  async adjustUserTime(guildId: string, userId: string, deltaMs: number) {
+    await this.ensureUser(userId);
+    
+    // Update all-time total
+    const row = await (prisma as any).voicePatrolTime.findUnique({
+      where: { guildId_userId: { guildId, userId } },
+    });
+    
+    const currentTotal = row?.totalMs ? Number(row.totalMs) : 0;
+    const newTotal = Math.max(0, currentTotal + deltaMs); // Don't go below 0
+    
+    await (prisma as any).voicePatrolTime.upsert({
+      where: { guildId_userId: { guildId, userId } },
+      update: { totalMs: BigInt(newTotal) },
+      create: { guildId, userId, totalMs: BigInt(newTotal) },
+    });
+
+    // Also adjust current month's total
+    const now = new Date();
+    const year = now.getUTCFullYear();
+    const month = now.getUTCMonth() + 1;
+    
+    const monthRow = await (prisma as any).voicePatrolMonthlyTime.findUnique({
+      where: { guildId_userId_year_month: { guildId, userId, year, month } },
+    });
+    
+    const currentMonthTotal = monthRow?.totalMs ? Number(monthRow.totalMs) : 0;
+    const newMonthTotal = Math.max(0, currentMonthTotal + deltaMs);
+    
+    await (prisma as any).voicePatrolMonthlyTime.upsert({
+      where: { guildId_userId_year_month: { guildId, userId, year, month } },
+      update: { totalMs: BigInt(newMonthTotal) },
+      create: { guildId, userId, year, month, totalMs: BigInt(newMonthTotal) },
+    });
   }
 
   /**
