@@ -99,6 +99,9 @@ export class PatrolTimerManager {
       guildId: string;
       patrolBotuserRoleId?: string | null;
       patrolChannelCategoryId?: string | null;
+      promotionChannelId?: string | null;
+      promotionMinHours?: number | null;
+      promotionRecruitRoleId?: string | null;
     };
   }
 
@@ -238,6 +241,9 @@ export class PatrolTimerManager {
       tracked.startedAt,
       new Date(nowMs),
     );
+
+    // Check for promotion eligibility
+    await this.checkPromotion(guildId, member);
   }
 
   /** Scan the guild's voice channels within the tracked category and resume tracking for present members. */
@@ -792,6 +798,68 @@ export class PatrolTimerManager {
       console.error("[PatrolTimer] ensureUser failed", e);
     }
   }
+
+  /**
+   * Check if a user is eligible for promotion and send notification if so.
+   */
+  private async checkPromotion(guildId: string, member: GuildMember) {
+    try {
+      const settings = await this.getSettings(guildId);
+      
+      // Check if promotion system is configured
+      if (!settings.promotionChannelId || !settings.promotionRecruitRoleId) {
+        return; // Promotion system not configured
+      }
+
+      // Check if user has the recruit role
+      if (!member.roles.cache.has(settings.promotionRecruitRoleId)) {
+        return; // User doesn't have recruit role
+      }
+
+      // Check if user has already been promoted (notification already sent)
+      const existingPromotion = await (prisma as any).voicePatrolPromotion.findUnique({
+        where: { guildId_userId: { guildId, userId: member.id } },
+      });
+      
+      if (existingPromotion) {
+        return; // Already promoted
+      }
+
+      const minHours = settings.promotionMinHours ?? 4;
+
+      // Get total patrol time in milliseconds
+      const totalTime = await this.getUserTotal(guildId, member.id);
+      const totalHours = totalTime / (1000 * 60 * 60);
+
+      // Check if user meets promotion criteria (only hours requirement)
+      if (totalHours >= minHours) {
+        // Get promotion channel
+        const channel = await member.guild.channels.fetch(settings.promotionChannelId);
+        if (!channel || !channel.isTextBased()) {
+          console.error(`[PatrolTimer] Promotion channel ${settings.promotionChannelId} not found or not a text channel`);
+          return;
+        }
+
+        // Send promotion notification
+        const message = `<@${member.id}>\nRecruit > Deputy\nAttended ${Math.floor(totalHours)}+ hours and been in 2+ patrols.`;
+        await channel.send(message);
+        
+        // Record the promotion to prevent duplicate notifications
+        await (prisma as any).voicePatrolPromotion.create({
+          data: {
+            guildId,
+            userId: member.id,
+            totalHours,
+          },
+        });
+        
+        console.log(`[PatrolTimer] Promotion notification sent for ${member.user.tag} (${totalHours.toFixed(2)}h)`);
+      }
+    } catch (err) {
+      console.error("[PatrolTimer] checkPromotion error:", err);
+    }
+  }
+
   private async persistMonthly(
     guildId: string,
     userId: string,
