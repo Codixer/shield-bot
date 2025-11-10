@@ -303,7 +303,7 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
       }
 
       // Send promotion notification with reactions
-      const message = `<@${user.id}>\nRecruit > Deputy\nAttended ${Math.floor(totalHours)}+ hours.`;
+      const message = `<@${user.id}>\nRecruit > Deputy\nAttended ${Math.floor(totalHours)}+ hours and been in 2+ patrols.`;
       const sentMessage = await channel.send(message);
       
       // Add reactions
