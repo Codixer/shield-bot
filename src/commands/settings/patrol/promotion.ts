@@ -6,8 +6,9 @@ import {
   Channel,
   Role,
   ChannelType,
+  User,
 } from "discord.js";
-import { prisma } from "../../../main.js";
+import { prisma, patrolTimer } from "../../../main.js";
 import { StaffGuard } from "../../../utility/guards.js";
 
 @Discord()
@@ -215,6 +216,229 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
       await interaction.reply({
         content: `ℹ️ <@${user.id}> has no promotion record to reset.`,
         flags: MessageFlags.Ephemeral,
+      });
+    }
+  }
+
+  @Slash({
+    name: "check",
+    description: "Manually check a user for promotion eligibility",
+  })
+  async check(
+    @SlashOption({
+      name: "user",
+      description: "User to check for promotion",
+      type: ApplicationCommandOptionType.User,
+      required: true,
+    })
+    user: User,
+    interaction: CommandInteraction,
+  ) {
+    if (!interaction.guildId || !interaction.guild) return;
+
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    try {
+      // Get settings
+      const settings = await prisma.guildSettings.findUnique({
+        where: { guildId: interaction.guildId },
+      });
+
+      if (!settings?.promotionChannelId || !settings?.promotionRecruitRoleId) {
+        await interaction.editReply({
+          content: "❌ Promotion system is not fully configured. Set both channel and role to enable.",
+        });
+        return;
+      }
+
+      // Get member
+      const member = await interaction.guild.members.fetch(user.id);
+      if (!member) {
+        await interaction.editReply({
+          content: "❌ User not found in this server.",
+        });
+        return;
+      }
+
+      // Check if user has recruit role
+      if (!member.roles.cache.has(settings.promotionRecruitRoleId)) {
+        await interaction.editReply({
+          content: `❌ <@${user.id}> does not have the recruit role (<@&${settings.promotionRecruitRoleId}>).`,
+        });
+        return;
+      }
+
+      // Check if already promoted
+      const existingPromotion = await (prisma as any).voicePatrolPromotion.findUnique({
+        where: { guildId_userId: { guildId: interaction.guildId, userId: user.id } },
+      });
+
+      if (existingPromotion) {
+        await interaction.editReply({
+          content: `ℹ️ <@${user.id}> has already been promoted (notified on <t:${Math.floor(existingPromotion.notifiedAt.getTime() / 1000)}:F>).`,
+        });
+        return;
+      }
+
+      // Get total hours
+      const minHours = settings.promotionMinHours ?? 4;
+      const totalTime = await patrolTimer.getUserTotal(interaction.guildId, user.id);
+      const totalHours = totalTime / (1000 * 60 * 60);
+
+      // Check if meets criteria
+      if (totalHours < minHours) {
+        await interaction.editReply({
+          content: `❌ <@${user.id}> does not meet the minimum hours requirement.\n**Current:** ${totalHours.toFixed(2)} hours\n**Required:** ${minHours} hours`,
+        });
+        return;
+      }
+
+      // Get promotion channel
+      const channel = await interaction.guild.channels.fetch(settings.promotionChannelId);
+      if (!channel || !channel.isTextBased()) {
+        await interaction.editReply({
+          content: `❌ Promotion channel <#${settings.promotionChannelId}> not found or is not a text channel.`,
+        });
+        return;
+      }
+
+      // Send promotion notification with reactions
+      const message = `<@${user.id}>\nRecruit > Deputy\nAttended ${Math.floor(totalHours)}+ hours.`;
+      const sentMessage = await channel.send(message);
+      
+      // Add reactions
+      await sentMessage.react('✅');
+      await sentMessage.react('❌');
+
+      // Record the promotion
+      await (prisma as any).voicePatrolPromotion.create({
+        data: {
+          guildId: interaction.guildId,
+          userId: user.id,
+          totalHours,
+        },
+      });
+
+      await interaction.editReply({
+        content: `✅ Promotion notification sent for <@${user.id}> in <#${settings.promotionChannelId}> (${totalHours.toFixed(2)} hours).`,
+      });
+
+      console.log(`[PatrolTimer] Manual promotion check for ${user.tag} by ${interaction.user.tag} (${totalHours.toFixed(2)}h)`);
+    } catch (err) {
+      console.error("[PatrolTimer] Manual promotion check error:", err);
+      await interaction.editReply({
+        content: "❌ An error occurred while checking for promotion. Please check the logs.",
+      });
+    }
+  }
+
+  @Slash({
+    name: "check-all",
+    description: "Check all users with recruit role for promotion eligibility",
+  })
+  async checkAll(interaction: CommandInteraction) {
+    if (!interaction.guildId || !interaction.guild) return;
+
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    try {
+      // Get settings
+      const settings = await prisma.guildSettings.findUnique({
+        where: { guildId: interaction.guildId },
+      });
+
+      if (!settings?.promotionChannelId || !settings?.promotionRecruitRoleId) {
+        await interaction.editReply({
+          content: "❌ Promotion system is not fully configured. Set both channel and role to enable.",
+        });
+        return;
+      }
+
+      const minHours = settings.promotionMinHours ?? 4;
+
+      // Get promotion channel
+      const channel = await interaction.guild.channels.fetch(settings.promotionChannelId);
+      if (!channel || !channel.isTextBased()) {
+        await interaction.editReply({
+          content: `❌ Promotion channel <#${settings.promotionChannelId}> not found or is not a text channel.`,
+        });
+        return;
+      }
+
+      // Get all members with the recruit role
+      const role = await interaction.guild.roles.fetch(settings.promotionRecruitRoleId);
+      if (!role) {
+        await interaction.editReply({
+          content: `❌ Recruit role <@&${settings.promotionRecruitRoleId}> not found.`,
+        });
+        return;
+      }
+
+      // Fetch all members to ensure we have the full list
+      await interaction.guild.members.fetch();
+
+      const recruits = role.members;
+      if (recruits.size === 0) {
+        await interaction.editReply({
+          content: `ℹ️ No users currently have the recruit role (<@&${settings.promotionRecruitRoleId}>).`,
+        });
+        return;
+      }
+
+      // Get all existing promotions
+      const existingPromotions = await (prisma as any).voicePatrolPromotion.findMany({
+        where: { guildId: interaction.guildId },
+      });
+      const promotedUserIds = new Set(existingPromotions.map((p: any) => p.userId));
+
+      // Check each recruit
+      const eligible: Array<{ userId: string; hours: number }> = [];
+      const ineligible: Array<{ userId: string; hours: number }> = [];
+      const alreadyPromoted: string[] = [];
+
+      for (const [userId, member] of recruits) {
+        // Skip bots
+        if (member.user.bot) continue;
+
+        // Check if already promoted
+        if (promotedUserIds.has(userId)) {
+          alreadyPromoted.push(userId);
+          continue;
+        }
+
+        // Get total hours
+        const totalTime = await patrolTimer.getUserTotal(interaction.guildId, userId);
+        const totalHours = totalTime / (1000 * 60 * 60);
+
+        if (totalHours >= minHours) {
+          eligible.push({ userId, hours: totalHours });
+        } else {
+          ineligible.push({ userId, hours: totalHours });
+        }
+      }
+
+      // Build summary message
+      let summary = `**Promotion Check Results**\n\n`;
+      summary += `**Eligible for Promotion:** ${eligible.length}\n`;
+      summary += `**Not Yet Eligible:** ${ineligible.length}\n`;
+      summary += `**Already Promoted:** ${alreadyPromoted.length}\n`;
+      summary += `**Total Recruits:** ${recruits.size}\n\n`;
+
+      if (eligible.length > 0) {
+        summary += `**Eligible Users:**\n`;
+        for (const { userId, hours } of eligible) {
+          summary += `• <@${userId}> — ${hours.toFixed(2)} hours\n`;
+        }
+        summary += `\nUse \`/settings patrol promotion check <user>\` to promote them individually.`;
+      }
+
+      await interaction.editReply({ content: summary });
+
+      console.log(`[PatrolTimer] Bulk promotion check by ${interaction.user.tag}: ${eligible.length} eligible, ${ineligible.length} not eligible, ${alreadyPromoted.length} already promoted`);
+    } catch (err) {
+      console.error("[PatrolTimer] Bulk promotion check error:", err);
+      await interaction.editReply({
+        content: "❌ An error occurred while checking promotions. Please check the logs.",
       });
     }
   }
