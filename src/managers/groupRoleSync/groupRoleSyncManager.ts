@@ -227,6 +227,15 @@ export class GroupRoleSyncManager {
         ...(groupMember.mRoleIds || []),
       ]);
 
+      // Group mappings by VRChat role (since multiple Discord roles can map to one VRChat role)
+      const vrcRoleToDiscordRoles = new Map<string, string[]>();
+      for (const mapping of roleMappings) {
+        if (!vrcRoleToDiscordRoles.has(mapping.vrcGroupRoleId)) {
+          vrcRoleToDiscordRoles.set(mapping.vrcGroupRoleId, []);
+        }
+        vrcRoleToDiscordRoles.get(mapping.vrcGroupRoleId)!.push(mapping.discordRoleId);
+      }
+
       // Determine which VRChat roles should be added and removed based on Discord roles
       const vrcRolesToAdd: string[] = [];
       const vrcRolesToRemove: string[] = [];
@@ -242,25 +251,28 @@ export class GroupRoleSyncManager {
         `[GroupRoleSync] VRChat mRoleIds: ${groupMember.mRoleIds || "none"}`,
       );
 
-      for (const mapping of roleMappings) {
-        const hasDiscordRole = member.roles.cache.has(mapping.discordRoleId);
-        const hasVrcRole = currentVrcRoleIds.has(mapping.vrcGroupRoleId);
+      // For each VRChat role, check if user has ANY of the Discord roles that map to it
+      for (const [vrcRoleId, discordRoleIds] of vrcRoleToDiscordRoles.entries()) {
+        const hasVrcRole = currentVrcRoleIds.has(vrcRoleId);
+        const hasAnyDiscordRole = discordRoleIds.some(discordRoleId => 
+          member.roles.cache.has(discordRoleId)
+        );
 
         console.log(
-          `[GroupRoleSync] Mapping check: Discord role ${mapping.discordRoleId} -> VRC role ${mapping.vrcGroupRoleId}`,
+          `[GroupRoleSync] VRC role ${vrcRoleId} mapped from Discord roles: ${discordRoleIds.join(", ")}`,
         );
-        console.log(`  - Has Discord role: ${hasDiscordRole}`);
+        console.log(`  - Has ANY mapped Discord role: ${hasAnyDiscordRole}`);
         console.log(`  - Has VRChat role: ${hasVrcRole}`);
 
-        if (hasDiscordRole && !hasVrcRole) {
-          vrcRolesToAdd.push(mapping.vrcGroupRoleId);
+        if (hasAnyDiscordRole && !hasVrcRole) {
+          vrcRolesToAdd.push(vrcRoleId);
           console.log(
-            `  ➡️ Will ADD VRChat role ${mapping.vrcGroupRoleId} (has Discord role)`,
+            `  ➡️ Will ADD VRChat role ${vrcRoleId} (has qualifying Discord role)`,
           );
-        } else if (!hasDiscordRole && hasVrcRole) {
-          vrcRolesToRemove.push(mapping.vrcGroupRoleId);
+        } else if (!hasAnyDiscordRole && hasVrcRole) {
+          vrcRolesToRemove.push(vrcRoleId);
           console.log(
-            `  ⬅️ Will REMOVE VRChat role ${mapping.vrcGroupRoleId} (missing Discord role)`,
+            `  ⬅️ Will REMOVE VRChat role ${vrcRoleId} (missing all qualifying Discord roles)`,
           );
         } else {
           console.log(`  ✓ VRChat role already in sync`);
