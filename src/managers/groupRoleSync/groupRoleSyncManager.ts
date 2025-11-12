@@ -52,9 +52,6 @@ export class GroupRoleSyncManager {
     try {
       const member = await getGroupMember(groupId, userId);
       if (!member) {
-        console.log(
-          `[GroupRoleSync] User ${userId} not found in group ${groupId}`,
-        );
         return Infinity; // No roles = lowest possible rank
       }
 
@@ -64,15 +61,8 @@ export class GroupRoleSyncManager {
         : [...(member.roleIds || []), ...(member.mRoleIds || [])];
 
       if (roleIdsToCheck.length === 0) {
-        console.log(
-          `[GroupRoleSync] User ${userId} has no ${managementOnly ? "management " : ""}roles`,
-        );
         return Infinity; // No roles = lowest possible rank
       }
-
-      console.log(
-        `[GroupRoleSync] User ${userId} has ${roleIdsToCheck.length} ${managementOnly ? "management " : ""}role(s): ${roleIdsToCheck.join(", ")}`,
-      );
 
       // Fetch all group roles to get their order values
       const allRoles = await this.getGroupRolesWithCache(groupId);
@@ -86,15 +76,9 @@ export class GroupRoleSyncManager {
         const order = roleOrderMap.get(roleId);
         if (order !== undefined && order < highestRankOrder) {
           highestRankOrder = order;
-          console.log(
-            `[GroupRoleSync] Role ${roleId} has order ${order} (current highest rank)`,
-          );
         }
       }
 
-      console.log(
-        `[GroupRoleSync] Highest ${managementOnly ? "management " : ""}role rank for ${userId}: order ${highestRankOrder}`,
-      );
       return highestRankOrder;
     } catch (error) {
       console.error(
@@ -148,9 +132,6 @@ export class GroupRoleSyncManager {
         false,
       );
       if (botHighestRankOrder === Infinity) {
-        console.log(
-          `[GroupRoleSync] ❌ Bot is not a member of group ${groupId}`,
-        );
         return false;
       }
 
@@ -161,35 +142,15 @@ export class GroupRoleSyncManager {
         false, // Check ALL roles, not just management
       );
 
-      console.log(
-        `[GroupRoleSync] Permission check for ${userId} in group ${groupId}:`,
-      );
-      console.log(`  - Bot's highest rank (order): ${botHighestRankOrder}`);
-      console.log(
-        `  - Member's highest rank (order): ${memberHighestRankOrder}`,
-      );
-
       // If member has no roles, bot can manage them
       if (memberHighestRankOrder === Infinity) {
-        console.log(
-          `[GroupRoleSync] ✅ Bot can manage member ${userId} (member has no roles)`,
-        );
         return true;
       }
 
       // Bot can manage if its order is LOWER (higher rank) than member's order
-      // Example: Bot order 10, Member order 50 → Bot can manage (10 < 50)
-      if (botHighestRankOrder < memberHighestRankOrder) {
-        console.log(
-          `[GroupRoleSync] ✅ Bot can manage member ${userId} (bot order ${botHighestRankOrder} < member order ${memberHighestRankOrder})`,
-        );
-        return true;
-      }
-
-      console.log(
-        `[GroupRoleSync] ❌ Bot cannot manage member ${userId} (member has roles with equal or higher rank: order ${memberHighestRankOrder} <= ${botHighestRankOrder})`,
-      );
-      return false;
+      // Example: Bot order 3, Member order 5 → Bot CAN manage (3 < 5)
+      // Example: Bot order 3, Member order 2 → Bot CANNOT manage (3 > 2)
+      return botHighestRankOrder < memberHighestRankOrder;
     } catch (error) {
       console.error(
         `[GroupRoleSync] Error checking if bot can manage ${userId}:`,
@@ -212,49 +173,28 @@ export class GroupRoleSyncManager {
     vrcUserId: string,
   ): Promise<void> {
     try {
-      console.log(
-        `[GroupRoleSync] Starting role sync for user ${vrcUserId} (Discord: ${discordId}) in guild ${guildId}`,
-      );
-
       // Get guild settings to find the VRChat group ID
       const settings = await prisma.guildSettings.findUnique({
         where: { guildId },
       });
 
       if (!settings?.vrcGroupId) {
-        console.log(
-          `[GroupRoleSync] ❌ No VRChat group configured for guild ${guildId}`,
-        );
         return;
       }
 
       const groupId = settings.vrcGroupId;
-      console.log(`[GroupRoleSync] Using VRChat group: ${groupId}`);
 
       // Check if bot can manage this member
       const canManage = await this.canBotManageMember(groupId, vrcUserId);
       if (!canManage) {
-        console.log(
-          `[GroupRoleSync] ❌ Skipping role sync - bot cannot manage ${vrcUserId}`,
-        );
         return;
       }
 
       // Get the member's current VRChat group roles
-      console.log(
-        `[GroupRoleSync] Fetching group member info for ${vrcUserId}...`,
-      );
       const groupMember = await getGroupMember(groupId, vrcUserId);
       if (!groupMember) {
-        console.log(
-          `[GroupRoleSync] ❌ User ${vrcUserId} is not in group ${groupId}`,
-        );
         return;
       }
-
-      console.log(
-        `[GroupRoleSync] Member has ${groupMember.roleIds?.length || 0} regular roles and ${groupMember.mRoleIds?.length || 0} management roles in VRChat`,
-      );
 
       // Get role mappings for this guild
       const roleMappings = await prisma.groupRoleMapping.findMany({
@@ -265,45 +205,31 @@ export class GroupRoleSyncManager {
       });
 
       if (roleMappings.length === 0) {
-        console.log(
-          `[GroupRoleSync] ℹ️ No role mappings configured for guild ${guildId}`,
-        );
         return;
       }
-
-      console.log(
-        `[GroupRoleSync] Found ${roleMappings.length} role mapping(s) for this guild`,
-      );
 
       // Get Discord member to check their roles
       const guild = await bot.guilds.fetch(guildId);
       if (!guild) {
-        console.error(`[GroupRoleSync] ❌ Guild ${guildId} not found`);
         return;
       }
 
       const member = await guild.members.fetch(discordId);
       if (!member) {
-        console.error(
-          `[GroupRoleSync] ❌ Member ${discordId} not found in guild ${guildId}`,
-        );
         return;
       }
-
-      console.log(
-        `[GroupRoleSync] Processing Discord member: ${member.displayName}`,
-      );
 
       // Get the VRChat role IDs the member currently has (non-management only)
       const currentVrcRoleIds = new Set(groupMember.roleIds || []);
 
-      console.log(
-        `[GroupRoleSync] Member has VRChat roles: ${Array.from(currentVrcRoleIds).join(", ") || "none"}`,
-      );
-
       // Determine which VRChat roles should be added and removed based on Discord roles
       const vrcRolesToAdd: string[] = [];
       const vrcRolesToRemove: string[] = [];
+
+      // Debug: Log member's Discord roles
+      console.log(
+        `[GroupRoleSync] ${member.displayName} has ${member.roles.cache.size} Discord roles: ${Array.from(member.roles.cache.keys()).join(", ")}`,
+      );
 
       for (const mapping of roleMappings) {
         const hasDiscordRole = member.roles.cache.has(mapping.discordRoleId);
@@ -332,17 +258,12 @@ export class GroupRoleSyncManager {
 
       // Apply VRChat role changes
       if (vrcRolesToAdd.length > 0) {
-        console.log(
-          `[GroupRoleSync] Adding ${vrcRolesToAdd.length} VRChat role(s) to ${member.displayName}:`,
-          vrcRolesToAdd,
-        );
         for (const roleId of vrcRolesToAdd) {
           try {
             await addRoleToGroupMember(groupId, vrcUserId, roleId);
-            console.log(`[GroupRoleSync] ✅ Added VRChat role ${roleId}`);
           } catch (error: any) {
             console.error(
-              `[GroupRoleSync] ❌ Failed to add VRChat role ${roleId}:`,
+              `[GroupRoleSync] Failed to add VRChat role ${roleId}:`,
               error.message,
             );
           }
@@ -350,27 +271,16 @@ export class GroupRoleSyncManager {
       }
 
       if (vrcRolesToRemove.length > 0) {
-        console.log(
-          `[GroupRoleSync] Removing ${vrcRolesToRemove.length} VRChat role(s) from ${member.displayName}:`,
-          vrcRolesToRemove,
-        );
         for (const roleId of vrcRolesToRemove) {
           try {
             await removeRoleFromGroupMember(groupId, vrcUserId, roleId);
-            console.log(`[GroupRoleSync] ✅ Removed VRChat role ${roleId}`);
           } catch (error: any) {
             console.error(
-              `[GroupRoleSync] ❌ Failed to remove VRChat role ${roleId}:`,
+              `[GroupRoleSync] Failed to remove VRChat role ${roleId}:`,
               error.message,
             );
           }
         }
-      }
-
-      if (vrcRolesToAdd.length === 0 && vrcRolesToRemove.length === 0) {
-        console.log(
-          `[GroupRoleSync] ✓ No VRChat role changes needed for ${member.displayName}`,
-        );
       }
 
       // Log the sync if there were changes
@@ -383,16 +293,12 @@ export class GroupRoleSyncManager {
           "sync",
         );
       }
-
-      console.log(
-        `[GroupRoleSync] ✅ Completed role sync for ${member.displayName}`,
-      );
     } catch (error) {
       console.error(
-        `[GroupRoleSync] ❌ Error syncing roles for ${discordId}:`,
+        `[GroupRoleSync] Error syncing roles for ${discordId}:`,
         error,
       );
-      throw error; // Re-throw so the command can catch and display the error
+      throw error;
     }
   }
 
@@ -419,9 +325,6 @@ export class GroupRoleSyncManager {
         settings.botPromotionLogsChannelId,
       )) as TextChannel;
       if (!channel || !channel.isTextBased()) {
-        console.warn(
-          `[GroupRoleSync] Invalid promotion logs channel ${settings.botPromotionLogsChannelId}`,
-        );
         return;
       }
 
@@ -489,9 +392,6 @@ export class GroupRoleSyncManager {
     discordId: string,
     vrcUserId: string,
   ): Promise<void> {
-    console.log(
-      `[GroupRoleSync] User ${vrcUserId} joined group, assigning VRChat roles based on Discord...`,
-    );
     await this.syncUserRoles(guildId, discordId, vrcUserId);
   }
 
@@ -504,9 +404,6 @@ export class GroupRoleSyncManager {
     discordId: string,
     vrcUserId: string,
   ): Promise<void> {
-    console.log(
-      `[GroupRoleSync] Discord roles updated for ${discordId}, syncing VRChat roles...`,
-    );
     await this.syncUserRoles(guildId, discordId, vrcUserId);
   }
 
@@ -519,19 +416,16 @@ export class GroupRoleSyncManager {
     vrcUserId: string,
   ): Promise<void> {
     try {
-      console.log(`[GroupRoleSync] User ${vrcUserId} left group, logging...`);
-
       const settings = await prisma.guildSettings.findUnique({
         where: { guildId },
       });
 
       if (!settings?.botPromotionLogsChannelId) {
-        return; // No log channel configured
+        return;
       }
 
       const guild = await bot.guilds.fetch(guildId);
       if (!guild) {
-        console.error(`[GroupRoleSync] Guild ${guildId} not found`);
         return;
       }
 
@@ -542,9 +436,6 @@ export class GroupRoleSyncManager {
         settings.botPromotionLogsChannelId,
       )) as TextChannel;
       if (!channel || !channel.isTextBased()) {
-        console.warn(
-          `[GroupRoleSync] Invalid promotion logs channel ${settings.botPromotionLogsChannelId}`,
-        );
         return;
       }
 
