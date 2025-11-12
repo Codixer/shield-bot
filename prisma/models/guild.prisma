@@ -20,6 +20,9 @@ model GuildSettings {
   whitelistLogChannelId   String? // Channel ID for whitelist verification and modification logs
   // VRChat instance settings
   avatarWorldId           String? // VRChat world ID for avatar world invites (e.g., wrld_xxx)
+  // VRChat group settings
+  vrcGroupId              String? // VRChat group ID for group invites and role sync (e.g., grp_xxx)
+  botPromotionLogsChannelId String? // Channel ID for logging VRChat group promotions/demotions
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 }

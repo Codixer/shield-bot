@@ -1,0 +1,14 @@
+// VRChat Group Role to Discord Role Mapping
+model GroupRoleMapping {
+  id              Int      @id @default(autoincrement())
+  guildId         String   // Discord guild ID
+  vrcGroupId      String   // VRChat group ID (e.g., grp_xxx)
+  vrcGroupRoleId  String   // VRChat group role ID (e.g., grol_xxx)
+  discordRoleId   String   // Discord role ID to assign
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([guildId, vrcGroupRoleId])
+  @@index([guildId])
+  @@index([vrcGroupId])
+}

@@ -1,7 +1,8 @@
 import { getUserById } from '../../../../utility/vrchat.js';
+import { inviteUserToGroup } from '../../../../utility/vrchat/groups.js';
 import { whitelistManager } from '../../../../managers/whitelist/whitelistManager.js';
 import { prisma, bot } from '../../../../main.js';
-import { EmbedBuilder, Colors } from 'discord.js';
+import { EmbedBuilder, Colors, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
 import { sendWhitelistLog, getUserWhitelistRoles } from '../../../../utility/vrchat/whitelistLogger.js';
 
 export async function handleFriendAdd(content: any) {
@@ -119,6 +120,7 @@ async function sendDMConfirmation(userId: number, vrcUserId: string, vrchatUsern
         // Try to send a DM to the user
         try {
             const discordUser = await bot.users.fetch(user.discordId);
+            
             const embed = new EmbedBuilder()
                 .setTitle("✅ VRChat Verification Complete!")
                 .setDescription(`Your VRChat account has been successfully verified!\n\n**Account:** ${vrchatUsername || vrcUserId}\n**Method:** Friend Request\n\nYour account is now fully verified and protected from takeover. You now have access to all whitelisted worlds!`)
@@ -126,7 +128,34 @@ async function sendDMConfirmation(userId: number, vrcUserId: string, vrchatUsern
                 .setFooter({ text: "S.H.I.E.L.D. Bot - Verification System" })
                 .setTimestamp();
 
-            await discordUser.send({ embeds: [embed] });
+            // Check if there's a VRChat group configured for any guild
+            const guildSettings = await prisma.guildSettings.findFirst({
+                where: { vrcGroupId: { not: null } },
+            });
+
+            const components: any[] = [];
+            if (guildSettings?.vrcGroupId) {
+                // Add button to join the VRChat group
+                const joinGroupButton = new ButtonBuilder()
+                    .setCustomId(`vrchat-group-invite:${user.discordId}:${vrcUserId}:${guildSettings.vrcGroupId}`)
+                    .setLabel("Join SHIELD VRChat Group")
+                    .setStyle(ButtonStyle.Primary)
+                    .setEmoji("🛡️");
+
+                components.push(
+                    new ActionRowBuilder().addComponents(joinGroupButton)
+                );
+
+                embed.setDescription(
+                    embed.data.description + 
+                    `\n\n**Want to join the official SHIELD VRChat group?**\nClick the button below to receive a group invite!`
+                );
+            }
+
+            await discordUser.send({ 
+                embeds: [embed],
+                components: components.length > 0 ? components : undefined,
+            });
             console.log(`[DM Confirmation] Successfully sent verification confirmation DM to ${user.discordId}`);
         } catch (dmError: any) {
             // If DM fails (user has DMs disabled, etc.), log but don't throw

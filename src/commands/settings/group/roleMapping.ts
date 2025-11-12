@@ -1,0 +1,303 @@
+import { Discord, Guard, Slash, SlashGroup, SlashOption } from "discordx";
+import {
+  CommandInteraction,
+  ApplicationCommandOptionType,
+  EmbedBuilder,
+  Colors,
+} from "discord.js";
+import { DevGuardAndStaffGuard } from "../../../utility/guards.js";
+import { prisma } from "../../../main.js";
+import { getGroupRoles } from "../../../utility/vrchat/groups.js";
+
+@Discord()
+@SlashGroup({
+  name: "role",
+  description: "VRChat group role mapping",
+  root: "group",
+})
+@SlashGroup("role", "group")
+@Guard(DevGuardAndStaffGuard)
+export class GroupRoleMappingCommand {
+  @Slash({
+    name: "map",
+    description: "Map a VRChat group role to a Discord role",
+  })
+  async mapRole(
+    @SlashOption({
+      name: "vrc_role_id",
+      description: "VRChat group role ID (e.g., grol_xxx)",
+      type: ApplicationCommandOptionType.String,
+      required: true,
+    })
+    vrcRoleId: string,
+    @SlashOption({
+      name: "discord_role",
+      description: "Discord role to assign",
+      type: ApplicationCommandOptionType.Role,
+      required: true,
+    })
+    discordRole: any,
+    interaction: CommandInteraction,
+  ): Promise<void> {
+    try {
+      if (!interaction.guildId) {
+        await interaction.reply({
+          content: "❌ This command can only be used in a server.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      // Get guild settings to find VRChat group ID
+      const settings = await prisma.guildSettings.findUnique({
+        where: { guildId: interaction.guildId },
+      });
+
+      if (!settings?.vrcGroupId) {
+        await interaction.reply({
+          content:
+            "❌ No VRChat group ID configured. Please set it first using `/settings group set-group-id`.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      // Validate VRChat role ID format
+      if (!vrcRoleId.startsWith("grol_")) {
+        await interaction.reply({
+          content:
+            "❌ Invalid VRChat role ID format. It should start with 'grol_'.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      // Create or update the mapping
+      await prisma.groupRoleMapping.upsert({
+        where: {
+          guildId_vrcGroupRoleId: {
+            guildId: interaction.guildId,
+            vrcGroupRoleId: vrcRoleId,
+          },
+        },
+        update: {
+          discordRoleId: discordRole.id,
+        },
+        create: {
+          guildId: interaction.guildId,
+          vrcGroupId: settings.vrcGroupId,
+          vrcGroupRoleId: vrcRoleId,
+          discordRoleId: discordRole.id,
+        },
+      });
+
+      const embed = new EmbedBuilder()
+        .setTitle("✅ Role Mapping Created")
+        .setDescription(
+          `VRChat role \`${vrcRoleId}\` is now mapped to <@&${discordRole.id}>.`,
+        )
+        .addFields({
+          name: "ℹ️ Note",
+          value:
+            "Members with this VRChat group role will automatically receive the Discord role when they join the group or when their roles are updated.",
+        })
+        .setColor(Colors.Green)
+        .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+    } catch (error: any) {
+      console.error("[GroupRoleMapping] Error mapping role:", error);
+      await interaction.reply({
+        content: `❌ Failed to map role: ${error.message}`,
+        ephemeral: true,
+      });
+    }
+  }
+
+  @Slash({
+    name: "unmap",
+    description: "Remove a VRChat group role mapping",
+  })
+  async unmapRole(
+    @SlashOption({
+      name: "vrc_role_id",
+      description: "VRChat group role ID to unmap (e.g., grol_xxx)",
+      type: ApplicationCommandOptionType.String,
+      required: true,
+    })
+    vrcRoleId: string,
+    interaction: CommandInteraction,
+  ): Promise<void> {
+    try {
+      if (!interaction.guildId) {
+        await interaction.reply({
+          content: "❌ This command can only be used in a server.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const mapping = await prisma.groupRoleMapping.findUnique({
+        where: {
+          guildId_vrcGroupRoleId: {
+            guildId: interaction.guildId,
+            vrcGroupRoleId: vrcRoleId,
+          },
+        },
+      });
+
+      if (!mapping) {
+        await interaction.reply({
+          content: `❌ No mapping found for VRChat role \`${vrcRoleId}\`.`,
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await prisma.groupRoleMapping.delete({
+        where: {
+          guildId_vrcGroupRoleId: {
+            guildId: interaction.guildId,
+            vrcGroupRoleId: vrcRoleId,
+          },
+        },
+      });
+
+      const embed = new EmbedBuilder()
+        .setTitle("✅ Role Mapping Removed")
+        .setDescription(
+          `The mapping for VRChat role \`${vrcRoleId}\` has been removed.`,
+        )
+        .setColor(Colors.Green)
+        .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+    } catch (error: any) {
+      console.error("[GroupRoleMapping] Error unmapping role:", error);
+      await interaction.reply({
+        content: `❌ Failed to unmap role: ${error.message}`,
+        ephemeral: true,
+      });
+    }
+  }
+
+  @Slash({
+    name: "list",
+    description: "List all VRChat group role mappings for this server",
+  })
+  async listMappings(interaction: CommandInteraction): Promise<void> {
+    try {
+      if (!interaction.guildId) {
+        await interaction.reply({
+          content: "❌ This command can only be used in a server.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const mappings = await prisma.groupRoleMapping.findMany({
+        where: { guildId: interaction.guildId },
+      });
+
+      if (mappings.length === 0) {
+        await interaction.reply({
+          content:
+            "ℹ️ No role mappings configured. Use `/group role map` to create mappings.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      const mappingList = mappings
+        .map((m) => `\`${m.vrcGroupRoleId}\` → <@&${m.discordRoleId}>`)
+        .join("\n");
+
+      const embed = new EmbedBuilder()
+        .setTitle("VRChat Group Role Mappings")
+        .setDescription(mappingList)
+        .setColor(Colors.Blue)
+        .setFooter({
+          text: `${mappings.length} mapping(s) configured | S.H.I.E.L.D. Bot`,
+        })
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+    } catch (error: any) {
+      console.error("[GroupRoleMapping] Error listing mappings:", error);
+      await interaction.reply({
+        content: `❌ Failed to list mappings: ${error.message}`,
+        ephemeral: true,
+      });
+    }
+  }
+
+  @Slash({
+    name: "fetch-roles",
+    description: "Fetch and display all roles from the VRChat group",
+  })
+  async fetchRoles(interaction: CommandInteraction): Promise<void> {
+    try {
+      if (!interaction.guildId) {
+        await interaction.reply({
+          content: "❌ This command can only be used in a server.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      await interaction.deferReply({ ephemeral: true });
+
+      const settings = await prisma.guildSettings.findUnique({
+        where: { guildId: interaction.guildId },
+      });
+
+      if (!settings?.vrcGroupId) {
+        await interaction.editReply({
+          content:
+            "❌ No VRChat group ID configured. Please set it first using `/settings group set-group-id`.",
+        });
+        return;
+      }
+
+      // Fetch roles from VRChat API
+      const roles = await getGroupRoles(settings.vrcGroupId);
+
+      if (!roles || roles.length === 0) {
+        await interaction.editReply({
+          content: "ℹ️ No roles found in the VRChat group.",
+        });
+        return;
+      }
+
+      // Format roles for display
+      const roleList = roles
+        .map((role: any) => {
+          const type = role.isSelfAssignable
+            ? "Self-Assignable"
+            : role.requiresTwoFactor
+              ? "Requires 2FA"
+              : role.order !== undefined
+                ? `Order: ${role.order}`
+                : "Member Role";
+          return `**${role.name}**\n└ ID: \`${role.id}\`\n└ ${type}`;
+        })
+        .join("\n\n");
+
+      const embed = new EmbedBuilder()
+        .setTitle(`VRChat Group Roles (${roles.length})`)
+        .setDescription(roleList)
+        .setColor(Colors.Blue)
+        .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" })
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error: any) {
+      console.error("[GroupRoleMapping] Error fetching roles:", error);
+      await interaction.editReply({
+        content: `❌ Failed to fetch roles: ${error.message}`,
+      });
+    }
+  }
+}

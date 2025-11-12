@@ -1,11 +1,10 @@
 import {
   ButtonInteraction,
-  MessageFlags,
   ButtonStyle,
   EmbedBuilder,
+  ButtonBuilder,
 } from "discord.js";
 import { Discord, ButtonComponent } from "discordx";
-import { ButtonBuilder } from "discord.js";
 import { prisma } from "../../../../../main.js";
 import { getUserById } from "../../../../../utility/vrchat.js";
 
@@ -117,6 +116,7 @@ export class VRChatStatusVerifyButtonHandler {
           `Your VRChat account (**${vrchatUsername || vrcUserId}**) has been successfully verified via status change!\n\n✅ Your account is now fully verified and protected from takeover.`,
         )
         .setColor(0x57f287);
+
       await interaction.update({
         embeds: [embed],
         components: [],
