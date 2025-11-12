@@ -19,8 +19,8 @@ interface QueuedRequest {
 
 const DEFAULT_CONFIG: RateLimitConfig = {
   maxRetries: 3,
-  baseDelay: 1000, // Start with 1 second
-  maxDelay: 60000, // Max 60 seconds
+  baseDelay: 3000, // Start with 3 seconds (increased from 2s)
+  maxDelay: 180000, // Max 180 seconds / 3 minutes (increased from 120s)
   aggressiveMode: true, // Proactively prevent 429s
 };
 
@@ -28,7 +28,7 @@ class VRChatRateLimiter {
   private queue: QueuedRequest[] = [];
   private processing = false;
   private lastRequestTime = 0;
-  private minRequestInterval = 100; // Minimum 100ms between requests
+  private minRequestInterval = 1000; // Minimum 1 second between requests (increased from 500ms)
   private currentDelay = 0; // Current delay for 429 backoff
   private rateLimitRemaining: number | null = null; // Requests remaining
   private rateLimitReset: number | null = null; // Unix timestamp when limit resets
@@ -89,13 +89,13 @@ class VRChatRateLimiter {
         if (config.aggressiveMode && this.rateLimitRemaining !== null) {
           if (this.rateLimitRemaining <= 10) {
             // Very close to limit - add significant delay
-            additionalDelay = 2000; // 2 seconds
+            additionalDelay = 10000; // 10 seconds (increased from 5s)
           } else if (this.rateLimitRemaining <= 20) {
             // Getting close - add moderate delay
-            additionalDelay = 1000; // 1 second
+            additionalDelay = 5000; // 5 seconds (increased from 3s)
           } else if (this.rateLimitRemaining <= 50) {
             // Approaching limit - add small delay
-            additionalDelay = 500; // 0.5 seconds
+            additionalDelay = 2500; // 2.5 seconds (increased from 1.5s)
           }
         }
         

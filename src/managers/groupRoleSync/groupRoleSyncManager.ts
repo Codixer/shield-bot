@@ -37,11 +37,12 @@ export class GroupRoleSyncManager {
 
   /**
    * Get the highest role order for a member in the VRChat group
-   * Higher order values = higher rank in the hierarchy
+   * IMPORTANT: In VRChat groups, LOWER order values = HIGHER rank
+   * (e.g., order 0 is highest, order 100 is lowest)
    * @param groupId VRChat group ID
    * @param userId VRChat user ID
    * @param managementOnly If true, only check management roles
-   * @returns The highest order value, or -1 if none
+   * @returns The lowest order value (highest rank), or Infinity if none
    */
   private async getHighestRoleOrder(
     groupId: string,
@@ -54,7 +55,7 @@ export class GroupRoleSyncManager {
         console.log(
           `[GroupRoleSync] User ${userId} not found in group ${groupId}`,
         );
-        return -1;
+        return Infinity; // No roles = lowest possible rank
       }
 
       // Get the role IDs to check
@@ -66,7 +67,7 @@ export class GroupRoleSyncManager {
         console.log(
           `[GroupRoleSync] User ${userId} has no ${managementOnly ? "management " : ""}roles`,
         );
-        return -1;
+        return Infinity; // No roles = lowest possible rank
       }
 
       console.log(
@@ -79,28 +80,28 @@ export class GroupRoleSyncManager {
         allRoles.map((role: any) => [role.id, role.order]),
       );
 
-      // Find the highest order among the member's roles
-      let highestOrder = -1;
+      // Find the LOWEST order (highest rank) among the member's roles
+      let highestRankOrder = Infinity;
       for (const roleId of roleIdsToCheck) {
         const order = roleOrderMap.get(roleId);
-        if (order !== undefined && order > highestOrder) {
-          highestOrder = order;
+        if (order !== undefined && order < highestRankOrder) {
+          highestRankOrder = order;
           console.log(
-            `[GroupRoleSync] Role ${roleId} has order ${order} (current highest)`,
+            `[GroupRoleSync] Role ${roleId} has order ${order} (current highest rank)`,
           );
         }
       }
 
       console.log(
-        `[GroupRoleSync] Highest ${managementOnly ? "management " : ""}role order for ${userId}: ${highestOrder}`,
+        `[GroupRoleSync] Highest ${managementOnly ? "management " : ""}role rank for ${userId}: order ${highestRankOrder}`,
       );
-      return highestOrder;
+      return highestRankOrder;
     } catch (error) {
       console.error(
         `[GroupRoleSync] Error getting role order for ${userId}:`,
         error,
       );
-      return -1;
+      return Infinity;
     }
   }
 
@@ -121,7 +122,14 @@ export class GroupRoleSyncManager {
    * Check if the bot can manage a member based on role hierarchy
    * Bot can manage members if:
    * 1. Bot is in the group
-   * 2. Member has no management roles OR bot's highest role > member's highest management role
+   * 2. Member's highest role (any role) has a HIGHER order value than bot's highest role
+   * 
+   * IMPORTANT: In VRChat, LOWER order = HIGHER rank (order 0 is top, order 100 is bottom)
+   * So bot can manage if: bot's order < member's order (bot is higher rank)
+   * 
+   * This prevents the bot from managing members who have roles above it in the hierarchy,
+   * even if those roles aren't management roles (e.g., Staff role above Bot role)
+   * 
    * @param groupId VRChat group ID
    * @param userId VRChat user ID to check
    * @returns True if the bot can manage this member
@@ -133,51 +141,53 @@ export class GroupRoleSyncManager {
     try {
       const botVrcUserId = "usr_c3c58aa6-c4dc-4de7-80a6-6826be9327ff";
 
-      // Check if bot is in the group and get its highest role order (any role, not just management)
-      const botHighestOrder = await this.getHighestRoleOrder(
+      // Get bot's highest role order (lowest number = highest rank)
+      const botHighestRankOrder = await this.getHighestRoleOrder(
         groupId,
         botVrcUserId,
         false,
       );
-      if (botHighestOrder === -1) {
+      if (botHighestRankOrder === Infinity) {
         console.log(
           `[GroupRoleSync] ❌ Bot is not a member of group ${groupId}`,
         );
         return false;
       }
 
-      // Get the member's highest management role order
-      const memberManagementOrder = await this.getHighestManagementRoleOrder(
+      // Get the member's highest role order (lowest number = highest rank)
+      const memberHighestRankOrder = await this.getHighestRoleOrder(
         groupId,
         userId,
+        false, // Check ALL roles, not just management
       );
 
       console.log(
         `[GroupRoleSync] Permission check for ${userId} in group ${groupId}:`,
       );
-      console.log(`  - Bot's highest role order: ${botHighestOrder}`);
+      console.log(`  - Bot's highest rank (order): ${botHighestRankOrder}`);
       console.log(
-        `  - Member's highest management role order: ${memberManagementOrder}`,
+        `  - Member's highest rank (order): ${memberHighestRankOrder}`,
       );
 
-      // If member has no management roles, bot can manage them
-      if (memberManagementOrder === -1) {
+      // If member has no roles, bot can manage them
+      if (memberHighestRankOrder === Infinity) {
         console.log(
-          `[GroupRoleSync] ✅ Bot can manage member ${userId} (member has no management roles)`,
+          `[GroupRoleSync] ✅ Bot can manage member ${userId} (member has no roles)`,
         );
         return true;
       }
 
-      // If member has management roles, check if bot's role is higher
-      if (botHighestOrder > memberManagementOrder) {
+      // Bot can manage if its order is LOWER (higher rank) than member's order
+      // Example: Bot order 10, Member order 50 → Bot can manage (10 < 50)
+      if (botHighestRankOrder < memberHighestRankOrder) {
         console.log(
-          `[GroupRoleSync] ✅ Bot can manage member ${userId} (bot role order ${botHighestOrder} > member management order ${memberManagementOrder})`,
+          `[GroupRoleSync] ✅ Bot can manage member ${userId} (bot order ${botHighestRankOrder} < member order ${memberHighestRankOrder})`,
         );
         return true;
       }
 
       console.log(
-        `[GroupRoleSync] ❌ Bot cannot manage member ${userId} (member has management roles with equal or higher order)`,
+        `[GroupRoleSync] ❌ Bot cannot manage member ${userId} (member has roles with equal or higher rank: order ${memberHighestRankOrder} <= ${botHighestRankOrder})`,
       );
       return false;
     } catch (error) {
