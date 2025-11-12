@@ -17,7 +17,7 @@ import { handleContentRefresh } from "./handlers/user/handleContentRefresh.js";
 import { handleInstanceQueueJoined } from "./handlers/user/handleInstanceQueueJoined.js";
 import { handleGroupJoined } from "./handlers/group/handleGroupJoined.js";
 import { handleGroupLeft } from "./handlers/group/handleGroupLeft.js";
-import { handleGroupMemberUpdated } from "./handlers/group/handleGroupMemberUpdated.js";
+// import { handleGroupMemberUpdated } from "./handlers/group/handleGroupMemberUpdated.js";
 import { handleGroupRoleUpdated } from "./handlers/group/handleGroupRoleUpdated.js";
 import { handleNotification } from "./handlers/notification/notification.js";
 import { handleResponseNotification } from "./handlers/notification/response-notification.js";
@@ -184,9 +184,10 @@ export function startVRChatWebSocketListener() {
           case "group-left":
             await handleGroupLeft(content);
             break;
-          case "group-member-updated":
-            await handleGroupMemberUpdated(content);
-            break;
+          // case "group-member-updated":
+          //   // This event is for the local user (bot) only, not other members
+          //   await handleGroupMemberUpdated(content);
+          //   break;
           // case "group-role-updated":
           //     await handleGroupRoleUpdated(content);
           //     break;
