@@ -86,7 +86,13 @@ export class GroupRoleSyncCommand {
       }
 
       // Attempt to sync for each verified account
-      const results: string[] = [];
+      const syncedAccounts: Array<{
+        username: string;
+        userId: string;
+        success: boolean;
+        error?: string;
+      }> = [];
+
       for (const vrcAccount of discordUser.vrchatAccounts) {
         try {
           await groupRoleSyncManager.syncUserRoles(
@@ -94,22 +100,56 @@ export class GroupRoleSyncCommand {
             user.id,
             vrcAccount.vrcUserId,
           );
-          results.push(
-            `✅ Synced roles for VRChat account: \`${vrcAccount.vrchatUsername || vrcAccount.vrcUserId}\``,
-          );
+          syncedAccounts.push({
+            username: vrcAccount.vrchatUsername || "Unknown",
+            userId: vrcAccount.vrcUserId,
+            success: true,
+          });
         } catch (error: any) {
-          results.push(
-            `❌ Failed to sync \`${vrcAccount.vrchatUsername || vrcAccount.vrcUserId}\`: ${error.message}`,
-          );
+          syncedAccounts.push({
+            username: vrcAccount.vrchatUsername || "Unknown",
+            userId: vrcAccount.vrcUserId,
+            success: false,
+            error: error.message,
+          });
         }
       }
 
+      const hasErrors = syncedAccounts.some((a) => !a.success);
+      const accountsList = syncedAccounts
+        .map((acc) => {
+          const link = `[${acc.username}](https://vrchat.com/home/user/${acc.userId})`;
+          if (acc.success) {
+            return `✅ ${link}`;
+          } else {
+            return `❌ ${link}\n   └ Error: ${acc.error}`;
+          }
+        })
+        .join("\n");
+
       const embed = new EmbedBuilder()
-        .setTitle("Role Sync Results")
-        .setDescription(results.join("\n"))
-        .setColor(
-          results.some((r) => r.startsWith("❌")) ? Colors.Orange : Colors.Green,
+        .setTitle("🔄 VRChat Role Sync Results")
+        .setDescription(
+          `Synced Discord roles to VRChat group roles for ${user.tag}`,
         )
+        .addFields(
+          {
+            name: "Discord Member",
+            value: `<@${user.id}>`,
+            inline: true,
+          },
+          {
+            name: "Accounts Synced",
+            value: `${syncedAccounts.filter((a) => a.success).length}/${syncedAccounts.length}`,
+            inline: true,
+          },
+          {
+            name: "VRChat Accounts",
+            value: accountsList,
+            inline: false,
+          },
+        )
+        .setColor(hasErrors ? Colors.Orange : Colors.Green)
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" })
         .setTimestamp();
 
