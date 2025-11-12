@@ -17,7 +17,7 @@ import { groupRoleSyncManager } from "../../../managers/groupRoleSync/groupRoleS
 export class GroupRoleSyncCommand {
   @Slash({
     name: "rolesync",
-    description: "Manually sync a user's VRChat group roles to Discord roles",
+    description: "Manually sync a user's Discord roles to their VRChat group roles",
   })
   async syncRoles(
     @SlashOption({

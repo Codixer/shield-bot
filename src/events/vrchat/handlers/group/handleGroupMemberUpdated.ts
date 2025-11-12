@@ -1,11 +1,13 @@
-import { prisma } from "../../../../main.js";
-import { groupRoleSyncManager } from "../../../../managers/groupRoleSync/groupRoleSyncManager.js";
+import { prisma, bot } from "../../../../main.js";
+import { EmbedBuilder, Colors, TextChannel } from "discord.js";
 
 export async function handleGroupMemberUpdated(content: any) {
   console.log("[Group Member Updated]", content);
 
-  // content should have userId (VRChat user ID)
+  // content should have userId (VRChat user ID) and groupId
   const vrcUserId = content.userId;
+  const groupId = content.groupId;
+
   if (!vrcUserId) {
     console.warn("[Group Member Updated] No userId in event content");
     return;
@@ -27,26 +29,68 @@ export async function handleGroupMemberUpdated(content: any) {
     return;
   }
 
-  // Find all guilds with VRChat group ID configured
+  // Find all guilds with this VRChat group ID configured
   const guildSettings = await prisma.guildSettings.findMany({
     where: {
-      vrcGroupId: { not: null },
+      vrcGroupId: groupId || { not: null },
     },
   });
 
-  // Sync roles for each configured guild
+  // Log to promotion logs channel for each configured guild
   for (const settings of guildSettings) {
-    if (!settings.vrcGroupId) continue;
+    if (!settings.botPromotionLogsChannelId) continue;
 
     try {
-      await groupRoleSyncManager.handleGroupMemberUpdated(
-        settings.guildId,
-        vrcAccount.user.discordId,
-        vrcUserId,
+      const guild = await bot.guilds.fetch(settings.guildId).catch(() => null);
+      if (!guild) continue;
+
+      const member = await guild.members
+        .fetch(vrcAccount.user.discordId)
+        .catch(() => null);
+      const displayName =
+        member?.displayName || vrcAccount.vrchatUsername || vrcUserId;
+
+      const channel = (await bot.channels.fetch(
+        settings.botPromotionLogsChannelId,
+      )) as TextChannel;
+      if (!channel || !channel.isTextBased()) {
+        console.warn(
+          `[Group Member Updated] Invalid promotion logs channel ${settings.botPromotionLogsChannelId}`,
+        );
+        continue;
+      }
+
+      // Log the role change event
+      const embed = new EmbedBuilder()
+        .setTitle("🔄 VRChat Group Roles Updated")
+        .setDescription(
+          `${displayName}'s roles were updated in the VRChat group by a group admin.`,
+        )
+        .addFields(
+          {
+            name: "Member",
+            value: member ? `<@${member.id}>` : vrcAccount.user.discordId,
+            inline: true,
+          },
+          { name: "Display Name", value: displayName, inline: true },
+          {
+            name: "ℹ️ Note",
+            value:
+              "This change was made directly in VRChat by a group administrator. To keep Discord and VRChat roles in sync, use `/group rolesync` to update VRChat roles based on their Discord roles.",
+            inline: false,
+          },
+        )
+        .setColor(Colors.Gold)
+        .setTimestamp()
+        .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" });
+
+      await channel.send({ embeds: [embed] });
+      console.log(
+        `[Group Member Updated] Logged role update for ${displayName} in guild ${settings.guildId}`,
       );
     } catch (error) {
       console.error(
-        `[Group Member Updated] Error syncing roles for guild ${settings.guildId}:`,
+        `[Group Member Updated] Error logging for guild ${settings.guildId}:`,
         error,
       );
     }

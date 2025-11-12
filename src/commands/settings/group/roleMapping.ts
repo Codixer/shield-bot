@@ -21,23 +21,23 @@ import { getGroupRoles } from "../../../utility/vrchat/groups.js";
 export class GroupRoleMappingCommand {
   @Slash({
     name: "map",
-    description: "Map a VRChat group role to a Discord role",
+    description: "Map a Discord role to a VRChat group role",
   })
   async mapRole(
     @SlashOption({
-      name: "vrc_role_id",
-      description: "VRChat group role ID (e.g., grol_xxx)",
-      type: ApplicationCommandOptionType.String,
-      required: true,
-    })
-    vrcRoleId: string,
-    @SlashOption({
       name: "discord_role",
-      description: "Discord role to assign",
+      description: "Discord role to map from",
       type: ApplicationCommandOptionType.Role,
       required: true,
     })
     discordRole: any,
+    @SlashOption({
+      name: "vrc_role_id",
+      description: "VRChat group role ID to assign (e.g., grol_xxx)",
+      type: ApplicationCommandOptionType.String,
+      required: true,
+    })
+    vrcRoleId: string,
     interaction: CommandInteraction,
   ): Promise<void> {
     try {
@@ -95,12 +95,12 @@ export class GroupRoleMappingCommand {
       const embed = new EmbedBuilder()
         .setTitle("✅ Role Mapping Created")
         .setDescription(
-          `VRChat role \`${vrcRoleId}\` is now mapped to <@&${discordRole.id}>.`,
+          `Discord role <@&${discordRole.id}> is now mapped to VRChat role \`${vrcRoleId}\`.`,
         )
         .addFields({
-          name: "ℹ️ Note",
+          name: "ℹ️ How it works",
           value:
-            "Members with this VRChat group role will automatically receive the Discord role when they join the group or when their roles are updated.",
+            "Members with this Discord role will automatically be assigned the VRChat group role when they join the group or when their Discord roles are updated.",
         })
         .setColor(Colors.Green)
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" })

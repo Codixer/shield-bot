@@ -190,7 +190,8 @@ export class GroupRoleSyncManager {
   }
 
   /**
-   * Sync a user's Discord roles based on their VRChat group roles
+   * Sync a user's VRChat group roles based on their Discord roles
+   * This assigns/removes VRChat group roles to match their Discord roles
    * @param guildId Discord guild ID
    * @param discordId Discord user ID
    * @param vrcUserId VRChat user ID
@@ -229,8 +230,10 @@ export class GroupRoleSyncManager {
         return;
       }
 
-      // Get the member's VRChat group roles
-      console.log(`[GroupRoleSync] Fetching group member info for ${vrcUserId}...`);
+      // Get the member's current VRChat group roles
+      console.log(
+        `[GroupRoleSync] Fetching group member info for ${vrcUserId}...`,
+      );
       const groupMember = await getGroupMember(groupId, vrcUserId);
       if (!groupMember) {
         console.log(
@@ -240,7 +243,7 @@ export class GroupRoleSyncManager {
       }
 
       console.log(
-        `[GroupRoleSync] Member has ${groupMember.roleIds?.length || 0} regular roles and ${groupMember.mRoleIds?.length || 0} management roles`,
+        `[GroupRoleSync] Member has ${groupMember.roleIds?.length || 0} regular roles and ${groupMember.mRoleIds?.length || 0} management roles in VRChat`,
       );
 
       // Get role mappings for this guild
@@ -262,7 +265,7 @@ export class GroupRoleSyncManager {
         `[GroupRoleSync] Found ${roleMappings.length} role mapping(s) for this guild`,
       );
 
-      // Get Discord member
+      // Get Discord member to check their roles
       const guild = await bot.guilds.fetch(guildId);
       if (!guild) {
         console.error(`[GroupRoleSync] ❌ Guild ${guildId} not found`);
@@ -277,75 +280,96 @@ export class GroupRoleSyncManager {
         return;
       }
 
-      console.log(`[GroupRoleSync] Processing Discord member: ${member.displayName}`);
-
-      // Get the VRChat role IDs the member has (including both member and management roles)
-      const vrcRoleIds = new Set([
-        ...(groupMember.roleIds || []),
-        ...(groupMember.mRoleIds || []),
-      ]);
-
       console.log(
-        `[GroupRoleSync] Member has VRChat roles: ${Array.from(vrcRoleIds).join(", ")}`,
+        `[GroupRoleSync] Processing Discord member: ${member.displayName}`,
       );
 
-      // Determine which Discord roles should be added and removed
-      const rolesToAdd: string[] = [];
-      const rolesToRemove: string[] = [];
+      // Get the VRChat role IDs the member currently has (non-management only)
+      const currentVrcRoleIds = new Set(groupMember.roleIds || []);
+
+      console.log(
+        `[GroupRoleSync] Member has VRChat roles: ${Array.from(currentVrcRoleIds).join(", ") || "none"}`,
+      );
+
+      // Determine which VRChat roles should be added and removed based on Discord roles
+      const vrcRolesToAdd: string[] = [];
+      const vrcRolesToRemove: string[] = [];
 
       for (const mapping of roleMappings) {
-        const hasVrcRole = vrcRoleIds.has(mapping.vrcGroupRoleId);
         const hasDiscordRole = member.roles.cache.has(mapping.discordRoleId);
+        const hasVrcRole = currentVrcRoleIds.has(mapping.vrcGroupRoleId);
 
         console.log(
-          `[GroupRoleSync] Mapping check: VRC role ${mapping.vrcGroupRoleId} -> Discord role ${mapping.discordRoleId}`,
+          `[GroupRoleSync] Mapping check: Discord role ${mapping.discordRoleId} -> VRC role ${mapping.vrcGroupRoleId}`,
         );
-        console.log(`  - Has VRC role: ${hasVrcRole}`);
         console.log(`  - Has Discord role: ${hasDiscordRole}`);
+        console.log(`  - Has VRChat role: ${hasVrcRole}`);
 
-        if (hasVrcRole && !hasDiscordRole) {
-          rolesToAdd.push(mapping.discordRoleId);
-          console.log(`  ➡️ Will ADD Discord role ${mapping.discordRoleId}`);
-        } else if (!hasVrcRole && hasDiscordRole) {
-          rolesToRemove.push(mapping.discordRoleId);
-          console.log(`  ⬅️ Will REMOVE Discord role ${mapping.discordRoleId}`);
+        if (hasDiscordRole && !hasVrcRole) {
+          vrcRolesToAdd.push(mapping.vrcGroupRoleId);
+          console.log(
+            `  ➡️ Will ADD VRChat role ${mapping.vrcGroupRoleId} (has Discord role)`,
+          );
+        } else if (!hasDiscordRole && hasVrcRole) {
+          vrcRolesToRemove.push(mapping.vrcGroupRoleId);
+          console.log(
+            `  ⬅️ Will REMOVE VRChat role ${mapping.vrcGroupRoleId} (missing Discord role)`,
+          );
         } else {
-          console.log(`  ✓ Role already in sync`);
+          console.log(`  ✓ VRChat role already in sync`);
         }
       }
 
-      // Apply role changes
-      if (rolesToAdd.length > 0) {
+      // Apply VRChat role changes
+      if (vrcRolesToAdd.length > 0) {
         console.log(
-          `[GroupRoleSync] Adding ${rolesToAdd.length} role(s) to ${member.displayName}:`,
-          rolesToAdd,
+          `[GroupRoleSync] Adding ${vrcRolesToAdd.length} VRChat role(s) to ${member.displayName}:`,
+          vrcRolesToAdd,
         );
-        await member.roles.add(rolesToAdd);
-        console.log(`[GroupRoleSync] ✅ Successfully added roles`);
+        for (const roleId of vrcRolesToAdd) {
+          try {
+            await addRoleToGroupMember(groupId, vrcUserId, roleId);
+            console.log(`[GroupRoleSync] ✅ Added VRChat role ${roleId}`);
+          } catch (error: any) {
+            console.error(
+              `[GroupRoleSync] ❌ Failed to add VRChat role ${roleId}:`,
+              error.message,
+            );
+          }
+        }
       }
 
-      if (rolesToRemove.length > 0) {
+      if (vrcRolesToRemove.length > 0) {
         console.log(
-          `[GroupRoleSync] Removing ${rolesToRemove.length} role(s) from ${member.displayName}:`,
-          rolesToRemove,
+          `[GroupRoleSync] Removing ${vrcRolesToRemove.length} VRChat role(s) from ${member.displayName}:`,
+          vrcRolesToRemove,
         );
-        await member.roles.remove(rolesToRemove);
-        console.log(`[GroupRoleSync] ✅ Successfully removed roles`);
+        for (const roleId of vrcRolesToRemove) {
+          try {
+            await removeRoleFromGroupMember(groupId, vrcUserId, roleId);
+            console.log(`[GroupRoleSync] ✅ Removed VRChat role ${roleId}`);
+          } catch (error: any) {
+            console.error(
+              `[GroupRoleSync] ❌ Failed to remove VRChat role ${roleId}:`,
+              error.message,
+            );
+          }
+        }
       }
 
-      if (rolesToAdd.length === 0 && rolesToRemove.length === 0) {
+      if (vrcRolesToAdd.length === 0 && vrcRolesToRemove.length === 0) {
         console.log(
-          `[GroupRoleSync] ✓ No role changes needed for ${member.displayName}`,
+          `[GroupRoleSync] ✓ No VRChat role changes needed for ${member.displayName}`,
         );
       }
 
       // Log the sync if there were changes
-      if (rolesToAdd.length > 0 || rolesToRemove.length > 0) {
+      if (vrcRolesToAdd.length > 0 || vrcRolesToRemove.length > 0) {
         await this.logRoleSync(
           guildId,
           member,
-          rolesToAdd,
-          rolesToRemove,
+          vrcRolesToAdd,
+          vrcRolesToRemove,
           "sync",
         );
       }
@@ -368,9 +392,9 @@ export class GroupRoleSyncManager {
   private async logRoleSync(
     guildId: string,
     member: GuildMember,
-    rolesAdded: string[],
-    rolesRemoved: string[],
-    action: "sync" | "group-joined" | "group-member-updated",
+    vrcRolesAdded: string[],
+    vrcRolesRemoved: string[],
+    action: "sync" | "group-joined" | "discord-role-updated",
   ): Promise<void> {
     try {
       const settings = await prisma.guildSettings.findUnique({
@@ -391,31 +415,33 @@ export class GroupRoleSyncManager {
         return;
       }
 
+      // Format VRChat role IDs
       const addedRoles =
-        rolesAdded.length > 0
-          ? rolesAdded.map((r) => `<@&${r}>`).join(", ")
+        vrcRolesAdded.length > 0
+          ? vrcRolesAdded.map((r) => `\`${r}\``).join(", ")
           : "None";
       const removedRoles =
-        rolesRemoved.length > 0
-          ? rolesRemoved.map((r) => `<@&${r}>`).join(", ")
+        vrcRolesRemoved.length > 0
+          ? vrcRolesRemoved.map((r) => `\`${r}\``).join(", ")
           : "None";
 
       let title = "🔄 VRChat Group Roles Synced";
       let color: number = Colors.Blue;
+      let description = `VRChat group roles have been synced for ${member.user.tag} based on their Discord roles.`;
 
       if (action === "group-joined") {
         title = "✅ Member Joined VRChat Group";
         color = Colors.Green;
-      } else if (action === "group-member-updated") {
-        title = "🔄 VRChat Group Roles Updated";
+        description = `${member.user.tag} joined the VRChat group. Their VRChat roles have been assigned based on their Discord roles.`;
+      } else if (action === "discord-role-updated") {
+        title = "🔄 Discord Roles Changed";
         color = Colors.Gold;
+        description = `${member.user.tag}'s Discord roles changed. Their VRChat group roles have been updated to match.`;
       }
 
       const embed = new EmbedBuilder()
         .setTitle(title)
-        .setDescription(
-          `Discord roles have been synced for ${member.user.tag} based on their VRChat group roles.`,
-        )
+        .setDescription(description)
         .addFields(
           { name: "Member", value: `<@${member.id}>`, inline: true },
           {
@@ -423,8 +449,16 @@ export class GroupRoleSyncManager {
             value: member.displayName || member.user.username,
             inline: true,
           },
-          { name: "Roles Added", value: addedRoles, inline: false },
-          { name: "Roles Removed", value: removedRoles, inline: false },
+          {
+            name: "VRChat Roles Added",
+            value: addedRoles,
+            inline: false,
+          },
+          {
+            name: "VRChat Roles Removed",
+            value: removedRoles,
+            inline: false,
+          },
         )
         .setColor(color)
         .setTimestamp()
@@ -438,6 +472,7 @@ export class GroupRoleSyncManager {
 
   /**
    * Handle a user joining the VRChat group
+   * Assigns VRChat group roles based on their Discord roles
    */
   async handleGroupJoined(
     guildId: string,
@@ -445,21 +480,22 @@ export class GroupRoleSyncManager {
     vrcUserId: string,
   ): Promise<void> {
     console.log(
-      `[GroupRoleSync] User ${vrcUserId} joined group, syncing roles...`,
+      `[GroupRoleSync] User ${vrcUserId} joined group, assigning VRChat roles based on Discord...`,
     );
     await this.syncUserRoles(guildId, discordId, vrcUserId);
   }
 
   /**
-   * Handle a user's group roles being updated
+   * Handle Discord role updates for a verified user
+   * Updates their VRChat group roles to match
    */
-  async handleGroupMemberUpdated(
+  async handleDiscordRoleUpdate(
     guildId: string,
     discordId: string,
     vrcUserId: string,
   ): Promise<void> {
     console.log(
-      `[GroupRoleSync] User ${vrcUserId} roles updated in group, syncing...`,
+      `[GroupRoleSync] Discord roles updated for ${discordId}, syncing VRChat roles...`,
     );
     await this.syncUserRoles(guildId, discordId, vrcUserId);
   }
@@ -505,7 +541,7 @@ export class GroupRoleSyncManager {
       const embed = new EmbedBuilder()
         .setTitle("⬅️ Member Left VRChat Group")
         .setDescription(
-          `${displayName} has left the VRChat group. Their Discord roles remain unchanged.`,
+          `${displayName} has left the VRChat group.`,
         )
         .addFields(
           { name: "Member", value: `<@${discordId}>`, inline: true },
