@@ -23,9 +23,21 @@ export class GroupRoleSyncManager {
   ): Promise<number> {
     try {
       const member = await getGroupMember(groupId, userId);
-      if (!member || !member.mRoleIds || member.mRoleIds.length === 0) {
+      if (!member) {
+        console.log(
+          `[GroupRoleSync] User ${userId} not found in group ${groupId}`,
+        );
+        return -1;
+      }
+
+      if (!member.mRoleIds || member.mRoleIds.length === 0) {
+        console.log(`[GroupRoleSync] User ${userId} has no management roles`);
         return -1; // No management roles
       }
+
+      console.log(
+        `[GroupRoleSync] User ${userId} has ${member.mRoleIds.length} management role(s): ${member.mRoleIds.join(", ")}`,
+      );
 
       // mRoleIds contains the management role IDs
       // We need to fetch role details to get order values
@@ -70,17 +82,32 @@ export class GroupRoleSyncManager {
         userId,
       );
 
+      console.log(
+        `[GroupRoleSync] Permission check for ${userId} in group ${groupId}:`,
+      );
+      console.log(`  - Bot management role order: ${botOrder}`);
+      console.log(`  - Member management role order: ${memberOrder}`);
+
       // If bot has no management roles, it cannot manage anyone
       if (botOrder === -1) {
+        console.log(
+          `[GroupRoleSync] ❌ Bot has no management permissions in group ${groupId}`,
+        );
         return false;
       }
 
       // If member has any management roles, bot cannot manage them
       // This is a safety measure to prevent accidental changes to staff
       if (memberOrder !== -1) {
+        console.log(
+          `[GroupRoleSync] ❌ Member ${userId} has management roles and cannot be managed (safety measure)`,
+        );
         return false;
       }
 
+      console.log(
+        `[GroupRoleSync] ✅ Bot can manage member ${userId} (no management roles)`,
+      );
       return true;
     } catch (error) {
       console.error(
@@ -103,6 +130,10 @@ export class GroupRoleSyncManager {
     vrcUserId: string,
   ): Promise<void> {
     try {
+      console.log(
+        `[GroupRoleSync] Starting role sync for user ${vrcUserId} (Discord: ${discordId}) in guild ${guildId}`,
+      );
+
       // Get guild settings to find the VRChat group ID
       const settings = await prisma.guildSettings.findUnique({
         where: { guildId },
@@ -110,30 +141,36 @@ export class GroupRoleSyncManager {
 
       if (!settings?.vrcGroupId) {
         console.log(
-          `[GroupRoleSync] No VRChat group configured for guild ${guildId}`,
+          `[GroupRoleSync] ❌ No VRChat group configured for guild ${guildId}`,
         );
         return;
       }
 
       const groupId = settings.vrcGroupId;
+      console.log(`[GroupRoleSync] Using VRChat group: ${groupId}`);
 
       // Check if bot can manage this member
       const canManage = await this.canBotManageMember(groupId, vrcUserId);
       if (!canManage) {
         console.log(
-          `[GroupRoleSync] Bot cannot manage ${vrcUserId} - member has management roles`,
+          `[GroupRoleSync] ❌ Skipping role sync - bot cannot manage ${vrcUserId}`,
         );
         return;
       }
 
       // Get the member's VRChat group roles
+      console.log(`[GroupRoleSync] Fetching group member info for ${vrcUserId}...`);
       const groupMember = await getGroupMember(groupId, vrcUserId);
       if (!groupMember) {
         console.log(
-          `[GroupRoleSync] User ${vrcUserId} is not in group ${groupId}`,
+          `[GroupRoleSync] ❌ User ${vrcUserId} is not in group ${groupId}`,
         );
         return;
       }
+
+      console.log(
+        `[GroupRoleSync] Member has ${groupMember.roleIds?.length || 0} regular roles and ${groupMember.mRoleIds?.length || 0} management roles`,
+      );
 
       // Get role mappings for this guild
       const roleMappings = await prisma.groupRoleMapping.findMany({
@@ -145,31 +182,41 @@ export class GroupRoleSyncManager {
 
       if (roleMappings.length === 0) {
         console.log(
-          `[GroupRoleSync] No role mappings configured for guild ${guildId}`,
+          `[GroupRoleSync] ℹ️ No role mappings configured for guild ${guildId}`,
         );
         return;
       }
 
+      console.log(
+        `[GroupRoleSync] Found ${roleMappings.length} role mapping(s) for this guild`,
+      );
+
       // Get Discord member
       const guild = await bot.guilds.fetch(guildId);
       if (!guild) {
-        console.error(`[GroupRoleSync] Guild ${guildId} not found`);
+        console.error(`[GroupRoleSync] ❌ Guild ${guildId} not found`);
         return;
       }
 
       const member = await guild.members.fetch(discordId);
       if (!member) {
         console.error(
-          `[GroupRoleSync] Member ${discordId} not found in guild ${guildId}`,
+          `[GroupRoleSync] ❌ Member ${discordId} not found in guild ${guildId}`,
         );
         return;
       }
+
+      console.log(`[GroupRoleSync] Processing Discord member: ${member.displayName}`);
 
       // Get the VRChat role IDs the member has (including both member and management roles)
       const vrcRoleIds = new Set([
         ...(groupMember.roleIds || []),
         ...(groupMember.mRoleIds || []),
       ]);
+
+      console.log(
+        `[GroupRoleSync] Member has VRChat roles: ${Array.from(vrcRoleIds).join(", ")}`,
+      );
 
       // Determine which Discord roles should be added and removed
       const rolesToAdd: string[] = [];
@@ -179,25 +226,45 @@ export class GroupRoleSyncManager {
         const hasVrcRole = vrcRoleIds.has(mapping.vrcGroupRoleId);
         const hasDiscordRole = member.roles.cache.has(mapping.discordRoleId);
 
+        console.log(
+          `[GroupRoleSync] Mapping check: VRC role ${mapping.vrcGroupRoleId} -> Discord role ${mapping.discordRoleId}`,
+        );
+        console.log(`  - Has VRC role: ${hasVrcRole}`);
+        console.log(`  - Has Discord role: ${hasDiscordRole}`);
+
         if (hasVrcRole && !hasDiscordRole) {
           rolesToAdd.push(mapping.discordRoleId);
+          console.log(`  ➡️ Will ADD Discord role ${mapping.discordRoleId}`);
         } else if (!hasVrcRole && hasDiscordRole) {
           rolesToRemove.push(mapping.discordRoleId);
+          console.log(`  ⬅️ Will REMOVE Discord role ${mapping.discordRoleId}`);
+        } else {
+          console.log(`  ✓ Role already in sync`);
         }
       }
 
       // Apply role changes
       if (rolesToAdd.length > 0) {
-        await member.roles.add(rolesToAdd);
         console.log(
-          `[GroupRoleSync] Added ${rolesToAdd.length} roles to ${member.displayName}`,
+          `[GroupRoleSync] Adding ${rolesToAdd.length} role(s) to ${member.displayName}:`,
+          rolesToAdd,
         );
+        await member.roles.add(rolesToAdd);
+        console.log(`[GroupRoleSync] ✅ Successfully added roles`);
       }
 
       if (rolesToRemove.length > 0) {
-        await member.roles.remove(rolesToRemove);
         console.log(
-          `[GroupRoleSync] Removed ${rolesToRemove.length} roles from ${member.displayName}`,
+          `[GroupRoleSync] Removing ${rolesToRemove.length} role(s) from ${member.displayName}:`,
+          rolesToRemove,
+        );
+        await member.roles.remove(rolesToRemove);
+        console.log(`[GroupRoleSync] ✅ Successfully removed roles`);
+      }
+
+      if (rolesToAdd.length === 0 && rolesToRemove.length === 0) {
+        console.log(
+          `[GroupRoleSync] ✓ No role changes needed for ${member.displayName}`,
         );
       }
 
@@ -211,11 +278,16 @@ export class GroupRoleSyncManager {
           "sync",
         );
       }
+
+      console.log(
+        `[GroupRoleSync] ✅ Completed role sync for ${member.displayName}`,
+      );
     } catch (error) {
       console.error(
-        `[GroupRoleSync] Error syncing roles for ${discordId}:`,
+        `[GroupRoleSync] ❌ Error syncing roles for ${discordId}:`,
         error,
       );
+      throw error; // Re-throw so the command can catch and display the error
     }
   }
 
