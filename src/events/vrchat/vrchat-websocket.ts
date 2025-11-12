@@ -105,7 +105,7 @@ export function startVRChatWebSocketListener() {
           return;
         }
 
-        console.log (`[VRChat WS] Received event: ${msg}`);
+        // console.log (`[VRChat WS] Received event: ${msg}`);
         switch (msg.type) {
           // Notification Events
           case "notification":

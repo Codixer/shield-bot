@@ -76,13 +76,14 @@ export class GroupRoleMappingCommand {
       // Create or update the mapping
       await prisma.groupRoleMapping.upsert({
         where: {
-          guildId_vrcGroupRoleId: {
+          guildId_discordRoleId_vrcGroupRoleId: {
             guildId: interaction.guildId,
+            discordRoleId: discordRole.id,
             vrcGroupRoleId: vrcRoleId,
           },
         },
         update: {
-          discordRoleId: discordRole.id,
+          // Nothing to update since all fields are in the unique key
         },
         create: {
           guildId: interaction.guildId,
@@ -118,9 +119,16 @@ export class GroupRoleMappingCommand {
 
   @Slash({
     name: "unmap",
-    description: "Remove a VRChat group role mapping",
+    description: "Remove a Discord role to VRChat group role mapping",
   })
   async unmapRole(
+    @SlashOption({
+      name: "discord_role",
+      description: "Discord role to unmap",
+      type: ApplicationCommandOptionType.Role,
+      required: true,
+    })
+    discordRole: any,
     @SlashOption({
       name: "vrc_role_id",
       description: "VRChat group role ID to unmap (e.g., grol_xxx)",
@@ -139,18 +147,17 @@ export class GroupRoleMappingCommand {
         return;
       }
 
-      const mapping = await prisma.groupRoleMapping.findUnique({
+      const mapping = await prisma.groupRoleMapping.findFirst({
         where: {
-          guildId_vrcGroupRoleId: {
-            guildId: interaction.guildId,
-            vrcGroupRoleId: vrcRoleId,
-          },
+          guildId: interaction.guildId,
+          discordRoleId: discordRole.id,
+          vrcGroupRoleId: vrcRoleId,
         },
       });
 
       if (!mapping) {
         await interaction.reply({
-          content: `❌ No mapping found for VRChat role \`${vrcRoleId}\`.`,
+          content: `❌ No mapping found for Discord role <@&${discordRole.id}> to VRChat role \`${vrcRoleId}\`.`,
           ephemeral: true,
         });
         return;
@@ -158,17 +165,14 @@ export class GroupRoleMappingCommand {
 
       await prisma.groupRoleMapping.delete({
         where: {
-          guildId_vrcGroupRoleId: {
-            guildId: interaction.guildId,
-            vrcGroupRoleId: vrcRoleId,
-          },
+          id: mapping.id,
         },
       });
 
       const embed = new EmbedBuilder()
         .setTitle("✅ Role Mapping Removed")
         .setDescription(
-          `The mapping for VRChat role \`${vrcRoleId}\` has been removed.`,
+          `The mapping from Discord role <@&${discordRole.id}> to VRChat role \`${vrcRoleId}\` has been removed.`,
         )
         .setColor(Colors.Green)
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" })
@@ -186,7 +190,7 @@ export class GroupRoleMappingCommand {
 
   @Slash({
     name: "list",
-    description: "List all VRChat group role mappings for this server",
+    description: "List all Discord to VRChat group role mappings for this server",
   })
   async listMappings(interaction: CommandInteraction): Promise<void> {
     try {
@@ -211,16 +215,32 @@ export class GroupRoleMappingCommand {
         return;
       }
 
-      const mappingList = mappings
-        .map((m) => `\`${m.vrcGroupRoleId}\` → <@&${m.discordRoleId}>`)
-        .join("\n");
+      // Group mappings by VRChat role ID
+      const groupedMappings = new Map<string, string[]>();
+      for (const mapping of mappings) {
+        if (!groupedMappings.has(mapping.vrcGroupRoleId)) {
+          groupedMappings.set(mapping.vrcGroupRoleId, []);
+        }
+        groupedMappings.get(mapping.vrcGroupRoleId)!.push(mapping.discordRoleId);
+      }
+
+      const mappingList = Array.from(groupedMappings.entries())
+        .map(([vrcRoleId, discordRoleIds]) => {
+          const discordRoles = discordRoleIds.map((id) => `<@&${id}>`).join(", ");
+          return `**VRChat Role:** \`${vrcRoleId}\`\n└ Discord Role(s): ${discordRoles}`;
+        })
+        .join("\n\n");
 
       const embed = new EmbedBuilder()
-        .setTitle("VRChat Group Role Mappings")
+        .setTitle("Discord → VRChat Group Role Mappings")
         .setDescription(mappingList)
+        .addFields({
+          name: "ℹ️ How it works",
+          value: "Users with any of the Discord roles will be assigned the corresponding VRChat group role.",
+        })
         .setColor(Colors.Blue)
         .setFooter({
-          text: `${mappings.length} mapping(s) configured | S.H.I.E.L.D. Bot`,
+          text: `${groupedMappings.size} VRChat role(s) mapped | S.H.I.E.L.D. Bot`,
         })
         .setTimestamp();
 
