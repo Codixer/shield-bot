@@ -1,0 +1,90 @@
+import { Discord, Slash, SlashGroup } from "discordx";
+import {
+  CommandInteraction,
+  EmbedBuilder,
+  Colors,
+  MessageFlags,
+} from "discord.js";
+import { prisma } from "../../../main.js";
+import { inviteUserToGroup } from "../../../utility/vrchat/groups.js";
+
+@Discord()
+@SlashGroup({ name: "group", description: "VRChat group commands" })
+@SlashGroup("group")
+export class GroupSelfInviteCommand {
+  @Slash({
+    name: "join",
+    description: "Request an invite to the SHIELD VRChat group",
+  })
+  async selfInvite(interaction: CommandInteraction): Promise<void> {
+    try {
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+      // Get the VRChat group ID from guild settings
+      const guildSettings = await prisma.guildSettings.findFirst({
+        where: { vrcGroupId: { not: null } },
+      });
+
+      if (!guildSettings?.vrcGroupId) {
+        await interaction.editReply({
+          content: "❌ No VRChat group configured for this server.",
+        });
+        return;
+      }
+
+      // Get user's verified VRChat account
+      const user = await prisma.user.findUnique({
+        where: { discordId: interaction.user.id },
+        include: {
+          vrchatAccounts: {
+            where: { accountType: { in: ["MAIN", "ALT"] } },
+          },
+        },
+      });
+
+      if (!user || user.vrchatAccounts.length === 0) {
+        await interaction.editReply({
+          content:
+            "❌ You don't have a verified VRChat account. Please verify your account first using `/verify account`.",
+        });
+        return;
+      }
+
+      // Use the main account if available, otherwise first verified account
+      const mainAccount = user.vrchatAccounts.find((acc) => acc.accountType === "MAIN");
+      const vrcAccount = mainAccount || user.vrchatAccounts[0];
+
+      // Send group invite
+      await inviteUserToGroup(guildSettings.vrcGroupId, vrcAccount.vrcUserId);
+
+      const embed = new EmbedBuilder()
+        .setTitle("✅ Group Invite Sent!")
+        .setDescription(
+          `A group invite has been sent to your VRChat account!\n\n**Account:** ${vrcAccount.vrchatUsername || vrcAccount.vrcUserId}\n\nCheck your VRChat notifications to accept the invite.`,
+        )
+        .setColor(Colors.Green)
+        .setFooter({ text: "S.H.I.E.L.D. Bot - Group Management" })
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
+    } catch (error: any) {
+      console.error("[Self Group Invite] Error:", error);
+
+      let errorMessage = "Failed to send group invite. Please try again later.";
+      if (error.message?.includes("400")) {
+        errorMessage =
+          "You may already be in the group, have a pending invite, or the group settings don't allow invites.";
+      } else if (error.message?.includes("404")) {
+        errorMessage = "The VRChat group was not found.";
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle("❌ Group Invite Failed")
+        .setDescription(errorMessage)
+        .setColor(Colors.Red)
+        .setFooter({ text: "S.H.I.E.L.D. Bot - Group Management" });
+
+      await interaction.editReply({ embeds: [embed] });
+    }
+  }
+}

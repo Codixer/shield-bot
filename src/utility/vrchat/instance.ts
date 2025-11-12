@@ -1,5 +1,5 @@
 import { loadCookie, USER_AGENT } from "./index.js";
-import fetch from "node-fetch";
+import { vrchatFetch } from "./rateLimiter.js";
 import { getCurrentUser } from "./user.js";
 
 export async function createInstance({
@@ -41,7 +41,7 @@ export async function createInstance({
     }
   }
 
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -67,7 +67,7 @@ export async function inviteUser(userId: string, instanceLocation: string) {
 
   const url = `https://api.vrchat.cloud/api/1/invite/${userId}`;
 
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

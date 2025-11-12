@@ -2,7 +2,7 @@
 
 import { prisma } from "../../main.js";
 import { loadCookie, USER_AGENT } from "../vrchat/index.js";
-import fetch from "node-fetch";
+import { vrchatFetch } from "./rateLimiter.js";
 
 export async function findFriendInstanceOrWorld(userId: string) {
   const record = await prisma.friendLocation.findUnique({
@@ -37,7 +37,7 @@ export async function getFriendInstanceInfo(userId: string) {
     const cookie = loadCookie();
     if (!cookie) throw new Error("Not authenticated. Please log in first.");
     const url = `https://api.vrchat.cloud/api/1/instances/${record.worldId}`;
-    const response = await fetch(url, {
+    const response = await vrchatFetch(url, {
       method: "GET",
       headers: {
         "User-Agent": USER_AGENT,
@@ -84,7 +84,7 @@ export async function getFriendInstanceInfo(userId: string) {
   const cookie = loadCookie();
   if (!cookie) throw new Error("Not authenticated. Please log in first.");
   const url = `https://api.vrchat.cloud/api/1/instances/${worldId}:${instanceId}`;
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "GET",
     headers: {
       "User-Agent": USER_AGENT,
@@ -121,7 +121,7 @@ export async function getInstanceInfoByShortName(shortName: string) {
   const cookie = loadCookie();
   if (!cookie) throw new Error("Not authenticated. Please log in first.");
   const url = `https://api.vrchat.cloud/api/1/instances/s/${shortName}`;
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "GET",
     headers: {
       "User-Agent": USER_AGENT,

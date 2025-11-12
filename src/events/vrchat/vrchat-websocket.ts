@@ -178,12 +178,12 @@ export function startVRChatWebSocketListener() {
           //     console.log("[Instance Queue Ready]", content);
           //     break;
           // Group Events
-          case "group-joined":
-            await handleGroupJoined(content);
-            break;
-          case "group-left":
-            await handleGroupLeft(content);
-            break;
+          // case "group-joined":
+          //   await handleGroupJoined(content);
+          //   break;
+          // case "group-left":
+          //   await handleGroupLeft(content);
+          //   break;
           // case "group-member-updated":
           //   // This event is for the local user (bot) only, not other members
           //   await handleGroupMemberUpdated(content);

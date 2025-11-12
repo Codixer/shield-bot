@@ -1,7 +1,7 @@
 // Invite message–related VRChat API methods
 
 import { loadCookie, USER_AGENT } from "../vrchat/index.js";
-import fetch from "node-fetch";
+import { vrchatFetch } from "./rateLimiter.js";
 import type { InviteMessage } from "../../managers/messages/InviteMessageManager.js";
 
 export async function updateInviteMessage({
@@ -20,7 +20,7 @@ export async function updateInviteMessage({
   const cookie = loadCookie();
   if (!cookie) throw new Error("Not authenticated. Please log in first.");
   const url = `https://api.vrchat.cloud/api/1/message/${encodeURIComponent(userId)}/${messageType}/${slot}`;
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -29,11 +29,7 @@ export async function updateInviteMessage({
     },
     body: JSON.stringify({ message }),
   });
-  if (response.status === 429) {
-    throw new Error(
-      "Cooldown not expired. Try again later (429 Too Fast Error)",
-    );
-  }
+  // Note: 429 is now handled automatically by vrchatFetch with retry logic
   if (!response.ok) {
     const text = await response.text();
     throw new Error(
@@ -54,7 +50,7 @@ export async function listInviteMessages({
   const cookie = loadCookie();
   if (!cookie) throw new Error("Not authenticated. Please log in first.");
   const url = `https://api.vrchat.cloud/api/1/message/${encodeURIComponent(userId)}/${messageType}`;
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "GET",
     headers: {
       "User-Agent": USER_AGENT,

@@ -3,6 +3,7 @@
 import axios from "axios";
 import { authenticator } from "otplib";
 import { loadCookie, saveCookie, USER_AGENT } from "../vrchat/index.js";
+import { vrchatFetch } from "./rateLimiter.js";
 import { prisma } from "../../main.js";
 // Use the application's Prisma instance from main.ts at runtime to avoid creating a separate client here.
 
@@ -15,14 +16,14 @@ export async function sendFriendRequest(userId: string): Promise<object> {
     "User-Agent": USER_AGENT,
     "Content-Type": "application/json",
   };
-  let res = await fetch(url, {
+  let res = await vrchatFetch(url, {
     method: "POST",
     headers,
   });
   if (res.status === 400) {
     // Already friends, unfriend and try again
     await unfriendUser(userId);
-    res = await fetch(url, {
+    res = await vrchatFetch(url, {
       method: "POST",
       headers,
     });
@@ -32,7 +33,7 @@ export async function sendFriendRequest(userId: string): Promise<object> {
       `Failed to send friend request: ${res.status} ${await res.text()}`,
     );
   }
-  return await res.json();
+  return (await res.json()) as any;
 }
 
 export async function unfriendUser(userId: string): Promise<object> {
@@ -44,7 +45,7 @@ export async function unfriendUser(userId: string): Promise<object> {
     "User-Agent": USER_AGENT,
     "Content-Type": "application/json",
   };
-  const res = await fetch(url, {
+  const res = await vrchatFetch(url, {
     method: "DELETE",
     headers,
   });
@@ -53,7 +54,7 @@ export async function unfriendUser(userId: string): Promise<object> {
       `Failed to unfriend user: ${res.status} ${await res.text()}`,
     );
   }
-  return await res.json();
+  return (await res.json()) as any;
 }
 
 export async function loginAndGetCurrentUser(
@@ -207,7 +208,7 @@ export async function acceptFriendRequest(notificationId: string) {
   if (!cookie) throw new Error("Not authenticated. Please log in first.");
 
   const url = `https://api.vrchat.cloud/api/1/auth/user/notifications/${notificationId}/accept`;
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",

@@ -1,7 +1,7 @@
 // VRChat Group API utilities
 
 import { loadCookie, USER_AGENT } from "./index.js";
-import fetch from "node-fetch";
+import { vrchatFetch } from "./rateLimiter.js";
 
 /**
  * Invite a user to a VRChat group
@@ -19,7 +19,7 @@ export async function inviteUserToGroup(
   }
 
   const url = `https://api.vrchat.cloud/api/1/groups/${groupId}/invites`;
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "POST",
     headers: {
       "User-Agent": USER_AGENT,
@@ -59,7 +59,7 @@ export async function getGroupMember(
   }
 
   const url = `https://api.vrchat.cloud/api/1/groups/${groupId}/members/${userId}`;
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "GET",
     headers: {
       "User-Agent": USER_AGENT,
@@ -105,7 +105,7 @@ export async function updateGroupMember(
   }
 
   const url = `https://api.vrchat.cloud/api/1/groups/${groupId}/members/${userId}`;
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "PUT",
     headers: {
       "User-Agent": USER_AGENT,
@@ -143,7 +143,7 @@ export async function addRoleToGroupMember(
   }
 
   const url = `https://api.vrchat.cloud/api/1/groups/${groupId}/members/${userId}/roles/${roleId}`;
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "PUT",
     headers: {
       "User-Agent": USER_AGENT,
@@ -179,7 +179,7 @@ export async function removeRoleFromGroupMember(
   }
 
   const url = `https://api.vrchat.cloud/api/1/groups/${groupId}/members/${userId}/roles/${roleId}`;
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "DELETE",
     headers: {
       "User-Agent": USER_AGENT,
@@ -209,7 +209,7 @@ export async function getGroupRoles(groupId: string): Promise<any> {
   }
 
   const url = `https://api.vrchat.cloud/api/1/groups/${groupId}/roles`;
-  const response = await fetch(url, {
+  const response = await vrchatFetch(url, {
     method: "GET",
     headers: {
       "User-Agent": USER_AGENT,
