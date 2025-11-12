@@ -220,7 +220,12 @@ export class GroupRoleSyncManager {
       }
 
       // Get the VRChat role IDs the member currently has (non-management only)
-      const currentVrcRoleIds = new Set(groupMember.roleIds || []);
+      // VRChat has two role arrays: roleIds (regular) and mRoleIds (management/permissions)
+      // We need to check both to see if the user has the role
+      const currentVrcRoleIds = new Set([
+        ...(groupMember.roleIds || []),
+        ...(groupMember.mRoleIds || []),
+      ]);
 
       // Determine which VRChat roles should be added and removed based on Discord roles
       const vrcRolesToAdd: string[] = [];
@@ -229,6 +234,12 @@ export class GroupRoleSyncManager {
       // Debug: Log member's Discord roles
       console.log(
         `[GroupRoleSync] ${member.displayName} has ${member.roles.cache.size} Discord roles: ${Array.from(member.roles.cache.keys()).join(", ")}`,
+      );
+      console.log(
+        `[GroupRoleSync] VRChat roleIds: ${groupMember.roleIds || "none"}`,
+      );
+      console.log(
+        `[GroupRoleSync] VRChat mRoleIds: ${groupMember.mRoleIds || "none"}`,
       );
 
       for (const mapping of roleMappings) {
