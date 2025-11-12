@@ -6,6 +6,7 @@ interface RateLimitConfig {
   maxRetries: number;
   baseDelay: number; // Base delay in ms
   maxDelay: number; // Maximum delay in ms
+  aggressiveMode?: boolean; // Wait proactively when approaching limit
 }
 
 interface QueuedRequest {
@@ -20,6 +21,7 @@ const DEFAULT_CONFIG: RateLimitConfig = {
   maxRetries: 3,
   baseDelay: 1000, // Start with 1 second
   maxDelay: 60000, // Max 60 seconds
+  aggressiveMode: true, // Proactively prevent 429s
 };
 
 class VRChatRateLimiter {
@@ -28,6 +30,8 @@ class VRChatRateLimiter {
   private lastRequestTime = 0;
   private minRequestInterval = 100; // Minimum 100ms between requests
   private currentDelay = 0; // Current delay for 429 backoff
+  private rateLimitRemaining: number | null = null; // Requests remaining
+  private rateLimitReset: number | null = null; // Unix timestamp when limit resets
 
   /**
    * Make a rate-limited fetch request to VRChat API
@@ -67,9 +71,38 @@ class VRChatRateLimiter {
         // Wait for minimum interval between requests
         const now = Date.now();
         const timeSinceLastRequest = now - this.lastRequestTime;
+        
+        // Check if we need to wait for rate limit reset
+        if (this.rateLimitRemaining !== null && this.rateLimitRemaining <= 0 && this.rateLimitReset) {
+          const waitUntilReset = this.rateLimitReset - now;
+          if (waitUntilReset > 0) {
+            console.warn(`[VRChat API] Rate limit exhausted. Waiting ${waitUntilReset}ms until reset.`);
+            await this.sleep(waitUntilReset);
+            // Reset tracking after waiting
+            this.rateLimitRemaining = null;
+            this.rateLimitReset = null;
+          }
+        }
+        
+        // Aggressive mode: Proactively slow down when approaching limit
+        let additionalDelay = 0;
+        if (config.aggressiveMode && this.rateLimitRemaining !== null) {
+          if (this.rateLimitRemaining <= 10) {
+            // Very close to limit - add significant delay
+            additionalDelay = 2000; // 2 seconds
+          } else if (this.rateLimitRemaining <= 20) {
+            // Getting close - add moderate delay
+            additionalDelay = 1000; // 1 second
+          } else if (this.rateLimitRemaining <= 50) {
+            // Approaching limit - add small delay
+            additionalDelay = 500; // 0.5 seconds
+          }
+        }
+        
         const waitTime = Math.max(
           this.minRequestInterval - timeSinceLastRequest,
           this.currentDelay,
+          additionalDelay,
         );
 
         if (waitTime > 0) {
@@ -80,6 +113,9 @@ class VRChatRateLimiter {
 
         // Make the request
         const response = await fetch(request.url, request.options);
+
+        // Update rate limit info from headers
+        this.updateRateLimitInfo(response);
 
         // Handle 429 Too Many Requests
         if (response.status === 429) {
@@ -188,6 +224,47 @@ class VRChatRateLimiter {
     }
 
     return null;
+  }
+
+  /**
+   * Update rate limit tracking from response headers
+   * VRChat uses X-RateLimit-* headers
+   */
+  private updateRateLimitInfo(response: Response): void {
+    // Check for X-RateLimit-Remaining header
+    const remaining = response.headers.get("x-ratelimit-remaining");
+    if (remaining !== null) {
+      this.rateLimitRemaining = parseInt(remaining, 10);
+    }
+
+    // Check for X-RateLimit-Reset header (Unix timestamp in seconds)
+    const reset = response.headers.get("x-ratelimit-reset");
+    if (reset !== null) {
+      this.rateLimitReset = parseInt(reset, 10) * 1000; // Convert to milliseconds
+    }
+
+    // Also check for standard RateLimit headers (draft RFC)
+    const limit = response.headers.get("ratelimit-remaining");
+    if (limit !== null && this.rateLimitRemaining === null) {
+      this.rateLimitRemaining = parseInt(limit, 10);
+    }
+
+    const resetTime = response.headers.get("ratelimit-reset");
+    if (resetTime !== null && this.rateLimitReset === null) {
+      // Could be seconds or Unix timestamp
+      const parsed = parseInt(resetTime, 10);
+      this.rateLimitReset = parsed > 1000000000 ? parsed * 1000 : Date.now() + (parsed * 1000);
+    }
+
+    // Log when we're getting close to the limit
+    if (this.rateLimitRemaining !== null && this.rateLimitRemaining <= 10) {
+      const resetStr = this.rateLimitReset 
+        ? ` (resets at ${new Date(this.rateLimitReset).toISOString()})` 
+        : '';
+      console.warn(
+        `[VRChat API] ⚠️  Rate limit warning: ${this.rateLimitRemaining} requests remaining${resetStr}`
+      );
+    }
   }
 
   private sleep(ms: number): Promise<void> {
