@@ -10,6 +10,7 @@ import { prisma } from "../../../main.js";
 import { getGroupRoles } from "../../../utility/vrchat/groups.js";
 
 @Discord()
+@SlashGroup({ name: "group", description: "VRChat group management" })
 @SlashGroup({
   name: "role",
   description: "VRChat group role mapping",
