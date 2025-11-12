@@ -136,8 +136,9 @@ async function sendDMConfirmation(userId: number, vrcUserId: string, vrchatUsern
             const components: any[] = [];
             if (guildSettings?.vrcGroupId) {
                 // Add button to join the VRChat group
+                // Format: grp-inv:{discordId}:{vrcUserId}
                 const joinGroupButton = new ButtonBuilder()
-                    .setCustomId(`vrchat-group-invite:${user.discordId}:${vrcUserId}:${guildSettings.vrcGroupId}`)
+                    .setCustomId(`grp-inv:${user.discordId}:${vrcUserId}`)
                     .setLabel("Join SHIELD VRChat Group")
                     .setStyle(ButtonStyle.Primary)
                     .setEmoji("🛡️");
@@ -146,10 +147,14 @@ async function sendDMConfirmation(userId: number, vrcUserId: string, vrchatUsern
                     new ActionRowBuilder().addComponents(joinGroupButton)
                 );
 
-                embed.setDescription(
-                    embed.data.description + 
-                    `\n\n**Want to join the official SHIELD VRChat group?**\nClick the button below to receive a group invite!`
-                );
+                const currentDescription = embed.data.description || "";
+                const additionalText = `\n\n**Want to join the official SHIELD VRChat group?**\nClick the button below to receive a group invite!`;
+                const newDescription = currentDescription + additionalText;
+                
+                // Ensure we don't exceed Discord's 4096 character limit for embed descriptions
+                if (newDescription.length <= 4096) {
+                    embed.setDescription(newDescription);
+                }
             }
 
             await discordUser.send({ 

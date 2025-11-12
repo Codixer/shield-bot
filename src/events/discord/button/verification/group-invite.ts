@@ -10,12 +10,11 @@ import { inviteUserToGroup } from "../../../../utility/vrchat/groups.js";
 
 @Discord()
 export class VRChatGroupInviteButtonHandler {
-  @ButtonComponent({ id: /vrchat-group-invite:(\d+):([a-zA-Z0-9\-_]+):([a-zA-Z0-9\-_]+)/ })
+  @ButtonComponent({ id: /grp-inv:(\d+):([a-zA-Z0-9\-_]+)/ })
   async handleGroupInvite(interaction: ButtonInteraction) {
     const parts = interaction.customId.split(":");
     const discordId = parts[1];
     const vrcUserId = parts[2];
-    const groupId = parts[3];
 
     // Verify this is the correct user
     if (interaction.user.id !== discordId) {
@@ -44,11 +43,24 @@ export class VRChatGroupInviteButtonHandler {
       return;
     }
 
+    // Get the VRChat group ID from guild settings
+    const guildSettings = await prisma.guildSettings.findFirst({
+      where: { vrcGroupId: { not: null } },
+    });
+
+    if (!guildSettings?.vrcGroupId) {
+      await interaction.reply({
+        content: "❌ No VRChat group configured.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     try {
       // Send group invite
-      await inviteUserToGroup(groupId, vrcUserId);
+      await inviteUserToGroup(guildSettings.vrcGroupId, vrcUserId);
 
       const embed = new EmbedBuilder()
         .setTitle("✅ Group Invite Sent!")
