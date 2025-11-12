@@ -1,5 +1,6 @@
 import { prisma, bot } from "../../../../main.js";
 import { EmbedBuilder, Colors, TextChannel } from "discord.js";
+import { getGroupMember, getGroupRoles } from "../../../../utility/vrchat/groups.js";
 
 export async function handleGroupMemberUpdated(content: any) {
   console.log("[Group Member Updated]", content);
@@ -36,6 +37,36 @@ export async function handleGroupMemberUpdated(content: any) {
     },
   });
 
+  // Fetch current group member info and roles
+  let groupMember: any = null;
+  let allRoles: any[] = [];
+  let currentRoleNames: string[] = [];
+
+  if (groupId) {
+    try {
+      groupMember = await getGroupMember(groupId, vrcUserId);
+      allRoles = await getGroupRoles(groupId);
+
+      // Map role IDs to names
+      const roleMap = new Map(allRoles.map((r: any) => [r.id, r.name]));
+      const memberRoleIds = [
+        ...(groupMember?.roleIds || []),
+        ...(groupMember?.mRoleIds || []),
+      ];
+      currentRoleNames = memberRoleIds
+        .map((id) => roleMap.get(id))
+        .filter((name) => name !== undefined);
+    } catch (error) {
+      console.error(
+        "[Group Member Updated] Error fetching role information:",
+        error,
+      );
+    }
+  }
+
+  const vrcUsername = vrcAccount.vrchatUsername || vrcUserId;
+  const vrcUserLink = `[${vrcUsername}](https://vrchat.com/home/user/${vrcUserId})`;
+
   // Log to promotion logs channel for each configured guild
   for (const settings of guildSettings) {
     if (!settings.botPromotionLogsChannelId) continue;
@@ -47,8 +78,6 @@ export async function handleGroupMemberUpdated(content: any) {
       const member = await guild.members
         .fetch(vrcAccount.user.discordId)
         .catch(() => null);
-      const displayName =
-        member?.displayName || vrcAccount.vrchatUsername || vrcUserId;
 
       const channel = (await bot.channels.fetch(
         settings.botPromotionLogsChannelId,
@@ -60,19 +89,29 @@ export async function handleGroupMemberUpdated(content: any) {
         continue;
       }
 
+      const rolesText =
+        currentRoleNames.length > 0
+          ? currentRoleNames.map((name) => `• ${name}`).join("\n")
+          : "_No roles assigned_";
+
       // Log the role change event
       const embed = new EmbedBuilder()
         .setTitle("🔄 VRChat Group Roles Updated")
         .setDescription(
-          `${displayName}'s roles were updated in the VRChat group by a group admin.`,
+          `${member ? `<@${member.id}>` : vrcUsername}'s roles were updated in the VRChat group by a group admin.`,
         )
         .addFields(
           {
-            name: "Member",
-            value: member ? `<@${member.id}>` : vrcAccount.user.discordId,
+            name: "Discord Member",
+            value: member ? `<@${member.id}>` : "_Not in server_",
             inline: true,
           },
-          { name: "Display Name", value: displayName, inline: true },
+          { name: "VRChat User", value: vrcUserLink, inline: true },
+          {
+            name: "Current VRChat Roles",
+            value: rolesText,
+            inline: false,
+          },
           {
             name: "ℹ️ Note",
             value:
@@ -86,7 +125,7 @@ export async function handleGroupMemberUpdated(content: any) {
 
       await channel.send({ embeds: [embed] });
       console.log(
-        `[Group Member Updated] Logged role update for ${displayName} in guild ${settings.guildId}`,
+        `[Group Member Updated] Logged role update for ${vrcUsername} in guild ${settings.guildId}`,
       );
     } catch (error) {
       console.error(
