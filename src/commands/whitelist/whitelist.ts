@@ -8,7 +8,7 @@ import { Pagination } from "@discordx/pagination";
 import { Discord, Slash, SlashGroup, SlashOption, Guard } from "discordx";
 import { WhitelistManager } from "../../managers/whitelist/whitelistManager.js";
 import { searchUsers } from "../../utility/vrchat/user.js";
-import { DevGuardAndStaffGuard } from "../../utility/guards.js";
+import { DevGuardAndStaffGuard, StaffGuard } from "../../utility/guards.js";
 
 const whitelistManager = new WhitelistManager();
 

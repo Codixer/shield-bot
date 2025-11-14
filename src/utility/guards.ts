@@ -191,7 +191,8 @@ export async function DevGuardAndStaffGuard(
   }
 
   // Check if user has DEV_GUARD permission based on their roles
-  if (await userHasPermission(member, PermissionFlags.DEV_GUARD)) {
+  if (await userHasPermission(member, PermissionFlags.DEV_GUARD) || 
+      await userHasPermission(member, PermissionFlags.STAFF)) {
     return next();
   }
 

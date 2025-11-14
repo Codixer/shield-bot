@@ -43,7 +43,6 @@ const ROLE_PERMISSIONS: Record<PermissionLevel, number> = {
     PermissionFlags.SHIELD_MEMBER |
     PermissionFlags.HOST_ATTENDANCE |
     PermissionFlags.TRAINER |
-    PermissionFlags.STAFF |
     PermissionFlags.DEV_GUARD,
   [PermissionLevel.BOT_OWNER]: PermissionFlags.ALL_PERMISSIONS,
 };
