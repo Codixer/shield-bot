@@ -842,8 +842,12 @@ export class PatrolTimerManager {
 
         // Send promotion notification
         const message = `<@${member.id}>\nRecruit > Deputy\nAttended ${Math.floor(totalHours)}+ hours and been in 2+ patrols.`;
-        await channel.send(message);
+        const sentMessage = await channel.send(message);
         
+        // Add reactions
+        await sentMessage.react('✅');
+        await sentMessage.react('❌');
+
         // Record the promotion to prevent duplicate notifications
         await (prisma as any).voicePatrolPromotion.create({
           data: {
