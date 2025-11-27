@@ -23,7 +23,14 @@ import {
 } from "./managers/messages/InviteMessageManager.js";
 import { initializeSchedules } from "./schedules/schedules.js";
 
-export const prisma = new PrismaClient({} as any);
+import 'dotenv/config'
+import { PrismaMariaDb } from '@prisma/adapter-mariadb'
+
+const databaseUrl = process.env.DATABASE_URL!;
+
+const adapter = new PrismaMariaDb(databaseUrl);
+
+export const prisma = new PrismaClient({ adapter });
 
 export const bot = new Client({
   intents: [
