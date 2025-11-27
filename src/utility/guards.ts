@@ -173,35 +173,6 @@ export async function StaffGuard(
   );
 }
 
-export async function DevGuardAndStaffGuard(
-  interaction: Interaction,
-  _client: Client,
-  next: Next,
-): Promise<unknown> {
-  if (!interaction.guildId || !interaction.guild) {
-    return respondWithError(
-      interaction,
-      "This command can only be used in a server.",
-    );
-  }
-
-  const member = interaction.member as GuildMember;
-  if (!member) {
-    return respondWithError(interaction, "Unable to verify your permissions.");
-  }
-
-  // Check if user has DEV_GUARD permission based on their roles
-  if (await userHasPermission(member, PermissionFlags.DEV_GUARD) || 
-      await userHasPermission(member, PermissionFlags.STAFF)) {
-    return next();
-  }
-
-  return respondWithError(
-    interaction,
-    "You don't have permission to use this command. Dev guard access required.",
-  );
-}
-
 export async function TrainerGuard(
   interaction: Interaction,
   _client: Client,

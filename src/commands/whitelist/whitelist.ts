@@ -8,7 +8,7 @@ import { Pagination } from "@discordx/pagination";
 import { Discord, Slash, SlashGroup, SlashOption, Guard } from "discordx";
 import { WhitelistManager } from "../../managers/whitelist/whitelistManager.js";
 import { searchUsers } from "../../utility/vrchat/user.js";
-import { DevGuardAndStaffGuard, StaffGuard } from "../../utility/guards.js";
+import { StaffGuard } from "../../utility/guards.js";
 
 const whitelistManager = new WhitelistManager();
 
@@ -18,7 +18,7 @@ const whitelistManager = new WhitelistManager();
   description: "VRChat whitelist management commands",
 })
 @SlashGroup("whitelist")
-@Guard(DevGuardAndStaffGuard)
+@Guard(StaffGuard)
 export class WhitelistCommands {
   @Slash({ description: "Setup Discord role mapping to whitelist permissions" })
   async setuprole(

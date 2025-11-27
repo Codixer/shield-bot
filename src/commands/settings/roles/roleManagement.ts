@@ -15,7 +15,7 @@ import {
   EmbedBuilder,
 } from "discord.js";
 import { prisma } from "../../../main.js";
-import { DevGuardAndStaffGuard } from "../../../utility/guards.js";
+import { StaffGuard } from "../../../utility/guards.js";
 
 // This class only defines the subgroup commands for settings -> roles
 @Discord()
@@ -26,7 +26,7 @@ import { DevGuardAndStaffGuard } from "../../../utility/guards.js";
   root: "settings",
 })
 @SlashGroup("roles", "settings")
-@Guard(DevGuardAndStaffGuard)
+@Guard(StaffGuard)
 export class SettingsRolesManagementSubGroup {
   @Slash({ name: "add", description: "Add a role to a permission level" })
   async addRole(

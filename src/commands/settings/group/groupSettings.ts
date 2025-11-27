@@ -5,7 +5,7 @@ import {
   EmbedBuilder,
   Colors,
 } from "discord.js";
-import { DevGuardAndStaffGuard } from "../../../utility/guards.js";
+import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
 
 @Discord()
@@ -15,7 +15,7 @@ import { prisma } from "../../../main.js";
   root: "settings",
 })
 @SlashGroup("group", "settings")
-@Guard(DevGuardAndStaffGuard)
+@Guard(StaffGuard)
 export class GroupSettingsCommand {
   @Slash({
     name: "set-group-id",

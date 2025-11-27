@@ -32,17 +32,18 @@ const ROLE_PERMISSIONS: Record<PermissionLevel, number> = {
     PermissionFlags.BASIC_ACCESS |
     PermissionFlags.SHIELD_MEMBER |
     PermissionFlags.TRAINER,
-  [PermissionLevel.STAFF]:
-    PermissionFlags.BASIC_ACCESS |
-    PermissionFlags.SHIELD_MEMBER |
-    PermissionFlags.HOST_ATTENDANCE |
-    PermissionFlags.TRAINER |
-    PermissionFlags.STAFF,
   [PermissionLevel.DEV_GUARD]:
     PermissionFlags.BASIC_ACCESS |
     PermissionFlags.SHIELD_MEMBER |
     PermissionFlags.HOST_ATTENDANCE |
     PermissionFlags.TRAINER |
+    PermissionFlags.DEV_GUARD,
+  [PermissionLevel.STAFF]:
+    PermissionFlags.BASIC_ACCESS |
+    PermissionFlags.SHIELD_MEMBER |
+    PermissionFlags.HOST_ATTENDANCE |
+    PermissionFlags.TRAINER |
+    PermissionFlags.STAFF |
     PermissionFlags.DEV_GUARD,
   [PermissionLevel.BOT_OWNER]: PermissionFlags.ALL_PERMISSIONS,
 };
@@ -52,9 +53,9 @@ export function getPermissionLevelValue(level: PermissionLevel): number {
   switch (level) {
     case PermissionLevel.BOT_OWNER:
       return 100;
-    case PermissionLevel.DEV_GUARD:
-      return 99;
     case PermissionLevel.STAFF:
+      return 80;
+    case PermissionLevel.DEV_GUARD:
       return 75;
     case PermissionLevel.TRAINER:
       return 60;
@@ -83,8 +84,84 @@ export async function userHasPermission(
   member: GuildMember,
   requiredPermission: PermissionFlags,
 ): Promise<boolean> {
-  const userLevel = await getUserPermissionLevelFromRoles(member);
-  return hasPermission(userLevel, requiredPermission);
+  const allPermissions = await getAllPermissionsFromRoles(member);
+  return (allPermissions & requiredPermission) === requiredPermission;
+}
+
+// Get combined permissions from ALL roles a user has
+export async function getAllPermissionsFromRoles(
+  member: GuildMember,
+): Promise<number> {
+  const botOwnerId = process.env.BOT_OWNER_ID;
+
+  // Bot owner has all permissions
+  if (botOwnerId && member.id === botOwnerId) {
+    return PermissionFlags.ALL_PERMISSIONS;
+  }
+
+  // Get guild settings for role mappings
+  const settings = await prisma.guildSettings.findUnique({
+    where: { guildId: member.guild.id },
+  });
+
+  if (!settings) {
+    return PermissionFlags.BASIC_ACCESS;
+  }
+
+  let combinedPermissions = PermissionFlags.BASIC_ACCESS;
+
+  // Check each role type and combine their permissions
+  if (
+    settings.shieldMemberRoleIds &&
+    Array.isArray(settings.shieldMemberRoleIds) &&
+    (settings.shieldMemberRoleIds as string[]).some((roleId) =>
+      member.roles.cache.has(roleId),
+    )
+  ) {
+    combinedPermissions |= ROLE_PERMISSIONS[PermissionLevel.SHIELD_MEMBER];
+  }
+
+  if (
+    settings.hostAttendanceRoleIds &&
+    Array.isArray(settings.hostAttendanceRoleIds) &&
+    (settings.hostAttendanceRoleIds as string[]).some((roleId) =>
+      member.roles.cache.has(roleId),
+    )
+  ) {
+    combinedPermissions |= ROLE_PERMISSIONS[PermissionLevel.HOST_ATTENDANCE];
+  }
+
+  if (
+    settings.trainerRoleIds &&
+    Array.isArray(settings.trainerRoleIds) &&
+    (settings.trainerRoleIds as string[]).some((roleId) =>
+      member.roles.cache.has(roleId),
+    )
+  ) {
+    combinedPermissions |= ROLE_PERMISSIONS[PermissionLevel.TRAINER];
+  }
+
+  if (
+    settings.devGuardRoleIds &&
+    Array.isArray(settings.devGuardRoleIds) &&
+    (settings.devGuardRoleIds as string[]).some((roleId) =>
+      member.roles.cache.has(roleId),
+    )
+  ) {
+    combinedPermissions |= ROLE_PERMISSIONS[PermissionLevel.DEV_GUARD];
+  }
+
+  if (
+    settings.staffRoleIds &&
+    Array.isArray(settings.staffRoleIds) &&
+    (settings.staffRoleIds as string[]).some((roleId) =>
+      member.roles.cache.has(roleId),
+    )
+  ) {
+    combinedPermissions |= ROLE_PERMISSIONS[PermissionLevel.STAFF];
+  }
+
+  return combinedPermissions;
 }
 
 // Check if user has a specific role type (not just permissions inherited from higher roles)
@@ -187,16 +264,6 @@ export async function getUserPermissionLevelFromRoles(
 
   // Check roles in hierarchical order (highest first)
   if (
-    settings.devGuardRoleIds &&
-    Array.isArray(settings.devGuardRoleIds) &&
-    (settings.devGuardRoleIds as string[]).some((roleId) =>
-      member.roles.cache.has(roleId),
-    )
-  ) {
-    return PermissionLevel.DEV_GUARD;
-  }
-
-  if (
     settings.staffRoleIds &&
     Array.isArray(settings.staffRoleIds) &&
     (settings.staffRoleIds as string[]).some((roleId) =>
@@ -204,6 +271,16 @@ export async function getUserPermissionLevelFromRoles(
     )
   ) {
     return PermissionLevel.STAFF;
+  }
+
+  if (
+    settings.devGuardRoleIds &&
+    Array.isArray(settings.devGuardRoleIds) &&
+    (settings.devGuardRoleIds as string[]).some((roleId) =>
+      member.roles.cache.has(roleId),
+    )
+  ) {
+    return PermissionLevel.DEV_GUARD;
   }
 
   if (

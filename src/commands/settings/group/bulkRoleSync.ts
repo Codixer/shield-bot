@@ -5,14 +5,14 @@ import {
   EmbedBuilder,
   Colors,
 } from "discord.js";
-import { DevGuardAndStaffGuard } from "../../../utility/guards.js";
+import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
 import { groupRoleSyncManager } from "../../../managers/groupRoleSync/groupRoleSyncManager.js";
 
 @Discord()
 @SlashGroup({ name: "group", description: "VRChat group management" })
 @SlashGroup("group")
-@Guard(DevGuardAndStaffGuard)
+@Guard(StaffGuard)
 export class GroupBulkRoleSyncCommand {
   @Slash({
     name: "bulkrolesync",

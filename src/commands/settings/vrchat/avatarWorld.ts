@@ -3,13 +3,13 @@ import {
   CommandInteraction,
   ApplicationCommandOptionType,
 } from "discord.js";
-import { DevGuardAndStaffGuard } from "../../../utility/guards.js";
+import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
 
 @Discord()
 @SlashGroup({ name: "vrchat", description: "VRChat settings", root: "settings" })
 @SlashGroup("vrchat", "settings")
-@Guard(DevGuardAndStaffGuard)
+@Guard(StaffGuard)
 export class VRChatSettingsCommand {
   @Slash({
     name: "avatar-world",

@@ -5,7 +5,7 @@ import {
   EmbedBuilder,
   Colors,
 } from "discord.js";
-import { DevGuardAndStaffGuard } from "../../../utility/guards.js";
+import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
 import { getGroupRoles } from "../../../utility/vrchat/groups.js";
 
@@ -17,7 +17,7 @@ import { getGroupRoles } from "../../../utility/vrchat/groups.js";
   root: "group",
 })
 @SlashGroup("role", "group")
-@Guard(DevGuardAndStaffGuard)
+@Guard(StaffGuard)
 export class GroupRoleMappingCommand {
   @Slash({
     name: "map",

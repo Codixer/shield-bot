@@ -79,8 +79,8 @@ export class UserCommands {
   async listPermissions(interaction: CommandInteraction) {
     const permissions = [
       "🔴 **BOT_OWNER** (100) - Full bot access (configured via BOT_OWNER_ID environment variable)",
-      "🟠 **DEV_GUARD** (99) - Development and administrative access (requires Dev Guard role)",
-      "🟡 **STAFF** (75) - Staff-level administrative access (requires Staff role)",
+      "🟠 **STAFF** (80) - Staff-level administrative access (requires Staff role)",
+      "🟡 **DEV_GUARD** (75) - Development and administrative access (requires Dev Guard role)",
       "🟢 **TRAINER** (60) - Training and mentoring access (requires Trainer role) - *Cannot access Host Attendance commands*",
       "🟢 **HOST_ATTENDANCE** (50) - Can manage attendance events (requires Host Attendance role) - *Cannot access Trainer commands*",
       "🔵 **SHIELD_MEMBER** (25) - Shield member access (requires Shield Member role)",
