@@ -10,7 +10,7 @@ import {
 } from "discord.js";
 import { Client } from "discordx";
 import bodyParser from "@koa/bodyparser";
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "./generated/prisma/client";
 import { PatrolTimerManager } from "./managers/patrol/patrolTimerManager.js";
 import {
   isLoggedInAndVerified,
@@ -23,7 +23,7 @@ import {
 } from "./managers/messages/InviteMessageManager.js";
 import { initializeSchedules } from "./schedules/schedules.js";
 
-export const prisma = new PrismaClient();
+export const prisma = new PrismaClient({} as any);
 
 export const bot = new Client({
   intents: [

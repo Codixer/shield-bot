@@ -20,5 +20,5 @@
     // "sourceRoot": "/src" // Adjusted sourceRoot to match the root directory of your source files
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["build", "node_modules"]
+  "exclude": ["build", "node_modules", "src/generated"]
 }
