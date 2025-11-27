@@ -10,7 +10,7 @@ import {
 } from "discord.js";
 import { Client } from "discordx";
 import bodyParser from "@koa/bodyparser";
-import { PrismaClient } from "./generated/prisma/client";
+import { PrismaClient } from "./generated/prisma/client.js";
 import { PatrolTimerManager } from "./managers/patrol/patrolTimerManager.js";
 import {
   isLoggedInAndVerified,
