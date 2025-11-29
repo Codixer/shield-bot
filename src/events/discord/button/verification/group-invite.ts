@@ -6,7 +6,7 @@ import {
 } from "discord.js";
 import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
-import { inviteUserToGroup } from "../../../../utility/vrchat/groups.js";
+import { vrchatApi } from "../../../../utility/vrchatClient.js";
 
 @Discord()
 export class VRChatGroupInviteButtonHandler {
@@ -60,7 +60,11 @@ export class VRChatGroupInviteButtonHandler {
 
     try {
       // Send group invite
-      await inviteUserToGroup(guildSettings.vrcGroupId, vrcUserId);
+      await vrchatApi.groupApi.inviteUsertoGroup({ 
+        groupId: guildSettings.vrcGroupId as `grp_${string}-${string}-${string}-${string}-${string}`, 
+        userId: vrcUserId as `usr_${string}-${string}-${string}-${string}-${string}`,
+        confirmOverrideBlock: true
+      });
 
       const embed = new EmbedBuilder()
         .setTitle("✅ Group Invite Sent!")

@@ -1,4 +1,4 @@
-import fetch from "node-fetch";
+// Using native fetch (Node.js 18+)
 
 export async function purgeCloudflareCache(zoneId: string, apiToken: string, urls: string[]) {
   const endpoint = `https://api.cloudflare.com/client/v4/zones/${zoneId}/purge_cache`;

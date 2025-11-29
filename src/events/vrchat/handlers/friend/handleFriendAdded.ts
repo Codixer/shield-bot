@@ -1,5 +1,4 @@
-import { getUserById } from '../../../../utility/vrchat.js';
-import { inviteUserToGroup } from '../../../../utility/vrchat/groups.js';
+import { vrchatApi } from '../../../../utility/vrchatClient.js';
 import { whitelistManager } from '../../../../managers/whitelist/whitelistManager.js';
 import { prisma, bot } from '../../../../main.js';
 import { EmbedBuilder, Colors, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
@@ -25,7 +24,7 @@ export async function handleFriendAdd(content: any) {
     try {
         // Get VRChat username for caching
         try {
-            const userInfo = await getUserById(vrcUserId);
+            const userInfo = await vrchatApi.userApi.getUserById({ userId: vrcUserId });
             vrchatUsername = userInfo?.displayName || userInfo?.username;
         } catch (e) {
             console.warn(`Failed to fetch username for ${vrcUserId}:`, e);

@@ -6,7 +6,7 @@ import {
 } from "discord.js";
 import { Next } from "koa";
 import { respondWithError } from "./generalUtils.js";
-import { isLoggedInAndVerified } from "./vrchat.js";
+import { vrchatApi } from "./vrchatClient.js";
 import { userHasPermission, PermissionFlags } from "./permissionUtils.js";
 
 export async function VRChatLoginGuard(
@@ -14,8 +14,13 @@ export async function VRChatLoginGuard(
   _client: Client,
   next: Next,
 ): Promise<unknown> {
-  if (await isLoggedInAndVerified()) {
-    return next();
+  try {
+    const user = await vrchatApi.authApi.getCurrentUser();
+    if (user && user.id) {
+      return next();
+    }
+  } catch (err) {
+    // Not logged in
   }
 
   return respondWithError(

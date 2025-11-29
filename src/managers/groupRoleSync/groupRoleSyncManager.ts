@@ -1,11 +1,7 @@
 import { prisma, bot } from "../../main.js";
-import {
-  getGroupMember,
-  addRoleToGroupMember,
-  removeRoleFromGroupMember,
-  getGroupRoles,
-} from "../../utility/vrchat/groups.js";
+import { vrchatApi } from "../../utility/vrchatClient.js";
 import { GuildMember, EmbedBuilder, Colors, TextChannel } from "discord.js";
+import type { GroupIdType, GroupRoleIdType } from "vrc-ts";
 
 /**
  * Manager for syncing VRChat group roles to Discord roles
@@ -24,7 +20,7 @@ export class GroupRoleSyncManager {
       return this.roleCache.get(groupId)!;
     }
 
-    const roles = await getGroupRoles(groupId);
+    const roles = await vrchatApi.groupApi.getGroupRoles({ groupId: groupId as GroupIdType });
     this.roleCache.set(groupId, roles);
 
     // Clear cache after 5 minutes
@@ -50,15 +46,17 @@ export class GroupRoleSyncManager {
     managementOnly: boolean = false,
   ): Promise<number> {
     try {
-      const member = await getGroupMember(groupId, userId);
+      const member = await vrchatApi.groupApi.getGroupMember({ groupId: groupId as GroupIdType, userId });
       if (!member) {
         return Infinity; // No roles = lowest possible rank
       }
 
       // Get the role IDs to check
+      // Note: mRoleIds may exist at runtime even if not in the type definition
+      const memberAny = member as any;
       const roleIdsToCheck = managementOnly
-        ? member.mRoleIds || []
-        : [...(member.roleIds || []), ...(member.mRoleIds || [])];
+        ? memberAny.mRoleIds || []
+        : [...(member.roleIds || []), ...(memberAny.mRoleIds || [])];
 
       if (roleIdsToCheck.length === 0) {
         return Infinity; // No roles = lowest possible rank
@@ -191,7 +189,7 @@ export class GroupRoleSyncManager {
       }
 
       // Get the member's current VRChat group roles
-      const groupMember = await getGroupMember(groupId, vrcUserId);
+      const groupMember = await vrchatApi.groupApi.getGroupMember({ groupId: groupId as GroupIdType, userId: vrcUserId });
       if (!groupMember) {
         return;
       }
@@ -219,12 +217,14 @@ export class GroupRoleSyncManager {
         return;
       }
 
-      // Get the VRChat role IDs the member currently has (non-management only)
+      // Get the VRChat role IDs the member currently has
       // VRChat has two role arrays: roleIds (regular) and mRoleIds (management/permissions)
       // We need to check both to see if the user has the role
+      // Note: mRoleIds may exist at runtime even if not in the type definition
+      const groupMemberAny = groupMember as any;
       const currentVrcRoleIds = new Set([
         ...(groupMember.roleIds || []),
-        ...(groupMember.mRoleIds || []),
+        ...(groupMemberAny.mRoleIds || []),
       ]);
 
       // Group mappings by VRChat role (since multiple Discord roles can map to one VRChat role)
@@ -242,7 +242,7 @@ export class GroupRoleSyncManager {
 
       // For each VRChat role, check if user has ANY of the Discord roles that map to it
       for (const [vrcRoleId, discordRoleIds] of vrcRoleToDiscordRoles.entries()) {
-        const hasVrcRole = currentVrcRoleIds.has(vrcRoleId);
+        const hasVrcRole = currentVrcRoleIds.has(vrcRoleId as GroupRoleIdType);
         const hasAnyDiscordRole = discordRoleIds.some(discordRoleId => 
           member.roles.cache.has(discordRoleId)
         );
@@ -258,7 +258,11 @@ export class GroupRoleSyncManager {
       if (vrcRolesToAdd.length > 0) {
         for (const roleId of vrcRolesToAdd) {
           try {
-            await addRoleToGroupMember(groupId, vrcUserId, roleId);
+            await vrchatApi.groupApi.addRoleToGroupMember({ 
+              groupId: groupId as GroupIdType, 
+              userId: vrcUserId, 
+              groupRoleId: roleId as GroupRoleIdType 
+            });
           } catch (error: any) {
             console.error(
               `[GroupRoleSync] Failed to add VRChat role ${roleId}:`,
@@ -271,7 +275,11 @@ export class GroupRoleSyncManager {
       if (vrcRolesToRemove.length > 0) {
         for (const roleId of vrcRolesToRemove) {
           try {
-            await removeRoleFromGroupMember(groupId, vrcUserId, roleId);
+            await vrchatApi.groupApi.removeRoleFromGroupMember({ 
+              groupId: groupId as GroupIdType, 
+              userId: vrcUserId, 
+              groupRoleId: roleId as GroupRoleIdType 
+            });
           } catch (error: any) {
             console.error(
               `[GroupRoleSync] Failed to remove VRChat role ${roleId}:`,

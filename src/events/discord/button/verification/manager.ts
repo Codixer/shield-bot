@@ -6,7 +6,7 @@ import {
 } from "discord.js";
 import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
-import { getUserById } from "../../../../utility/vrchat.js";
+import { vrchatApi } from "../../../../utility/vrchatClient.js";
 import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
 
 @Discord()
@@ -53,7 +53,7 @@ export class VRChatVerifyManagerButtonHandler {
       // Get user info for display
       let userInfo = null;
       try {
-        userInfo = await getUserById(vrcUserId);
+        userInfo = await vrchatApi.userApi.getUserById({ userId: vrcUserId });
       } catch (e) {
         // Ignore errors
       }
@@ -131,7 +131,7 @@ export class VRChatVerifyManagerButtonHandler {
       // Get user info for display
       let userInfo = null;
       try {
-        userInfo = await getUserById(vrcUserId);
+        userInfo = await vrchatApi.userApi.getUserById({ userId: vrcUserId });
       } catch (e) {
         // Ignore errors
       }
@@ -200,7 +200,7 @@ export class VRChatVerifyManagerButtonHandler {
       // Get user info for display
       let userInfo = null;
       try {
-        userInfo = await getUserById(vrcUserId);
+        userInfo = await vrchatApi.userApi.getUserById({ userId: vrcUserId });
       } catch (e) {
         // Ignore errors
       }
@@ -259,7 +259,7 @@ export class VRChatVerifyManagerButtonHandler {
       // Get user info for display
       let userInfo = null;
       try {
-        userInfo = await getUserById(vrcUserId);
+        userInfo = await vrchatApi.userApi.getUserById({ userId: vrcUserId });
       } catch (e) {
         // Ignore errors
       }

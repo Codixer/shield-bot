@@ -6,7 +6,7 @@ import {
 } from "discord.js";
 import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../../main.js";
-import { getUserById } from "../../../../../utility/vrchat.js";
+import { vrchatApi } from "../../../../../utility/vrchatClient.js";
 
 @Discord()
 export class VRChatStatusVerifyButtonHandler {
@@ -71,7 +71,7 @@ export class VRChatStatusVerifyButtonHandler {
     // Fetch the VRChat user info
     let userInfo: any = null;
     try {
-      userInfo = await getUserById(vrcUserId);
+      userInfo = await vrchatApi.userApi.getUserById({ userId: vrcUserId });
     } catch (e) {
       userInfo = null;
     }

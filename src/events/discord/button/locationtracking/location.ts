@@ -1,10 +1,8 @@
 import { ButtonInteraction, MessageFlags } from "discord.js";
 import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
-import {
-  buildLocationTrackingContainer,
-  getUserById,
-} from "../../../../utility/vrchat.js";
+import { buildLocationTrackingContainer } from "../../../../utility/vrchat/tracking.js";
+import { vrchatApi } from "../../../../utility/vrchatClient.js";
 
 @Discord()
 export class LocationTrackingButtonHandler {
@@ -54,7 +52,7 @@ export class LocationTrackingButtonHandler {
         { where: { ownerVrcUserId: acc.vrcUserId } },
       ));
       try {
-        const userInfo = await getUserById(acc.vrcUserId);
+        const userInfo = await vrchatApi.userApi.getUserById({ userId: acc.vrcUserId });
         usernames[acc.vrcUserId] = userInfo?.displayName || acc.vrcUserId;
         friendsMap[acc.vrcUserId] = userInfo?.isFriend ?? true;
       } catch (e) {

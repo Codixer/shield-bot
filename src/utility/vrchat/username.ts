@@ -1,5 +1,5 @@
 import { prisma } from "../../main.js";
-import { getUserById } from "./user.js";
+import { vrchatApi } from "../vrchatClient.js";
 import { forceUpdateUsernameCache } from "./usernameCache.js";
 
 /**
@@ -28,7 +28,7 @@ export async function getVRChatUsername(
     }
 
     // Cache is stale or doesn't exist, fetch from API
-    const userInfo = await getUserById(vrcUserId);
+    const userInfo = await vrchatApi.userApi.getUserById({ userId: vrcUserId });
     const username = userInfo?.displayName || userInfo?.username;
 
     if (username && vrcAccount) {

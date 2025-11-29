@@ -12,10 +12,7 @@ import { Client } from "discordx";
 import bodyParser from "@koa/bodyparser";
 import { PrismaClient } from "./generated/prisma/client.js";
 import { PatrolTimerManager } from "./managers/patrol/patrolTimerManager.js";
-import {
-  isLoggedInAndVerified,
-  loginAndGetCurrentUser,
-} from "./utility/vrchat.js";
+import { vrchatApi } from "./utility/vrchatClient.js";
 import { startVRChatWebSocketListener } from "./events/vrchat/vrchat-websocket.js";
 import {
   syncAllInviteMessages,
@@ -64,7 +61,7 @@ bot.once("clientReady", async () => {
     console.log("|                      |                          |");
     console.log("###################################################");
 
-    // VRChat login on startup
+    // VRChat login on startup using vrc-ts
     const vrcUsername = process.env.VRCHAT_USERNAME;
     const vrcPassword = process.env.VRCHAT_PASSWORD;
     if (!vrcUsername || !vrcPassword) {
@@ -73,9 +70,11 @@ bot.once("clientReady", async () => {
       );
     } else {
       try {
-        const user = await loginAndGetCurrentUser(vrcUsername, vrcPassword);
+        // vrc-ts handles authentication automatically when making API calls
+        // but we can verify login by getting current user info
+        const user = await vrchatApi.authApi.getCurrentUser();
         console.log(
-          `[VRChat] VRChat login successful:  ${user.displayName} | ${user.username} | ${user.id}`,
+          `[VRChat] VRChat login successful: ${user.displayName} | ${user.username} | ${user.id}`,
         );
       } catch (err) {
         console.error("[VRChat] VRChat login failed:", err);
@@ -94,13 +93,33 @@ bot.once("clientReady", async () => {
   await patrolTimer.init();
   console.log("[PatrolTimer] Patrol timer initialized.");
 
-  const vrchatIsRunning = await isLoggedInAndVerified();
-  if (vrchatIsRunning) {
-    console.log("[VRChat] VRChat is running");
-    startVRChatWebSocketListener();
-    syncAllInviteMessages();
-  } else {
-    console.log("[VRChat] VRChat is not running");
+  // Ensure VRChat API is authenticated before starting websocket
+  try {
+    // Try to get current user - this will trigger auto-login if needed
+    const currentUser = await vrchatApi.authApi.getCurrentUser();
+    if (currentUser && currentUser.id) {
+      console.log("[VRChat] VRChat is authenticated");
+      // Start websocket listener - it will automatically connect when instantiated
+      startVRChatWebSocketListener();
+      syncAllInviteMessages();
+    } else {
+      console.log("[VRChat] VRChat is not authenticated");
+    }
+  } catch (err) {
+    console.log("[VRChat] VRChat is not authenticated:", err);
+    // Try explicit login if getCurrentUser failed
+    const vrcUsername = process.env.VRCHAT_USERNAME;
+    const vrcPassword = process.env.VRCHAT_PASSWORD;
+    if (vrcUsername && vrcPassword) {
+      try {
+        await vrchatApi.login();
+        console.log("[VRChat] Login successful, starting websocket...");
+        startVRChatWebSocketListener();
+        syncAllInviteMessages();
+      } catch (loginErr) {
+        console.error("[VRChat] Failed to login:", loginErr);
+      }
+    }
   }
 });
 

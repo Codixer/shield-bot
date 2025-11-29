@@ -6,7 +6,7 @@ import {
   MessageFlags,
 } from "discord.js";
 import { prisma } from "../../../main.js";
-import { inviteUserToGroup } from "../../../utility/vrchat/groups.js";
+import { vrchatApi } from "../../../utility/vrchatClient.js";
 
 @Discord()
 @SlashGroup({ name: "group", description: "VRChat group commands" })
@@ -55,7 +55,11 @@ export class GroupSelfInviteCommand {
       const vrcAccount = mainAccount || user.vrchatAccounts[0];
 
       // Send group invite
-      await inviteUserToGroup(guildSettings.vrcGroupId, vrcAccount.vrcUserId);
+      await vrchatApi.groupApi.inviteUsertoGroup({ 
+        groupId: guildSettings.vrcGroupId as `grp_${string}-${string}-${string}-${string}-${string}`, 
+        userId: vrcAccount.vrcUserId as `usr_${string}-${string}-${string}-${string}-${string}`,
+        confirmOverrideBlock: true
+      });
 
       const embed = new EmbedBuilder()
         .setTitle("✅ Group Invite Sent!")

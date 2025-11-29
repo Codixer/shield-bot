@@ -13,8 +13,7 @@ import {
 } from "discord.js";
 import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
-import { getUserById } from "../../../../utility/vrchat/user.js";
-import { unfriendUser } from "../../../../utility/vrchat/user.js";
+import { vrchatApi } from "../../../../utility/vrchatClient.js";
 import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
 import { sendWhitelistLog, getUserWhitelistRoles } from "../../../../utility/vrchat/whitelistLogger.js";
 
@@ -205,7 +204,7 @@ export class VRCAccountManagerButtonHandler {
     try {
       // Try to unfriend the user from VRChat
       try {
-        await unfriendUser(vrcUserId);
+        await vrchatApi.friendApi.unfriend({ userId: vrcUserId });
       } catch (unfriendError) {
         console.warn(
           `Failed to unfriend VRChat user ${vrcUserId}:`,
@@ -351,7 +350,7 @@ export class VRCAccountManagerButtonHandler {
     const usernames: Record<string, string> = {};
     for (const acc of verifiedAccounts) {
       try {
-        const vrcUser = await getUserById(acc.vrcUserId);
+        const vrcUser = await vrchatApi.userApi.getUserById({ userId: acc.vrcUserId });
         usernames[acc.vrcUserId] = vrcUser?.displayName || acc.vrcUserId;
       } catch {
         usernames[acc.vrcUserId] = acc.vrcUserId;

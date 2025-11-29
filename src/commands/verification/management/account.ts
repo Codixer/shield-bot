@@ -12,7 +12,7 @@ import {
   ButtonStyle,
 } from "discord.js";
 import { VRChatLoginGuard } from "../../../utility/guards.js";
-import { getUserById, searchUsers } from "../../../utility/vrchat.js";
+import { vrchatApi } from "../../../utility/vrchatClient.js";
 
 @Discord()
 @SlashGroup({
@@ -63,7 +63,7 @@ export class VRChatVerifyAccountCommand {
     // Fetch user details from VRChat API using the userId directly
     let userInfo: any = null;
     try {
-      userInfo = await getUserById(userId);
+      userInfo = await vrchatApi.userApi.getUserById({ userId });
     } catch (e) {
       userInfo = null;
     }
@@ -126,7 +126,7 @@ export class VRChatVerifyAccountCommand {
     }
 
     try {
-      const users = await searchUsers({ search: query, n: 25 });
+      const users = await vrchatApi.userApi.searchAllUsers({ search: query, n: 25 });
 
       // Filter and sort results based on relevance to the query
       const filteredUsers = users

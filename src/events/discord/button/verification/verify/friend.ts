@@ -6,11 +6,7 @@ import {
 } from "discord.js";
 import { Discord, ButtonComponent } from "discordx";
 import { ButtonBuilder } from "discord.js";
-import {
-  sendFriendRequest,
-  unfriendUser,
-  getUserById,
-} from "../../../../../utility/vrchat.js";
+import { vrchatApi } from "../../../../../utility/vrchatClient.js";
 import { prisma } from "../../../../../main.js";
 
 @Discord()
@@ -25,14 +21,14 @@ export class VRChatFriendVerifyButtonHandler {
     let friendRequestSent = false;
     let errorMsg = "";
     try {
-      await sendFriendRequest(vrcUserId);
+      await vrchatApi.friendApi.sendFriendRequest({ userId: vrcUserId });
       friendRequestSent = true;
     } catch (err: any) {
       if (err.message && err.message.includes("400")) {
         // Already friends, unfriend and try again
         try {
-          await unfriendUser(vrcUserId);
-          await sendFriendRequest(vrcUserId);
+          await vrchatApi.friendApi.unfriend({ userId: vrcUserId });
+          await vrchatApi.friendApi.sendFriendRequest({ userId: vrcUserId });
           friendRequestSent = true;
         } catch (err2: any) {
           errorMsg = err2.message || "Failed to unfriend and re-friend user.";
@@ -85,7 +81,7 @@ export class VRChatFriendVerifyButtonHandler {
       // Update username cache when checking verification status
       let vrchatUsername = vrcAccount.vrchatUsername;
       try {
-        const userInfo = await getUserById(vrcUserId);
+        const userInfo = await vrchatApi.userApi.getUserById({ userId: vrcUserId });
         vrchatUsername = userInfo?.displayName || userInfo?.username;
 
         // Update username if it's different or if it's been more than a week

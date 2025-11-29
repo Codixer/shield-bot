@@ -1,6 +1,5 @@
-import { getUserById } from "../../utility/vrchat.js";
 import { purgeCloudflareCache } from "../../utility/cloudflare/purgeCache.js";
-import { searchUsers } from "../../utility/vrchat/user.js";
+import { vrchatApi } from "../../utility/vrchatClient.js";
 import { prisma, bot } from "../../main.js";
 import { sendWhitelistLog } from "../../utility/vrchat/whitelistLogger.js";
 
@@ -100,7 +99,7 @@ export class WhitelistManager {
    */
   async addUserByVrcUsername(vrchatUsername: string): Promise<any> {
     try {
-      const searchResults = await searchUsers({ search: vrchatUsername, n: 1 });
+      const searchResults = await vrchatApi.userApi.searchAllUsers({ search: vrchatUsername, n: 1 });
 
       if (searchResults.length === 0) {
         throw new Error(`VRChat user "${vrchatUsername}" not found.`);
@@ -351,7 +350,7 @@ export class WhitelistManager {
         // If we don't have a cached username or it's outdated, try to fetch from VRChat API
         if (!vrchatUsername || vrchatUsername === vrchatAccount.vrcUserId) {
           try {
-            const userInfo = await getUserById(vrchatAccount.vrcUserId);
+            const userInfo = await vrchatApi.userApi.getUserById({ userId: vrchatAccount.vrcUserId });
             vrchatUsername =
               userInfo?.displayName ||
               userInfo?.username ||

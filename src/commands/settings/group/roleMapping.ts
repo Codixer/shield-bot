@@ -7,7 +7,7 @@ import {
 } from "discord.js";
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
-import { getGroupRoles } from "../../../utility/vrchat/groups.js";
+import { vrchatApi } from "../../../utility/vrchatClient.js";
 
 @Discord()
 @SlashGroup({ name: "group", description: "VRChat group management" })
@@ -283,7 +283,7 @@ export class GroupRoleMappingCommand {
       }
 
       // Fetch roles from VRChat API
-      const roles = await getGroupRoles(settings.vrcGroupId);
+      const roles = await vrchatApi.groupApi.getGroupRoles({ groupId: settings.vrcGroupId as `grp_${string}-${string}-${string}-${string}-${string}` });
 
       if (!roles || roles.length === 0) {
         await interaction.editReply({

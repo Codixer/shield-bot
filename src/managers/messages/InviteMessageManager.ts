@@ -1,8 +1,5 @@
-import {
-  updateInviteMessage,
-  listInviteMessages,
-  getCurrentUser,
-} from "../../utility/vrchat.js";
+import { vrchatApi } from "../../utility/vrchatClient.js";
+import { MessageType } from "vrc-ts";
 
 export enum InviteMessageType {
   Message = "message",
@@ -98,19 +95,19 @@ export class InviteMessageManager {
     messages: string[];
   }): Promise<InviteMessage[]> {
     // Get current messages
-    const current: InviteMessage[] = await listInviteMessages({
+    const current: InviteMessage[] = await vrchatApi.inviteApi.listInviteMessages({
       userId,
-      messageType,
-    });
+      messageType: messageType as unknown as MessageType,
+    }) as unknown as InviteMessage[];
     // Update only if different
     for (let slot = 0; slot < messages.length; slot++) {
       const newMsg = messages[slot];
       const currentMsg = current.find((m: InviteMessage) => m.slot === slot);
       if (!currentMsg || currentMsg.message !== newMsg) {
         try {
-          await updateInviteMessage({
+          await vrchatApi.inviteApi.updateInviteMessage({
             userId,
-            messageType,
+            messageType: messageType as unknown as MessageType,
             slot,
             message: newMsg,
           });
@@ -125,7 +122,10 @@ export class InviteMessageManager {
       }
     }
     // Return the latest list
-    return await listInviteMessages({ userId, messageType });
+    return await vrchatApi.inviteApi.listInviteMessages({ 
+      userId, 
+      messageType: messageType as unknown as MessageType 
+    }) as unknown as InviteMessage[];
   }
 
   /**
@@ -135,7 +135,10 @@ export class InviteMessageManager {
     userId: string,
     messageType: InviteMessageType,
   ): Promise<InviteMessage[]> {
-    return await listInviteMessages({ userId, messageType });
+    return await vrchatApi.inviteApi.listInviteMessages({ 
+      userId, 
+      messageType: messageType as unknown as MessageType 
+    }) as unknown as InviteMessage[];
   }
 }
 
@@ -271,10 +274,10 @@ export async function syncInviteMessageIfDifferent({
   slot: number;
   expected: string;
 }) {
-  const current: InviteMessage[] = await listInviteMessages({
+  const current: InviteMessage[] = await vrchatApi.inviteApi.listInviteMessages({
     userId,
-    messageType: type,
-  });
+    messageType: type as unknown as MessageType,
+  }) as unknown as InviteMessage[];
   const msg = current.find((m: InviteMessage) => m.slot === slot);
   if (msg && msg.message !== expected) {
     console.log(
@@ -283,9 +286,9 @@ export async function syncInviteMessageIfDifferent({
     console.log(
       `[InviteMessageManager] Current: "${msg.message}" | Expected: "${expected}"`,
     );
-    await updateInviteMessage({
+    await vrchatApi.inviteApi.updateInviteMessage({
       userId,
-      messageType: type,
+      messageType: type as unknown as MessageType,
       slot,
       message: expected,
     });
@@ -302,7 +305,7 @@ export async function syncInviteMessageIfDifferent({
 export async function syncAllInviteMessages(userId?: string) {
   let actualUserId = userId;
   if (!actualUserId) {
-    const user = await getCurrentUser();
+    const user = await vrchatApi.authApi.getCurrentUser();
     if (!user || !user.id) throw new Error("No logged-in VRChat user found.");
     actualUserId = user.id;
   }
@@ -324,11 +327,3 @@ export async function syncAllInviteMessages(userId?: string) {
     `[InviteMessageManager] All invite messages synced for userId=${actualUserId}`,
   );
 }
-
-// Example usage:
-// await syncInviteMessageIfDifferent({
-//   userId: "usr_xxx",
-//   type: InviteMessageType.RequestResponse,
-//   slot: 0,
-//   expected: invite.requestresponse.busy
-// });

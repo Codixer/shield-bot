@@ -13,8 +13,7 @@ import {
 } from "discord.js";
 import { Discord, ButtonComponent, Guard } from "discordx";
 import { prisma } from "../../../../main.js";
-import { getUserById } from "../../../../utility/vrchat/user.js";
-import { unfriendUser } from "../../../../utility/vrchat/user.js";
+import { vrchatApi } from "../../../../utility/vrchatClient.js";
 import { StaffGuard } from "../../../../utility/guards.js";
 import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
 import { sendWhitelistLog, getUserWhitelistRoles } from "../../../../utility/vrchat/whitelistLogger.js";
@@ -226,7 +225,7 @@ export class VRCStaffAccountManagerButtonHandler {
     try {
       // Try to unfriend the user from VRChat
       try {
-        await unfriendUser(vrcUserId);
+        await vrchatApi.friendApi.unfriend({ userId: vrcUserId });
       } catch (unfriendError) {
         console.warn(
           `Failed to unfriend VRChat user ${vrcUserId}:`,

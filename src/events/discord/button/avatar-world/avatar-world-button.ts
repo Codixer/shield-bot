@@ -6,8 +6,9 @@ import {
 } from "discord.js";
 import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
-import { getUserById } from "../../../../utility/vrchat/user.js";
-import { createInstance, inviteUser } from "../../../../utility/vrchat/index.js";
+import { vrchatApi } from "../../../../utility/vrchatClient.js";
+import { InstanceRegionType, InstanceAccessNormalType } from "vrc-ts";
+import type { WorldIdType } from "vrc-ts";
 
 @Discord()
 export class VRChatAvatarInviteButtonHandler {
@@ -46,7 +47,7 @@ export class VRChatAvatarInviteButtonHandler {
       const vrcAccount = mainAccount || user.vrchatAccounts[0];
 
       // Check if user is friends with the bot
-      const vrcUser = await getUserById(vrcAccount.vrcUserId);
+      const vrcUser = await vrchatApi.userApi.getUserById({ userId: vrcAccount.vrcUserId });
 
       if (!vrcUser || !vrcUser.isFriend) {
         await interaction.editReply({
@@ -76,12 +77,13 @@ export class VRChatAvatarInviteButtonHandler {
         return;
       }
 
-      // Create instance
-      const instance = await createInstance({
-        worldId,
-        type: "private",
-        region: "use",
-        canRequestInvite: true,
+      // Create instance using vrc-ts
+      const currentUser = await vrchatApi.authApi.getCurrentUser();
+      const instance = await vrchatApi.instanceApi.generateNormalInstance({
+        worldId: worldId as WorldIdType,
+        instanceType: InstanceAccessNormalType.Invite,
+        region: InstanceRegionType.US_EAST,
+        ownerId: currentUser.id,
       });
 
       if (!instance || !instance.instanceId) {
@@ -92,13 +94,16 @@ export class VRChatAvatarInviteButtonHandler {
       }
 
       // Invite user to the instance
-      await inviteUser(vrcAccount.vrcUserId, instance.location);
+      await vrchatApi.inviteApi.inviteUser({
+        userId: vrcAccount.vrcUserId,
+        instanceId: instance.location,
+      });
 
       const embed = new EmbedBuilder()
         .setTitle("✅ Instance Created & Invite Sent")
         .setDescription(
           `An instance has been created and an invite has been sent to your VRChat account.\n\n` +
-          `**World:** ${instance.world?.name || worldId}\n` +
+          `**World:** ${(instance.world as any)?.name || worldId}\n` +
           `**Instance ID:** ${instance.shortName || instance.instanceId}\n\n` +
           `Check your VRChat notifications for the invite!`
         )

@@ -1,5 +1,5 @@
 import { prisma } from "../../../../main.js";
-import { hasFriendLocationConsent } from "../../../../utility/vrchat.js";
+import { hasFriendLocationConsent } from "../../../../utility/vrchat/tracking.js";
 import { updateUsernameCache } from "../../../../utility/vrchat/usernameCache.js";
 
 export async function handleFriendLocation(content: any) {

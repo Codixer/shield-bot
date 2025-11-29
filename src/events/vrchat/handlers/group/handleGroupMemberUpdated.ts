@@ -1,6 +1,6 @@
 import { prisma, bot } from "../../../../main.js";
 import { EmbedBuilder, Colors, TextChannel } from "discord.js";
-import { getGroupMember, getGroupRoles } from "../../../../utility/vrchat/groups.js";
+import { vrchatApi } from "../../../../utility/vrchatClient.js";
 
 export async function handleGroupMemberUpdated(content: any) {
   console.log("[Group Member Updated] Event received:", content);
@@ -67,14 +67,16 @@ export async function handleGroupMemberUpdated(content: any) {
   if (groupId) {
     try {
       console.log(`[Group Member Updated] Fetching group member and roles info...`);
-      groupMember = await getGroupMember(groupId, vrcUserId);
-      allRoles = await getGroupRoles(groupId);
+      groupMember = await vrchatApi.groupApi.getGroupMember({ groupId, userId: vrcUserId });
+      allRoles = await vrchatApi.groupApi.getGroupRoles({ groupId });
 
       // Map role IDs to names
       const roleMap = new Map(allRoles.map((r: any) => [r.id, r.name]));
+      // Note: mRoleIds may exist at runtime even if not in the type definition
+      const groupMemberAny = groupMember as any;
       const memberRoleIds = [
         ...(groupMember?.roleIds || []),
-        ...(groupMember?.mRoleIds || []),
+        ...(groupMemberAny?.mRoleIds || []),
       ];
       currentRoleNames = memberRoleIds
         .map((id) => roleMap.get(id))

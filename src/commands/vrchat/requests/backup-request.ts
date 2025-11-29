@@ -14,19 +14,15 @@ import {
   ApplicationIntegrationType,
   AutocompleteInteraction,
 } from "discord.js";
-import {
-  findFriendInstanceOrWorld,
-  getFriendInstanceInfo,
-  getInstanceInfoByShortName,
-  getUserById,
-  hasFriendLocationConsent,
-} from "../../../utility/vrchat.js";
+import { vrchatApi } from "../../../utility/vrchatClient.js";
+import type { WorldIdType, InstanceIdType } from "vrc-ts";
 import { VRChatLoginGuard } from "../../../utility/guards.js";
 import { ShieldMemberGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
 import {
   extractInstanceNumber,
   resolveWorldDisplay,
+  hasFriendLocationConsent,
 } from "../../../utility/vrchat/tracking.js";
 
 @Discord()
@@ -129,13 +125,13 @@ export class VRChatBackupRequestCommand {
           ? mainAccount.vrcUserId
           : user.vrchatAccounts[0].vrcUserId;
         if (mainAccount) {
-          const vrcUser = await getUserById(mainAccount.vrcUserId);
+          const vrcUser = await vrchatApi.userApi.getUserById({ userId: mainAccount.vrcUserId });
           accountUsername = vrcUser?.displayName ?? null;
         }
       }
     } else {
       // If account is provided, get its username from VRChat API
-      const vrcUser = await getUserById(vrcUserId);
+      const vrcUser = await vrchatApi.userApi.getUserById({ userId: vrcUserId });
       accountUsername = vrcUser?.displayName ?? null;
     }
 
@@ -148,7 +144,7 @@ export class VRChatBackupRequestCommand {
     }
 
     // Get user info
-    const vrcUser = await getUserById(vrcUserId);
+    const vrcUser = await vrchatApi.userApi.getUserById({ userId: vrcUserId });
     if (!vrcUser) {
       await interaction.reply({
         content: "Could not find VRChat user information.",
@@ -156,6 +152,31 @@ export class VRChatBackupRequestCommand {
       });
       return;
     }
+
+    // Helper functions for resolveWorldDisplay that wrap vrc-ts API
+    const findFriendInstanceOrWorld = async (userId: string) => {
+      return await prisma.friendLocation.findUnique({ where: { vrcUserId: userId } });
+    };
+    const getFriendInstanceInfo = async (userId: string) => {
+      const record = await prisma.friendLocation.findUnique({ where: { vrcUserId: userId } });
+      if (!record || !record.worldId || !record.location) return null;
+      try {
+        return await vrchatApi.instanceApi.getInstance({ 
+          worldId: record.worldId as WorldIdType, 
+          instanceId: record.location as InstanceIdType 
+        });
+      } catch { return null; }
+    };
+    const getInstanceInfoByShortName = async (shortName: string) => {
+      try {
+        return await vrchatApi.instanceApi.getInstanceByShortName({ shortName });
+      } catch { return null; }
+    };
+    const getUserById = async (userId: string) => {
+      try {
+        return await vrchatApi.userApi.getUserById({ userId });
+      } catch { return null; }
+    };
 
     // Get world info if provided
     let worldInfo = "";

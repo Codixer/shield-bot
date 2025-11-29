@@ -7,7 +7,7 @@ import {
 import { Pagination } from "@discordx/pagination";
 import { Discord, Slash, SlashGroup, SlashOption, Guard } from "discordx";
 import { WhitelistManager } from "../../managers/whitelist/whitelistManager.js";
-import { searchUsers } from "../../utility/vrchat/user.js";
+import { vrchatApi } from "../../utility/vrchatClient.js";
 import { StaffGuard } from "../../utility/guards.js";
 
 const whitelistManager = new WhitelistManager();
@@ -314,7 +314,7 @@ export class WhitelistCommands {
       if (targetUser) {
         userInfo = await whitelistManager.getUserByDiscordId(targetUser.id);
       } else if (vrchatUsername) {
-        const searchResults = await searchUsers({
+        const searchResults = await vrchatApi.userApi.searchAllUsers({
           search: vrchatUsername.trim(),
           n: 1,
         });
@@ -856,7 +856,7 @@ export class WhitelistCommands {
 
       // Handle VRChat username lookup
       if (vrchatUsername && !user) {
-        const searchResults = await searchUsers({
+        const searchResults = await vrchatApi.userApi.searchAllUsers({
           search: vrchatUsername.trim(),
           n: 1,
         });
