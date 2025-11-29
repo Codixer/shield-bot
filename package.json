@@ -9,9 +9,10 @@
     "schema": "./prisma"
   },
   "scripts": {
-    "build": "tsc -p ./tsconfig.json",
-    "build:prod": "tsc -p ./tsconfig.json",
+    "build": "tsc -p ./tsconfig.json && npm run copy:prisma",
+    "build:prod": "tsc -p ./tsconfig.json && npm run copy:prisma",
     "build:changelog": "npx @discordx/changelog --src src",
+    "copy:prisma": "npx cpx2 \"src/generated/prisma/**/*\" build/generated/prisma",
     "dev": "ts-node-esm src/main.ts",
     "start": "ENV=development node build/main.js",
     "start:prod": "node build/main.js",
@@ -45,6 +46,7 @@
     "@types/mysql": "^2.15.26",
     "@types/node": "^24.10.1",
     "@types/node-cron": "^3.0.11",
+    "cpx2": "^8.0.0",
     "nodemon": "^3.1.11",
     "prettier": "^3.7.0",
     "prisma": "7.0.1",
