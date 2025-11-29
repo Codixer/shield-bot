@@ -31,3 +31,4 @@ export function loadCookie(): string | null {
 
 export * from "./instance.js";
 export * from "./rateLimiter.js";
+export * from "./client.js";
