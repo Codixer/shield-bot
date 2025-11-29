@@ -80,6 +80,8 @@ export class EvalCommand {
       const startTime = Date.now();
       
       // Prepare context with commonly used objects
+      // Note: This is an ES module project, so 'require' is not available
+      // Use 'import()' for dynamic imports instead
       const context = {
         bot,
         prisma,
@@ -90,9 +92,11 @@ export class EvalCommand {
         member: cmdInteraction.member,
         process,
         console,
-        require,
-        __dirname: undefined, // Prevent access to file system
-        __filename: undefined, // Prevent access to file system
+        // Provide import for dynamic module loading (ES module way)
+        import: (module: string) => import(module),
+        // Prevent access to file system
+        __dirname: undefined,
+        __filename: undefined,
       };
 
       // Execute the code
