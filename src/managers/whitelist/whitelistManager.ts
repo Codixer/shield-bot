@@ -1452,6 +1452,23 @@ export class WhitelistManager {
       return [];
     }
   }
+
+  /**
+   * Cleanup method to clear timers and pending operations
+   */
+  cleanup(): void {
+    if (this.updateTimer) {
+      clearTimeout(this.updateTimer);
+      this.updateTimer = null;
+    }
+    // Process any pending updates before shutdown
+    if (this.pendingUpdates.size > 0) {
+      console.log(`[WhitelistManager] Processing ${this.pendingUpdates.size} pending updates before shutdown`);
+      this.processBatchedUpdates("Shutdown cleanup").catch((err) => {
+        console.error("[WhitelistManager] Error processing final updates:", err);
+      });
+    }
+  }
 }
 
 // Export instance

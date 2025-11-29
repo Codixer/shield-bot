@@ -16,15 +16,14 @@ import {
   isLoggedInAndVerified,
   loginAndGetCurrentUser,
 } from "./utility/vrchat.js";
-import { startVRChatWebSocketListener } from "./events/vrchat/vrchat-websocket.js";
+import { startVRChatWebSocketListener, stopVRChatWebSocketListener } from "./events/vrchat/vrchat-websocket.js";
 import {
   syncAllInviteMessages,
   syncInviteMessageIfDifferent,
 } from "./managers/messages/InviteMessageManager.js";
 import { initializeSchedules } from "./schedules/schedules.js";
-
-import 'dotenv/config'
 import { PrismaMariaDb } from '@prisma/adapter-mariadb'
+import { whitelistManager } from "./managers/whitelist/whitelistManager.js";
 
 const databaseUrl = process.env.DATABASE_URL!;
 
@@ -98,18 +97,41 @@ bot.once("clientReady", async () => {
   if (vrchatIsRunning) {
     console.log("[VRChat] VRChat is running");
     startVRChatWebSocketListener();
-    syncAllInviteMessages();
+    // Sync invite messages in background, but handle errors
+    syncAllInviteMessages().catch((err) => {
+      console.error("[VRChat] Failed to sync invite messages:", err);
+    });
   } else {
     console.log("[VRChat] VRChat is not running");
   }
 });
 
 bot.on("interactionCreate", async (interaction: Interaction) => {
-  bot.executeInteraction(interaction);
+  try {
+    await bot.executeInteraction(interaction);
+  } catch (error) {
+    console.error("[Bot] Error handling interaction:", error);
+    // Try to respond if interaction hasn't been responded to
+    if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
+      try {
+        await interaction.reply({
+          content: "❌ An error occurred while processing your request.",
+          ephemeral: true,
+        });
+      } catch (replyError) {
+        // Ignore errors from trying to reply (might be too late)
+        console.error("[Bot] Failed to send error reply:", replyError);
+      }
+    }
+  }
 });
 
-bot.on("messageCreate", (message: Message) => {
-  bot.executeCommand(message);
+bot.on("messageCreate", async (message: Message) => {
+  try {
+    await bot.executeCommand(message);
+  } catch (error) {
+    console.error("[Bot] Error handling message:", error);
+  }
 });
 
 async function run() {
@@ -136,14 +158,90 @@ async function run() {
   });
 }
 
+// Graceful shutdown handler
+let isShuttingDown = false;
+
+async function gracefulShutdown(signal: string) {
+  if (isShuttingDown) {
+    return;
+  }
+  isShuttingDown = true;
+
+  console.log(`\n[Shutdown] Received ${signal}, shutting down gracefully...`);
+
+  try {
+    // Stop WebSocket listener
+    stopVRChatWebSocketListener();
+    console.log("[Shutdown] WebSocket listener stopped");
+
+    // Cleanup managers
+    whitelistManager.cleanup();
+    console.log("[Shutdown] Managers cleaned up");
+
+    // Disconnect bot
+    if (bot.isReady()) {
+      bot.destroy();
+      console.log("[Shutdown] Discord bot disconnected");
+    }
+
+    // Close database connection
+    await prisma.$disconnect();
+    console.log("[Shutdown] Database connection closed");
+
+    console.log("[Shutdown] Graceful shutdown complete");
+    process.exit(0);
+  } catch (error) {
+    console.error("[Shutdown] Error during shutdown:", error);
+    process.exit(1);
+  }
+}
+
+// Track uncaught exceptions to prevent infinite loops
+let uncaughtExceptionCount = 0;
+let lastUncaughtExceptionTime = 0;
+const MAX_UNCAUGHT_EXCEPTIONS = 5;
+const EXCEPTION_RESET_TIME = 60000; // 1 minute
+
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
-  // Optionally, you can add logic to restart the bot or notify the admin
+  // Log but don't crash - let the bot continue running
 });
 
 process.on("uncaughtException", (error) => {
-  console.error("Uncaught Exception thrown:", error);
-  // Optionally, you can add logic to restart the bot or notify the admin
+  const now = Date.now();
+  
+  // Reset counter if enough time has passed
+  if (now - lastUncaughtExceptionTime > EXCEPTION_RESET_TIME) {
+    uncaughtExceptionCount = 0;
+  }
+  
+  uncaughtExceptionCount++;
+  lastUncaughtExceptionTime = now;
+  
+  console.error(`[Uncaught Exception #${uncaughtExceptionCount}]`, error);
+  console.error("Stack trace:", error.stack);
+  
+  // Only shutdown if we're getting too many exceptions in a short time (likely infinite loop)
+  if (uncaughtExceptionCount >= MAX_UNCAUGHT_EXCEPTIONS) {
+    console.error(
+      `[Fatal] Too many uncaught exceptions (${uncaughtExceptionCount}) in a short period. Shutting down to prevent infinite loop.`
+    );
+    gracefulShutdown("uncaughtException").catch(() => {
+      process.exit(1);
+    });
+  } else {
+    console.warn(
+      `[Warning] Bot will continue running despite uncaught exception. This may lead to unstable behavior.`
+    );
+    // Bot continues running - don't exit
+  }
 });
 
-run();
+// Handle termination signals
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+run().catch((error) => {
+  console.error("[Startup] Fatal error during startup:", error);
+  process.exit(1);
+});

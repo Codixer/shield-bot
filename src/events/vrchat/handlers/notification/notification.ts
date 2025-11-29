@@ -2,13 +2,17 @@ import { handleFriendRequestNotification } from "./types/friendrequest.js";
 import { handleInviteNotification } from "./types/invite.js";
 import { handleResponseNotification } from "./types/response.js";
 
-export function handleNotification(content: any) {
+export async function handleNotification(content: any) {
   switch (content.type) {
     case "friendRequest":
-      handleFriendRequestNotification(content);
+      await handleFriendRequestNotification(content).catch((err) => {
+        console.error("[Notification] Error handling friendRequest:", err);
+      });
       break;
     case "invite":
-      handleInviteNotification(content);
+      await handleInviteNotification(content).catch((err) => {
+        console.error("[Notification] Error handling invite:", err);
+      });
       break;
     // case "inviteResponse":
     // case "message":

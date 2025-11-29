@@ -34,6 +34,27 @@ function getAuthTokenFromCookie(cookie: string): string | null {
   return match ? match[1] : null;
 }
 
+// Export cleanup function for graceful shutdown
+let ws: WebSocket | null = null;
+let reconnectTimeout: NodeJS.Timeout | null = null;
+let shouldReconnect = true;
+
+export function stopVRChatWebSocketListener() {
+  shouldReconnect = false;
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+  if (ws) {
+    ws.removeAllListeners();
+    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+      ws.close();
+    }
+    ws = null;
+  }
+  console.log("[WS] VRChat WebSocket listener stopped");
+}
+
 export function startVRChatWebSocketListener() {
   const cookie = loadCookie();
   if (!cookie) {
@@ -46,9 +67,6 @@ export function startVRChatWebSocketListener() {
     return;
   }
   const wsUrl = `wss://pipeline.vrchat.cloud/?authToken=${authToken}`;
-  let ws: WebSocket | null = null;
-  let reconnectTimeout: NodeJS.Timeout | null = null;
-  let shouldReconnect = true;
   let reconnectAttempts = 0;
   let baseReconnectDelay = 5000; // 5 seconds
   let maxReconnectDelay = 15 * 60 * 1000; // 15 minutes
@@ -109,7 +127,9 @@ export function startVRChatWebSocketListener() {
         switch (msg.type) {
           // Notification Events
           case "notification":
-            handleNotification(content);
+            handleNotification(content).catch((err) => {
+              console.error("[WS] Error handling notification:", err);
+            });
             break;
           // case "response-notification":
           //     handleResponseNotification(content);
@@ -134,25 +154,39 @@ export function startVRChatWebSocketListener() {
           //     break;
           // Friend Events
           case "friend-add":
-            await handleFriendAdd(content);
+            await handleFriendAdd(content).catch((err) => {
+              console.error("[WS] Error handling friend-add:", err);
+            });
             break;
           case "friend-delete":
-            await handleFriendDelete(content);
+            await handleFriendDelete(content).catch((err) => {
+              console.error("[WS] Error handling friend-delete:", err);
+            });
             break;
           case "friend-online":
-            await handleFriendOnline(content);
+            await handleFriendOnline(content).catch((err) => {
+              console.error("[WS] Error handling friend-online:", err);
+            });
             break;
           case "friend-active":
-            await handleFriendActive(content);
+            await handleFriendActive(content).catch((err) => {
+              console.error("[WS] Error handling friend-active:", err);
+            });
             break;
           case "friend-offline":
-            await handleFriendOffline(content);
+            await handleFriendOffline(content).catch((err) => {
+              console.error("[WS] Error handling friend-offline:", err);
+            });
             break;
           case "friend-update":
-            await handleFriendUpdate(content);
+            await handleFriendUpdate(content).catch((err) => {
+              console.error("[WS] Error handling friend-update:", err);
+            });
             break;
           case "friend-location":
-            await handleFriendLocation(content);
+            await handleFriendLocation(content).catch((err) => {
+              console.error("[WS] Error handling friend-location:", err);
+            });
             break;
           // // User Events
           // case "user-update":
