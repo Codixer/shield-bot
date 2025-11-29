@@ -1,4 +1,4 @@
-import { PermissionLevel } from "../generated/prisma/enums.js";
+import { PermissionLevel } from "../generated/prisma/client.js";
 import { GuildMember } from "discord.js";
 import { prisma, bot } from "../main.js";
 
