@@ -9,8 +9,8 @@
     "schema": "./prisma"
   },
   "scripts": {
-    "build": "tsc -p ./tsconfig.json",
-    "build:prod": "tsc -p ./tsconfig.json",
+    "build": "tsc -p ./tsconfig.json && node scripts/copy-prisma.js",
+    "build:prod": "tsc -p ./tsconfig.json && node scripts/copy-prisma.js",
     "build:changelog": "npx @discordx/changelog --src src",
     "dev": "ts-node-esm src/main.ts",
     "start": "ENV=development node build/main.js",
