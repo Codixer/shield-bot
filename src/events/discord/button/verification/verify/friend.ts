@@ -12,6 +12,7 @@ import {
   getUserById,
 } from "../../../../../utility/vrchat.js";
 import { prisma } from "../../../../../main.js";
+import { VerificationInteractionManager } from "../../../../../managers/verification/verificationInteractionManager.js";
 
 @Discord()
 export class VRChatFriendVerifyButtonHandler {
@@ -61,10 +62,36 @@ export class VRChatFriendVerifyButtonHandler {
       .setCustomId(`vrchat-friend-verify:${discordId}:${vrcUserId}`)
       .setLabel("Verify status")
       .setStyle(ButtonStyle.Success);
-    await interaction.update({
+    
+    const updatedMessage = await interaction.update({
       embeds: [embed],
       components: [{ type: 1, components: [verifyBtn] }],
+      fetchReply: true,
     });
+
+    // Store the interaction for later use (valid for 15 minutes)
+    if (friendRequestSent) {
+      VerificationInteractionManager.storeInteraction(
+        discordId,
+        vrcUserId,
+        interaction,
+      );
+    }
+
+    // Also store the message reference as fallback (for after 15 minutes)
+    if (updatedMessage && friendRequestSent) {
+      await prisma.vRChatAccount.updateMany({
+        where: {
+          vrcUserId,
+          user: { discordId },
+          accountType: { in: ["IN_VERIFICATION", "UNVERIFIED"] },
+        },
+        data: {
+          verificationMessageId: updatedMessage.id,
+          verificationChannelId: updatedMessage.channelId,
+        },
+      });
+    }
   }
 
   @ButtonComponent({ id: /vrchat-friend-verify:(\d+):([a-zA-Z0-9\-_]+)/ })
@@ -72,6 +99,15 @@ export class VRChatFriendVerifyButtonHandler {
     const parts = interaction.customId.split(":");
     const discordId = parts[1];
     const vrcUserId = parts[2];
+
+    // Defer reply with ephemeral flag so we can update it later
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    // Show initial "checking" message
+    await interaction.editReply({
+      content: "⏳ Checking verification status...",
+    });
+
     // Check if the user has been verified in the database
     const vrcAccount = await prisma.vRChatAccount.findFirst({
       where: {
@@ -110,18 +146,32 @@ export class VRChatFriendVerifyButtonHandler {
       }
 
       const embed = new EmbedBuilder()
-        .setTitle("Verification Successful")
+        .setTitle("✅ Verification Successful")
         .setDescription(
           `Your VRChat account (**${vrchatUsername || vrcUserId}**) has been successfully verified via friend request!\n\n✅ Your account is now fully verified and protected from takeover.`,
         )
         .setColor(0x57f287);
-      await interaction.update({
+      
+      // Update the ephemeral reply
+      await interaction.editReply({
         embeds: [embed],
         components: [],
       });
+
+      // Also update the original message that had the "Verify status" button
+      try {
+        if (interaction.message && interaction.message.editable) {
+          await interaction.message.edit({
+            embeds: [embed],
+            components: [],
+          });
+        }
+      } catch (error) {
+        console.warn(`[Friend Verify] Failed to update original message:`, error);
+      }
     } else {
       const embed = new EmbedBuilder()
-        .setTitle("Not Verified Yet")
+        .setTitle("❌ Not Verified Yet")
         .setDescription(
           `You are not verified yet. Please make sure you have accepted the friend request from the bot in VRChat, then press **Verify status** again.`,
         )
@@ -130,7 +180,7 @@ export class VRChatFriendVerifyButtonHandler {
         .setCustomId(`vrchat-friend-verify:${discordId}:${vrcUserId}`)
         .setLabel("Verify status")
         .setStyle(ButtonStyle.Success);
-      await interaction.update({
+      await interaction.editReply({
         embeds: [embed],
         components: [{ type: 1, components: [verifyBtn] }],
       });

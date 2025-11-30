@@ -14,15 +14,17 @@ model User {
 }
 
 model VRChatAccount {
-  id                Int               @id @default(autoincrement())
-  userId            Int
-  vrcUserId         String
-  accountType       VRChatAccountType @default(IN_VERIFICATION)
-  verificationCode  String?
-  verificationGuildId String? // Guild ID where verification was initiated
-  vrchatUsername    String? // Cached VRChat username
-  usernameUpdatedAt DateTime? // Last time username was updated
-  user              User              @relation(fields: [userId], references: [id])
+  id                      Int               @id @default(autoincrement())
+  userId                  Int
+  vrcUserId               String
+  accountType             VRChatAccountType @default(IN_VERIFICATION)
+  verificationCode        String?
+  verificationGuildId     String? // Guild ID where verification was initiated
+  verificationMessageId   String? // Message ID of the verification message to update
+  verificationChannelId   String? // Channel ID of the verification message
+  vrchatUsername          String? // Cached VRChat username
+  usernameUpdatedAt       DateTime? // Last time username was updated
+  user                    User              @relation(fields: [userId], references: [id])
 
   @@index([userId], map: "VRChatAccount_userId_fkey")
   @@index([vrcUserId], map: "VRChatAccount_vrcUserId_idx")

@@ -4,6 +4,7 @@ import { whitelistManager } from '../../../../managers/whitelist/whitelistManage
 import { prisma, bot } from '../../../../main.js';
 import { EmbedBuilder, Colors, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
 import { sendWhitelistLog, getUserWhitelistRoles } from '../../../../utility/vrchat/whitelistLogger.js';
+import { VerificationInteractionManager } from '../../../../managers/verification/verificationInteractionManager.js';
 
 export async function handleFriendAdd(content: any) {
     // content should include the VRChat user ID of the new friend
@@ -37,6 +38,10 @@ export async function handleFriendAdd(content: any) {
         });
         const finalAccountType = hasMainAccount ? "ALT" : "MAIN";
 
+        // Get message reference before updating account
+        const messageId = vrcAccount.verificationMessageId;
+        const channelId = vrcAccount.verificationChannelId;
+
         await prisma.vRChatAccount.update({
             where: { id: vrcAccount.id },
             data: {
@@ -44,13 +49,31 @@ export async function handleFriendAdd(content: any) {
                 vrchatUsername,
                 usernameUpdatedAt: new Date(),
                 verificationGuildId: null, // Clear guild ID after verification is complete
+                verificationMessageId: null, // Clear message reference after updating
+                verificationChannelId: null,
             }
         });
 
         console.log(`[Friend Add] Account ${vrcUserId} successfully verified and marked as VERIFIED`);
 
-        // Send DM confirmation to the user
-        await sendDMConfirmation(vrcAccount.userId, vrcUserId, vrchatUsername);
+        // Get user's Discord ID for interaction lookup
+        const user = await prisma.user.findUnique({ where: { id: vrcAccount.userId } });
+        const discordId = user?.discordId;
+
+        // Try to update the original verification message, fall back to DM if it fails
+        const messageUpdated = await updateVerificationMessage(
+            discordId,
+            messageId,
+            channelId,
+            vrcUserId,
+            vrchatUsername,
+            vrcAccount.userId
+        );
+
+        // If we couldn't update the message, send a DM instead
+        if (!messageUpdated) {
+            await sendDMConfirmation(vrcAccount.userId, vrcUserId, vrchatUsername);
+        }
     } catch (e) {
         console.log('[Friend Add] Could not update verification status:', e);
     }
@@ -102,6 +125,199 @@ export async function handleFriendAdd(content: any) {
             console.warn(`[Friend Add] Failed to update whitelist for user ${user.discordId}:`, e);
         }
         // Optionally, send a Discord notification here
+    }
+}
+
+/**
+ * Builds the verification success embed and components
+ */
+async function buildVerificationSuccessEmbed(
+    vrcUserId: string,
+    vrchatUsername: string | null,
+    discordId: string | null
+): Promise<{ embed: EmbedBuilder; components: any[] }> {
+    const embed = new EmbedBuilder()
+        .setTitle("✅ Verification Successful")
+        .setDescription(
+            `Your VRChat account (**${vrchatUsername || vrcUserId}**) has been successfully verified via friend request!\n\n✅ Your account is now fully verified and protected from takeover.`
+        )
+        .setColor(Colors.Green)
+        .setFooter({ text: "S.H.I.E.L.D. Bot - Verification System" })
+        .setTimestamp();
+
+    const components: any[] = [];
+
+    if (discordId) {
+        // Check if there's a VRChat group configured for any guild
+        const guildSettings = await prisma.guildSettings.findFirst({
+            where: { vrcGroupId: { not: null } },
+        });
+
+        if (guildSettings?.vrcGroupId) {
+            // Check if user is already in the group
+            let isInGroup = false;
+            let hasOnlyDefaultRole = false;
+            
+            try {
+                const groupMember = await getGroupMember(guildSettings.vrcGroupId, vrcUserId);
+                if (groupMember) {
+                    isInGroup = true;
+                    const totalRoles = [
+                        ...(groupMember.roleIds || []),
+                        ...(groupMember.mRoleIds || []),
+                    ].length;
+                    hasOnlyDefaultRole = totalRoles <= 1;
+                }
+            } catch (error) {
+                console.debug(`[Update Verification Message] Could not check group membership for ${vrcUserId}:`, error);
+            }
+
+            if (isInGroup) {
+                const syncRolesButton = new ButtonBuilder()
+                    .setCustomId(`grp-sync:${discordId}:${vrcUserId}`)
+                    .setLabel("Sync Roles")
+                    .setStyle(hasOnlyDefaultRole ? ButtonStyle.Primary : ButtonStyle.Secondary)
+                    .setEmoji("🔄");
+
+                components.push(
+                    new ActionRowBuilder().addComponents(syncRolesButton)
+                );
+
+                const currentDescription = embed.data.description || "";
+                const additionalText = `\n\n**SHIELD VRChat Group**\n✅ You're already in the group!\n• Click **Sync Roles** to update your VRChat group roles based on your Discord roles`;
+                const newDescription = currentDescription + additionalText;
+                
+                if (newDescription.length <= 4096) {
+                    embed.setDescription(newDescription);
+                }
+            } else {
+                const joinGroupButton = new ButtonBuilder()
+                    .setCustomId(`grp-inv:${discordId}:${vrcUserId}`)
+                    .setLabel("Join Group")
+                    .setStyle(ButtonStyle.Primary)
+                    .setEmoji("🛡️");
+
+                const syncRolesButton = new ButtonBuilder()
+                    .setCustomId(`grp-sync:${discordId}:${vrcUserId}`)
+                    .setLabel("Sync Roles")
+                    .setStyle(ButtonStyle.Secondary)
+                    .setEmoji("🔄");
+
+                components.push(
+                    new ActionRowBuilder().addComponents(joinGroupButton, syncRolesButton)
+                );
+
+                const currentDescription = embed.data.description || "";
+                const additionalText = `\n\n**SHIELD VRChat Group**\n• Click **Join Group** to receive an invite\n• Click **Sync Roles** to update your VRChat group roles based on your Discord roles`;
+                const newDescription = currentDescription + additionalText;
+                
+                if (newDescription.length <= 4096) {
+                    embed.setDescription(newDescription);
+                }
+            }
+        }
+    }
+
+    return { embed, components };
+}
+
+/**
+ * Updates the original verification message when verification completes automatically
+ * Tries stored interaction first (within 15 minutes), then falls back to message editing
+ * Returns true if successful, false otherwise
+ */
+async function updateVerificationMessage(
+    discordId: string | null | undefined,
+    messageId: string | null | undefined,
+    channelId: string | null | undefined,
+    vrcUserId: string,
+    vrchatUsername: string | null,
+    userId: number
+): Promise<boolean> {
+    if (!discordId) {
+        // Can't use interaction without Discord ID, try message fallback
+        return await updateVerificationMessageFallback(messageId, channelId, vrcUserId, vrchatUsername, userId);
+    }
+
+    // Step 1: Try to use stored interaction (valid for 15 minutes)
+    const storedInteraction = VerificationInteractionManager.getInteraction(discordId, vrcUserId);
+    if (storedInteraction) {
+        try {
+            const { embed, components } = await buildVerificationSuccessEmbed(
+                vrcUserId,
+                vrchatUsername,
+                discordId
+            );
+
+            // Use interaction.editReply() to update the ephemeral message
+            await storedInteraction.editReply({
+                embeds: [embed],
+                components: components.length > 0 ? components : [],
+            });
+
+            // Remove the interaction since we've used it
+            VerificationInteractionManager.removeInteraction(discordId, vrcUserId);
+
+            console.log(`[Update Verification Message] Successfully updated via stored interaction for ${vrcUserId}`);
+            return true;
+        } catch (error) {
+            console.warn(`[Update Verification Message] Failed to update via stored interaction:`, error);
+            // Fall through to message editing fallback
+        }
+    }
+
+    // Step 2: Fallback to message editing (for after 15 minutes or if interaction failed)
+    return await updateVerificationMessageFallback(messageId, channelId, vrcUserId, vrchatUsername, userId);
+}
+
+/**
+ * Fallback method: Updates message by fetching it by ID
+ * This works for non-ephemeral messages or after interaction expires
+ */
+async function updateVerificationMessageFallback(
+    messageId: string | null | undefined,
+    channelId: string | null | undefined,
+    vrcUserId: string,
+    vrchatUsername: string | null,
+    userId: number
+): Promise<boolean> {
+    if (!messageId || !channelId || !bot) {
+        return false;
+    }
+
+    try {
+        const channel = await bot.channels.fetch(channelId).catch(() => null);
+        if (!channel || !channel.isTextBased()) {
+            return false;
+        }
+
+        const message = await channel.messages.fetch(messageId).catch(() => null);
+        if (!message) {
+            return false;
+        }
+
+        // Check if bot can edit this message
+        if (!message.editable) {
+            return false;
+        }
+
+        const user = await prisma.user.findUnique({ where: { id: userId } });
+        const { embed, components } = await buildVerificationSuccessEmbed(
+            vrcUserId,
+            vrchatUsername,
+            user?.discordId || null
+        );
+
+        await message.edit({
+            embeds: [embed],
+            components: components.length > 0 ? components : [],
+        });
+
+        console.log(`[Update Verification Message] Successfully updated verification message ${messageId} for ${vrcUserId}`);
+        return true;
+    } catch (error) {
+        console.warn(`[Update Verification Message] Failed to update message ${messageId}:`, error);
+        return false;
     }
 }
 
