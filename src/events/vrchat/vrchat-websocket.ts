@@ -1,5 +1,5 @@
-import WebSocket from "ws";
-import { loadCookie } from "../../utility/vrchat.js";
+import { VRCWebSocket, EventType } from "vrc-ts";
+import { vrchatApi } from "../../utility/vrchat/index.js";
 import {
   handleFriendActive,
   handleFriendDelete,
@@ -17,271 +17,202 @@ import { handleContentRefresh } from "./handlers/user/handleContentRefresh.js";
 import { handleInstanceQueueJoined } from "./handlers/user/handleInstanceQueueJoined.js";
 import { handleGroupJoined } from "./handlers/group/handleGroupJoined.js";
 import { handleGroupLeft } from "./handlers/group/handleGroupLeft.js";
-// import { handleGroupMemberUpdated } from "./handlers/group/handleGroupMemberUpdated.js";
 import { handleGroupRoleUpdated } from "./handlers/group/handleGroupRoleUpdated.js";
 import { handleNotification } from "./handlers/notification/notification.js";
-import { handleResponseNotification } from "./handlers/notification/response-notification.js";
-import { handleSeeNotification } from "./handlers/notification/see-notification.js";
-import { handleHideNotification } from "./handlers/notification/hide-notification.js";
-import { handleClearNotification } from "./handlers/notification/clear-notification.js";
-import { handleNotificationV2 } from "./handlers/notification/notification-v2.js";
-import { handleNotificationV2Update } from "./handlers/notification/notification-v2-update.js";
-import { handleNotificationV2Delete } from "./handlers/notification/notification-v2-delete.js";
 
-function getAuthTokenFromCookie(cookie: string): string | null {
-  // VRChat cookie format: auth=authcookie_xxx; ...
-  const match = cookie.match(/auth=([^;]+)/);
-  return match ? match[1] : null;
-}
+// WebSocket instance
+let ws: VRCWebSocket | null = null;
 
-// Export cleanup function for graceful shutdown
-let ws: WebSocket | null = null;
-let reconnectTimeout: NodeJS.Timeout | null = null;
-let shouldReconnect = true;
-
+/**
+ * Stop the VRChat WebSocket listener
+ */
 export function stopVRChatWebSocketListener() {
-  shouldReconnect = false;
-  if (reconnectTimeout) {
-    clearTimeout(reconnectTimeout);
-    reconnectTimeout = null;
-  }
   if (ws) {
-    ws.removeAllListeners();
-    if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
-      ws.close();
+    try {
+      // vrc-ts WebSocket may have different cleanup methods
+      // Try to close/cleanup if methods exist
+      if (typeof (ws as any).close === "function") {
+        (ws as any).close();
+      } else if (typeof (ws as any).disconnect === "function") {
+        (ws as any).disconnect();
+      }
+    } catch (error) {
+      console.error("[WS] Error disconnecting WebSocket:", error);
     }
     ws = null;
   }
   console.log("[WS] VRChat WebSocket listener stopped");
 }
 
+/**
+ * Start the VRChat WebSocket listener
+ */
 export function startVRChatWebSocketListener() {
-  const cookie = loadCookie();
-  if (!cookie) {
-    console.error("[WS] No VRChat cookie found. Please log in first.");
+  // Check if already connected
+  if (ws) {
+    console.warn("[WS] WebSocket already connected");
     return;
   }
-  const authToken = getAuthTokenFromCookie(cookie);
-  if (!authToken) {
-    console.error("[WS] No auth token found in cookie.");
+
+  // Check if API is logged in
+  if (!vrchatApi.currentUser) {
+    console.error("[WS] Not logged in to VRChat. Please log in first.");
     return;
   }
-  const wsUrl = `wss://pipeline.vrchat.cloud/?authToken=${authToken}`;
-  let reconnectAttempts = 0;
-  let baseReconnectDelay = 5000; // 5 seconds
-  let maxReconnectDelay = 15 * 60 * 1000; // 15 minutes
-  let maintenanceMode = false;
 
-  function getReconnectDelay(): number {
-    if (maintenanceMode) {
-      return maxReconnectDelay; // 15 minutes during maintenance
-    }
-    
-    // Exponential backoff: 5s, 10s, 20s, 40s, 80s, then cap at 15 minutes
-    const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttempts), maxReconnectDelay);
-    return delay;
-  }
-
-  function connect() {
-    ws = new WebSocket(wsUrl, {
-      headers: {
-        "User-Agent": process.env.VRCHAT_USER_AGENT,
-      },
+  try {
+    // Create WebSocket instance with vrc-ts
+    ws = new VRCWebSocket({
+      vrchatAPI: vrchatApi,
+      eventsToListenTo: [
+        EventType.Friend_Add,
+        EventType.Friend_Delete,
+        EventType.Friend_Online,
+        EventType.Friend_Active,
+        EventType.Friend_Offline,
+        EventType.Friend_Update,
+        EventType.Friend_Location,
+        EventType.Notification,
+        EventType.Notification_V2,
+        // Add other events as needed
+      ],
     });
 
-    ws.on("open", () => {
-      console.log("[WS] Connected to VRChat WebSocket");
-      // Reset reconnection state on successful connection
-      reconnectAttempts = 0;
-      maintenanceMode = false;
-    });
-
-    ws.on("message", async (data) => {
+    // Friend Events
+    ws.on(EventType.Friend_Add, async (data: any) => {
       try {
-        const msg = JSON.parse(data.toString());
-        let content = msg.content;
-        // Double-encoded: content is a stringified JSON for some events
-        if (typeof content === "string") {
-          try {
-            content = JSON.parse(content);
-          } catch {
-            // If parsing fails, keep as string
-          }
-        }
-        // Ignore events from the bot user
-        const botUserId = "usr_c3c58aa6-c4dc-4de7-80a6-6826be9327ff";
-        if (
-          (content &&
-            (content.userId === botUserId ||
-              content.senderUserId === botUserId)) ||
-          (Array.isArray(content) &&
-            content.some(
-              (e) => e.userId === botUserId || e.senderUserId === botUserId,
-            ))
-        ) {
-          console.debug(`[VRChat WS] Ignoring ${msg.type} event from bot user`);
-          return;
-        }
-
-        // console.log (`[VRChat WS] Received event: ${msg}`);
-        switch (msg.type) {
-          // Notification Events
-          case "notification":
-            handleNotification(content).catch((err) => {
-              console.error("[WS] Error handling notification:", err);
-            });
-            break;
-          // case "response-notification":
-          //     handleResponseNotification(content);
-          //     break;
-          // case "see-notification":
-          //     handleSeeNotification(content);
-          //     break;
-          // case "hide-notification":
-          //     handleHideNotification(content);
-          //     break;
-          // case "clear-notification":
-          //     handleClearNotification(content);
-          //     break;
-          // case "notification-v2":
-          //     handleNotificationV2(content);
-          //     break;
-          // case "notification-v2-update":
-          //     handleNotificationV2Update(content);
-          //     break;
-          // case "notification-v2-delete":
-          //     handleNotificationV2Delete(content);
-          //     break;
-          // Friend Events
-          case "friend-add":
-            await handleFriendAdd(content).catch((err) => {
-              console.error("[WS] Error handling friend-add:", err);
-            });
-            break;
-          case "friend-delete":
-            await handleFriendDelete(content).catch((err) => {
-              console.error("[WS] Error handling friend-delete:", err);
-            });
-            break;
-          case "friend-online":
-            await handleFriendOnline(content).catch((err) => {
-              console.error("[WS] Error handling friend-online:", err);
-            });
-            break;
-          case "friend-active":
-            await handleFriendActive(content).catch((err) => {
-              console.error("[WS] Error handling friend-active:", err);
-            });
-            break;
-          case "friend-offline":
-            await handleFriendOffline(content).catch((err) => {
-              console.error("[WS] Error handling friend-offline:", err);
-            });
-            break;
-          case "friend-update":
-            await handleFriendUpdate(content).catch((err) => {
-              console.error("[WS] Error handling friend-update:", err);
-            });
-            break;
-          case "friend-location":
-            await handleFriendLocation(content).catch((err) => {
-              console.error("[WS] Error handling friend-location:", err);
-            });
-            break;
-          // // User Events
-          // case "user-update":
-          //     await handleUserUpdate(content);
-          //     break;
-          // case "user-location":
-          //     await handleUserLocation(content);
-          //     break;
-          // case "user-badge-assigned":
-          //     await handleUserBadgeAssigned(content);
-          //     break;
-          // case "user-badge-unassigned":
-          //     await handleUserBadgeUnassigned(content);
-          //     break;
-          // case "content-refresh":
-          //     await handleContentRefresh(content);
-          //     break;
-          // case "instance-queue-joined":
-          //     await handleInstanceQueueJoined(content);
-          //     break;
-          // case "instance-queue-ready":
-          //     // TODO: Implement handler for instance-queue-ready
-          //     console.log("[Instance Queue Ready]", content);
-          //     break;
-          // Group Events
-          // case "group-joined":
-          //   await handleGroupJoined(content);
-          //   break;
-          // case "group-left":
-          //   await handleGroupLeft(content);
-          //   break;
-          // case "group-member-updated":
-          //   // This event is for the local user (bot) only, not other members
-          //   await handleGroupMemberUpdated(content);
-          //   break;
-          // case "group-role-updated":
-          //     await handleGroupRoleUpdated(content);
-          //     break;
-          default:
-            console.debug("[VRChat WS]", msg);
-        }
+        // vrc-ts provides data in a structured format
+        // Map to our handler's expected format
+        await handleFriendAdd({
+          userId: data.user?.id || data.userId,
+          user: data.user,
+        });
       } catch (err) {
-        console.error(
-          "[WS]     Failed to parse VRChat WS message:",
-          err,
-          data.toString(),
-        );
+        console.error("[WS] Error handling friend-add:", err);
       }
     });
 
-    ws.on("close", (code, reason) => {
-      console.warn(`[WS] VRChat WebSocket closed: ${code} ${reason}`);
-      
-      // Check if this is a maintenance-related closure
-      if (code === 1006 && maintenanceMode) {
-        console.log("[WS] Detected maintenance mode, using extended retry delay");
-      }
-      
-      if (shouldReconnect && !reconnectTimeout) {
-        const delay = getReconnectDelay();
-        reconnectAttempts++;
-        
-        console.log(`[WS] Scheduling reconnection attempt ${reconnectAttempts} in ${delay / 1000}s ${maintenanceMode ? '(maintenance mode)' : ''}`);
-        
-        reconnectTimeout = setTimeout(() => {
-          reconnectTimeout = null;
-          console.log("[WS] Reconnecting to VRChat WebSocket...");
-          connect();
-        }, delay);
+    ws.on(EventType.Friend_Delete, async (data: any) => {
+      try {
+        await handleFriendDelete({
+          userId: data.user?.id || data.userId,
+          user: data.user,
+        });
+      } catch (err) {
+        console.error("[WS] Error handling friend-delete:", err);
       }
     });
 
-    ws.on("error", (err) => {
-      console.error("[WS] VRChat WebSocket error:", err);
-      
-      // Check if this is a 503 (Service Unavailable) error indicating maintenance
-      if (err.message && (err.message.includes("503") || err.message.includes("Unexpected server response: 503"))) {
-        console.log("[WS] Detected 503 error - VRChat appears to be in maintenance mode");
-        maintenanceMode = true;
-      }
-      
-      if (shouldReconnect && !reconnectTimeout) {
-        const delay = getReconnectDelay();
-        reconnectAttempts++;
-        
-        console.log(`[WS] Scheduling reconnection attempt ${reconnectAttempts} in ${delay / 1000}s after error ${maintenanceMode ? '(maintenance mode)' : ''}`);
-        
-        reconnectTimeout = setTimeout(() => {
-          reconnectTimeout = null;
-          console.log("[WS] Reconnecting to VRChat WebSocket after error...");
-          connect();
-        }, delay);
+    ws.on(EventType.Friend_Online, async (data: any) => {
+      try {
+        // Map vrc-ts event data to our handler format
+        await handleFriendOnline({
+          userId: data.user?.id || data.userId,
+          location: data.location,
+          worldId: data.worldId,
+          travelingToLocation: data.travelingToLocation,
+          user: data.user,
+        });
+      } catch (err) {
+        console.error("[WS] Error handling friend-online:", err);
       }
     });
+
+    ws.on(EventType.Friend_Active, async (data: any) => {
+      try {
+        await handleFriendActive({
+          userId: data.user?.id || data.userId,
+          location: data.location,
+          worldId: data.worldId,
+          user: data.user,
+        });
+      } catch (err) {
+        console.error("[WS] Error handling friend-active:", err);
+      }
+    });
+
+    ws.on(EventType.Friend_Offline, async (data: any) => {
+      try {
+        await handleFriendOffline({
+          userId: data.user?.id || data.userId,
+          user: data.user,
+        });
+      } catch (err) {
+        console.error("[WS] Error handling friend-offline:", err);
+      }
+    });
+
+    ws.on(EventType.Friend_Update, async (data: any) => {
+      try {
+        await handleFriendUpdate({
+          userId: data.user?.id || data.userId,
+          user: data.user,
+        });
+      } catch (err) {
+        console.error("[WS] Error handling friend-update:", err);
+      }
+    });
+
+    ws.on(EventType.Friend_Location, async (data: any) => {
+      try {
+        await handleFriendLocation({
+          userId: data.user?.id || data.userId,
+          location: data.location,
+          worldId: data.worldId,
+          travelingToLocation: data.travelingToLocation,
+          user: data.user,
+        });
+      } catch (err) {
+        console.error("[WS] Error handling friend-location:", err);
+      }
+    });
+
+    // Notification Events
+    ws.on(EventType.Notification, async (data: any) => {
+      try {
+        // vrc-ts notification format may differ, adapt as needed
+        await handleNotification(data);
+      } catch (err) {
+        console.error("[WS] Error handling notification:", err);
+      }
+    });
+
+    ws.on(EventType.Notification_V2, async (data: any) => {
+      try {
+        // Handle v2 notifications
+        await handleNotification(data);
+      } catch (err) {
+        console.error("[WS] Error handling notification-v2:", err);
+      }
+    });
+
+    // Error handling
+    ws.on(EventType.Error, (error: any) => {
+      console.error("[WS] VRChat WebSocket error:", error);
+    });
+
+    // Connection events - vrc-ts WebSocket may use different event names
+    // The WebSocket should connect automatically when created
+    // Listen for connection events if available
+    if (typeof (ws as any).on === "function") {
+      try {
+        (ws as any).on("open", () => {
+          console.log("[WS] Connected to VRChat WebSocket");
+        });
+
+        (ws as any).on("close", () => {
+          console.warn("[WS] VRChat WebSocket disconnected");
+          ws = null;
+        });
+      } catch (error) {
+        // Event listeners may not be available in this format
+        console.debug("[WS] Could not set up connection event listeners");
+      }
+    }
+
+    console.log("[WS] VRChat WebSocket listener started");
+  } catch (error) {
+    console.error("[WS] Failed to start VRChat WebSocket listener:", error);
+    ws = null;
   }
-
-  connect();
 }

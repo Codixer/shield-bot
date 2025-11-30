@@ -1,9 +1,13 @@
-// Location/instance–related VRChat API methods
+// Location/instance–related VRChat API methods using vrc-ts
 
 import { prisma } from "../../main.js";
-import { loadCookie, USER_AGENT } from "../vrchat/index.js";
-import { vrchatFetch } from "./rateLimiter.js";
+import { RequestError, InstanceIdType, WorldIdType } from "vrc-ts";
+import { vrchatApi } from "./index.js";
+import { getInstanceInfoByShortName } from "./instance.js";
 
+/**
+ * Find friend instance or world from database
+ */
 export async function findFriendInstanceOrWorld(userId: string) {
   const record = await prisma.friendLocation.findUnique({
     where: { vrcUserId: userId },
@@ -15,9 +19,13 @@ export async function findFriendInstanceOrWorld(userId: string) {
   return record;
 }
 
-export async function getFriendInstanceInfo(userId: string) {
+/**
+ * Get friend instance info
+ */
+export async function getFriendInstanceInfo(userId: string): Promise<any | null> {
   const record = await findFriendInstanceOrWorld(userId);
   if (!record) return null;
+
   // Handle special values
   if (
     !record.worldId ||
@@ -31,43 +39,29 @@ export async function getFriendInstanceInfo(userId: string) {
     );
     return null;
   }
+
   // Special handling for private location with worldId and senderUserId
   if (record.location === "private" && record.worldId && record.senderUserId) {
     // record.worldId is a full instance URL (worlduuid:instanceUuid~...)
-    const cookie = loadCookie();
-    if (!cookie) throw new Error("Not authenticated. Please log in first.");
-    const url = `https://api.vrchat.cloud/api/1/instances/${record.worldId}`;
-    const response = await vrchatFetch(url, {
-      method: "GET",
-      headers: {
-        "User-Agent": USER_AGENT,
-        Cookie: cookie,
-        "Content-Type": "application/json",
-      },
-    });
-    if (!response.ok) {
-      if (response.status === 404) {
+    try {
+      return await vrchatApi.instanceApi.getInstance({
+        worldId: record.worldId.split(":")[0] as WorldIdType, // Extract worldId from full instance string
+        instanceId: record.worldId as InstanceIdType,
+      });
+    } catch (error: any) {
+      if (error instanceof RequestError && error.statusCode === 404) {
         console.log(
           `[VRChat Instance Lookup] Private instance not found for user ${userId}`,
         );
         return null;
       }
-      throw new Error(
-        `Failed to fetch private instance info: ${response.status} ${response.statusText}`,
-      );
+      throw error;
     }
-    const data = await response.json();
-    if (!data) {
-      console.log(
-        `[VRChat Instance Lookup] Private instance info is null for user ${userId}`,
-      );
-      return null;
-    }
-    return data;
   }
+
   // The location is usually in the form worldId:instanceId or just instanceId
   let worldId = record.worldId;
-  let instanceId = null;
+  let instanceId: string | null = null;
   if (record.location.includes(":")) {
     const parts = record.location.split(":");
     worldId = parts[0];
@@ -75,77 +69,30 @@ export async function getFriendInstanceInfo(userId: string) {
   } else {
     instanceId = record.location;
   }
+
   if (!worldId || !instanceId) {
     console.log(
       `[VRChat Instance Lookup] Could not parse worldId/instanceId for user ${userId}`,
     );
     return null;
   }
-  const cookie = loadCookie();
-  if (!cookie) throw new Error("Not authenticated. Please log in first.");
-  const url = `https://api.vrchat.cloud/api/1/instances/${worldId}:${instanceId}`;
-  const response = await vrchatFetch(url, {
-    method: "GET",
-    headers: {
-      "User-Agent": USER_AGENT,
-      Cookie: cookie,
-      "Content-Type": "application/json",
-    },
-  });
-  if (!response.ok) {
-    if (response.status === 404) {
+
+  try {
+    const instanceIdFull = `${worldId}:${instanceId}`;
+    return await vrchatApi.instanceApi.getInstance({
+      worldId: worldId as WorldIdType,
+      instanceId: instanceIdFull as InstanceIdType,
+    });
+  } catch (error: any) {
+    if (error instanceof RequestError && error.statusCode === 404) {
       console.log(
         `[VRChat Instance Lookup] Instance not found for user ${userId}`,
       );
       return null;
     }
-    throw new Error(
-      `Failed to fetch instance info: ${response.status} ${response.statusText}`,
-    );
+    throw error;
   }
-  const data = await response.json();
-  if (!data) {
-    console.log(
-      `[VRChat Instance Lookup] Instance info is null for user ${userId}`,
-    );
-    return null;
-  }
-  return data;
 }
 
-export async function getInstanceInfoByShortName(shortName: string) {
-  if (!shortName) {
-    console.log("[VRChat Instance Lookup] No shortName provided");
-    return null;
-  }
-  const cookie = loadCookie();
-  if (!cookie) throw new Error("Not authenticated. Please log in first.");
-  const url = `https://api.vrchat.cloud/api/1/instances/s/${shortName}`;
-  const response = await vrchatFetch(url, {
-    method: "GET",
-    headers: {
-      "User-Agent": USER_AGENT,
-      Cookie: cookie,
-      "Content-Type": "application/json",
-    },
-  });
-  if (!response.ok) {
-    if (response.status === 404) {
-      console.log(
-        `[VRChat Instance Lookup] Instance not found for shortName ${shortName}`,
-      );
-      return null;
-    }
-    throw new Error(
-      `Failed to fetch instance info by shortName: ${response.status} ${response.statusText}`,
-    );
-  }
-  const data = await response.json();
-  if (!data) {
-    console.log(
-      `[VRChat Instance Lookup] Instance info is null for shortName ${shortName}`,
-    );
-    return null;
-  }
-  return data;
-}
+// Re-export getInstanceInfoByShortName from instance.ts for backward compatibility
+export { getInstanceInfoByShortName };

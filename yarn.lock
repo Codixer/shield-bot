@@ -681,7 +681,12 @@
     "@types/node" "*"
     "@types/send" "*"
 
-"@types/ws@^8.5.10":
+"@types/totp-generator@^0.0.6":
+  version "0.0.6"
+  resolved "https://registry.yarnpkg.com/@types/totp-generator/-/totp-generator-0.0.6.tgz#f857fb13832fcf5bb5aa408becb84161f2fe00c6"
+  integrity sha512-/5YjkPLh5okAX10hWpQBSrIo2AqqDkB/loNJim2xjYd61IvqzsFnftxfVif0TsXpaLYZQ1Sut9EsrE+8LMHcow==
+
+"@types/ws@^8.5.10", "@types/ws@^8.5.7":
   version "8.18.1"
   resolved "https://registry.yarnpkg.com/@types/ws/-/ws-8.18.1.tgz#48464e4bf2ddfd17db13d845467f6070ffea4aa9"
   integrity sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==
@@ -1106,7 +1111,7 @@ discordx@^11.13.2:
     "@discordx/internal" "^1.2.0"
     lodash "^4.17.21"
 
-dotenv@^16.6.1:
+dotenv@^16.3.1, dotenv@^16.6.1:
   version "16.6.1"
   resolved "https://registry.yarnpkg.com/dotenv/-/dotenv-16.6.1.tgz#773f0e69527a8315c7285d5ee73c4459d20a8020"
   integrity sha512-uBq4egWHTcTt33a72vpSG0z3HnPuIl6NqYcTrKEg2azoEyl2hpW0zqlxysq2pK9HlDIHyHyakeYaYnSAwd8bow==
@@ -1262,6 +1267,11 @@ fresh@~0.5.2:
   version "0.5.2"
   resolved "https://registry.yarnpkg.com/fresh/-/fresh-0.5.2.tgz#3d8cadd90d976569fa835ab1f8e4b23a105605a7"
   integrity sha512-zJ2mQYM18rEFOudeV4GShTGIQ7RbzA7ozbU9I/XBpm7kqgMywgmylMwXHxZJmkVoYkna9d2pVXVXPdYTP9ej8Q==
+
+fs@^0.0.1-security:
+  version "0.0.1-security"
+  resolved "https://registry.yarnpkg.com/fs/-/fs-0.0.1-security.tgz#8a7bd37186b6dddf3813f23858b57ecaaf5e41d4"
+  integrity sha512-3XY9e1pP0CVEUCdj5BmfIZxRBTSDycnbqhIOGec9QYtmVH2fbLpj86CFWkrNOkt/Fvty4KZG5lTglL9j/gJ87w==
 
 fsevents@~2.3.2:
   version "2.3.3"
@@ -1520,6 +1530,11 @@ jiti@^2.4.2:
   version "2.5.1"
   resolved "https://registry.yarnpkg.com/jiti/-/jiti-2.5.1.tgz#bd099c1c2be1c59bbea4e5adcd127363446759d0"
   integrity sha512-twQoecYPiVA5K/h6SxtORw/Bs3ar+mLUtoPSc7iMXzQzK8d7eJ/R09wmTwAjiamETn1cXYPGfNnu7DMoHgu12w==
+
+jssha@^3.1.2:
+  version "3.3.1"
+  resolved "https://registry.yarnpkg.com/jssha/-/jssha-3.3.1.tgz#c5b7fc7fb9aa745461923b87df0e247dd59c7ea8"
+  integrity sha512-VCMZj12FCFMQYcFLPRm/0lOBbLi8uM2BhXPTqw3U4YAfs4AZfiApOoBLoN8cQE60Z50m1MYMTQVCfgF/KaCVhQ==
 
 keygrip@~1.1.0:
   version "1.1.0"
@@ -2251,6 +2266,13 @@ toidentifier@1.0.1:
   resolved "https://registry.yarnpkg.com/toidentifier/-/toidentifier-1.0.1.tgz#3be34321a88a820ed1bd80dfaa33e479fbb8dd35"
   integrity sha512-o5sSPKEkg/DIQNmH43V0/uerLrpzVedkUh8tGNvaeXpfpuwjKenlSox/2O/BTlZUtEe+JG7s5YhEz608PlAHRA==
 
+totp-generator@^0.0.14:
+  version "0.0.14"
+  resolved "https://registry.yarnpkg.com/totp-generator/-/totp-generator-0.0.14.tgz#c136bcb4030f9cab5b10ecd82d15cd2d5518234a"
+  integrity sha512-vFZ8N2TdF4mCj8bUW460jI73LqS+JKccsZ8cttQSuXa3dkTmZo8q81Pq2yAuiPxCI5fPfUrfaKuU+7adjx5s4w==
+  dependencies:
+    jssha "^3.1.2"
+
 totp-generator@^1.0.0:
   version "1.1.0"
   resolved "https://registry.yarnpkg.com/totp-generator/-/totp-generator-1.1.0.tgz#c268f76eaddfe13f2bac842a1218a47865719ccf"
@@ -2389,6 +2411,19 @@ vary@^1.1.2:
   resolved "https://registry.yarnpkg.com/vary/-/vary-1.1.2.tgz#2299f02c6ded30d4a5961b0b9f74524a18f634fc"
   integrity sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==
 
+vrc-ts@^1.0.17:
+  version "1.0.17"
+  resolved "https://registry.yarnpkg.com/vrc-ts/-/vrc-ts-1.0.17.tgz#3dd9a0290e8eb746d88f2cfb29b3c8aa34cf8077"
+  integrity sha512-L+vsA0STmsG5PKIEir+w7/yS/sEVW1iH8R4MpI6tRDu00VMS4Zx33BhdpWTbGkSSFHkNlVHeloXsddLcUROPXg==
+  dependencies:
+    "@types/totp-generator" "^0.0.6"
+    "@types/ws" "^8.5.7"
+    dotenv "^16.3.1"
+    fs "^0.0.1-security"
+    totp-generator "^0.0.14"
+    websocket-ts "^2.1.5"
+    ws "^8.14.2"
+
 vrchat@^2.20.5:
   version "2.20.5"
   resolved "https://registry.yarnpkg.com/vrchat/-/vrchat-2.20.5.tgz#354389bddfcd507a647bbba37830de4046418d7d"
@@ -2406,6 +2441,11 @@ web-streams-polyfill@^3.0.3:
   version "3.3.3"
   resolved "https://registry.yarnpkg.com/web-streams-polyfill/-/web-streams-polyfill-3.3.3.tgz#2073b91a2fdb1fbfbd401e7de0ac9f8214cecb4b"
   integrity sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==
+
+websocket-ts@^2.1.5:
+  version "2.2.1"
+  resolved "https://registry.yarnpkg.com/websocket-ts/-/websocket-ts-2.2.1.tgz#d8e3ed2b83bb1d121ee6ee6f387010147f00b50a"
+  integrity sha512-YKPDfxlK5qOheLZ2bTIiktZO1bpfGdNCPJmTEaPW7G9UXI1GKjDdeacOrsULUS000OPNxDVOyAuKLuIWPqWM0Q==
 
 which@^2.0.1:
   version "2.0.2"
@@ -2432,7 +2472,7 @@ wrap-ansi@^8.1.0:
     string-width "^5.0.1"
     strip-ansi "^7.0.1"
 
-ws@^8.17.0, ws@^8.18.3:
+ws@^8.14.2, ws@^8.17.0, ws@^8.18.3:
   version "8.18.3"
   resolved "https://registry.yarnpkg.com/ws/-/ws-8.18.3.tgz#b56b88abffde62791c639170400c93dcb0c95472"
   integrity sha512-PEIGCY5tSlUt50cqyMXfCzX+oOPqN0vuGqWzbcJ2xvnkzkq46oOpz7dQaTDBdfICb4N14+GARUDw2XV2N4tvzg==

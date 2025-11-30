@@ -1,7 +1,7 @@
-// VRChat Group API utilities
+// VRChat Group API utilities using vrc-ts
 
-import { loadCookie, USER_AGENT } from "./index.js";
-import { vrchatFetch } from "./rateLimiter.js";
+import { RequestError, GroupIdType, GroupUserVisibility, GroupRoleIdType } from "vrc-ts";
+import { vrchatApi } from "./index.js";
 
 /**
  * Invite a user to a VRChat group
@@ -13,34 +13,20 @@ export async function inviteUserToGroup(
   groupId: string,
   userId: string,
 ): Promise<any> {
-  const cookie = loadCookie();
-  if (!cookie) {
-    throw new Error("Not logged in to VRChat");
-  }
-
-  const url = `https://api.vrchat.cloud/api/1/groups/${groupId}/invites`;
-  const response = await vrchatFetch(url, {
-    method: "POST",
-    headers: {
-      "User-Agent": USER_AGENT,
-      Cookie: cookie,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
+  try {
+    return await vrchatApi.groupApi.inviteUsertoGroup({
+      groupId: groupId as GroupIdType,
       userId,
       confirmOverrideBlock: true,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Failed to invite user to group: ${response.status} ${errorText}`,
-    );
+    });
+  } catch (error: any) {
+    if (error instanceof RequestError) {
+      throw new Error(
+        `Failed to invite user to group: ${error.statusCode} ${error.message}`,
+      );
+    }
+    throw error;
   }
-
-  // API returns 200 with empty body on success
-  return response.status === 200;
 }
 
 /**
@@ -53,31 +39,22 @@ export async function getGroupMember(
   groupId: string,
   userId: string,
 ): Promise<any> {
-  const cookie = loadCookie();
-  if (!cookie) {
-    throw new Error("Not logged in to VRChat");
-  }
-
-  const url = `https://api.vrchat.cloud/api/1/groups/${groupId}/members/${userId}`;
-  const response = await vrchatFetch(url, {
-    method: "GET",
-    headers: {
-      "User-Agent": USER_AGENT,
-      Cookie: cookie,
-    },
-  });
-
-  if (!response.ok) {
-    if (response.status === 404) {
+  try {
+    return await vrchatApi.groupApi.getGroupMember({
+      groupId: groupId as GroupIdType,
+      userId,
+    });
+  } catch (error: any) {
+    if (error instanceof RequestError && error.statusCode === 404) {
       return null; // User not in group
     }
-    const errorText = await response.text();
-    throw new Error(
-      `Failed to get group member: ${response.status} ${errorText}`,
-    );
+    if (error instanceof RequestError) {
+      throw new Error(
+        `Failed to get group member: ${error.statusCode} ${error.message}`,
+      );
+    }
+    throw error;
   }
-
-  return await response.json();
 }
 
 /**
@@ -99,30 +76,30 @@ export async function updateGroupMember(
     managerNotes?: string;
   },
 ): Promise<any> {
-  const cookie = loadCookie();
-  if (!cookie) {
-    throw new Error("Not logged in to VRChat");
+  try {
+    // Map visibility string to GroupUserVisibility enum
+    const visibility = updates.visibility 
+      ? (updates.visibility === "visible" ? GroupUserVisibility.Visible :
+         updates.visibility === "hidden" ? GroupUserVisibility.Hidden :
+         GroupUserVisibility.Friends)
+      : undefined;
+
+    return await vrchatApi.groupApi.updateGroupMember({
+      groupId: groupId as GroupIdType,
+      userId,
+      visibility,
+      isSubscribedToAnnouncements: updates.isSubscribedToAnnouncements,
+      managerNotes: updates.managerNotes,
+      // Note: isSubscribedToEventAnnouncements is not supported by vrc-ts API
+    });
+  } catch (error: any) {
+    if (error instanceof RequestError) {
+      throw new Error(
+        `Failed to update group member: ${error.statusCode} ${error.message}`,
+      );
+    }
+    throw error;
   }
-
-  const url = `https://api.vrchat.cloud/api/1/groups/${groupId}/members/${userId}`;
-  const response = await vrchatFetch(url, {
-    method: "PUT",
-    headers: {
-      "User-Agent": USER_AGENT,
-      Cookie: cookie,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(updates),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Failed to update group member: ${response.status} ${errorText}`,
-    );
-  }
-
-  return await response.json();
 }
 
 /**
@@ -137,28 +114,20 @@ export async function addRoleToGroupMember(
   userId: string,
   roleId: string,
 ): Promise<any> {
-  const cookie = loadCookie();
-  if (!cookie) {
-    throw new Error("Not logged in to VRChat");
+  try {
+    return await vrchatApi.groupApi.addRoleToGroupMember({
+      groupId: groupId as GroupIdType,
+      userId,
+      groupRoleId: roleId as GroupRoleIdType, // vrc-ts uses groupRoleId, not roleId
+    });
+  } catch (error: any) {
+    if (error instanceof RequestError) {
+      throw new Error(
+        `Failed to add role to group member: ${error.statusCode} ${error.message}`,
+      );
+    }
+    throw error;
   }
-
-  const url = `https://api.vrchat.cloud/api/1/groups/${groupId}/members/${userId}/roles/${roleId}`;
-  const response = await vrchatFetch(url, {
-    method: "PUT",
-    headers: {
-      "User-Agent": USER_AGENT,
-      Cookie: cookie,
-    },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Failed to add role to group member: ${response.status} ${errorText}`,
-    );
-  }
-
-  return await response.json();
 }
 
 /**
@@ -173,28 +142,20 @@ export async function removeRoleFromGroupMember(
   userId: string,
   roleId: string,
 ): Promise<any> {
-  const cookie = loadCookie();
-  if (!cookie) {
-    throw new Error("Not logged in to VRChat");
+  try {
+    return await vrchatApi.groupApi.removeRoleFromGroupMember({
+      groupId: groupId as GroupIdType,
+      userId,
+      groupRoleId: roleId as GroupRoleIdType, // vrc-ts uses groupRoleId, not roleId
+    });
+  } catch (error: any) {
+    if (error instanceof RequestError) {
+      throw new Error(
+        `Failed to remove role from group member: ${error.statusCode} ${error.message}`,
+      );
+    }
+    throw error;
   }
-
-  const url = `https://api.vrchat.cloud/api/1/groups/${groupId}/members/${userId}/roles/${roleId}`;
-  const response = await vrchatFetch(url, {
-    method: "DELETE",
-    headers: {
-      "User-Agent": USER_AGENT,
-      Cookie: cookie,
-    },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `Failed to remove role from group member: ${response.status} ${errorText}`,
-    );
-  }
-
-  return await response.json();
 }
 
 /**
@@ -203,25 +164,16 @@ export async function removeRoleFromGroupMember(
  * @returns Promise resolving to list of group roles
  */
 export async function getGroupRoles(groupId: string): Promise<any> {
-  const cookie = loadCookie();
-  if (!cookie) {
-    throw new Error("Not logged in to VRChat");
+  try {
+    return await vrchatApi.groupApi.getGroupRoles({ 
+      groupId: groupId as GroupIdType 
+    });
+  } catch (error: any) {
+    if (error instanceof RequestError) {
+      throw new Error(
+        `Failed to get group roles: ${error.statusCode} ${error.message}`,
+      );
+    }
+    throw error;
   }
-
-  const url = `https://api.vrchat.cloud/api/1/groups/${groupId}/roles`;
-  const response = await vrchatFetch(url, {
-    method: "GET",
-    headers: {
-      "User-Agent": USER_AGENT,
-      Cookie: cookie,
-    },
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Failed to get group roles: ${response.status} ${errorText}`);
-  }
-
-  const data: any = await response.json();
-  return data;
 }

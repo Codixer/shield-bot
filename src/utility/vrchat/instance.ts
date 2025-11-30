@@ -1,7 +1,12 @@
-import { loadCookie, USER_AGENT } from "./index.js";
-import { vrchatFetch } from "./rateLimiter.js";
+// Instance-related VRChat API methods using vrc-ts
+
+import { RequestError, InstanceRegionType, InstanceAccessNormalType, WorldIdType, InstanceIdType } from "vrc-ts";
+import { vrchatApi } from "./index.js";
 import { getCurrentUser } from "./user.js";
 
+/**
+ * Create a VRChat instance
+ */
 export async function createInstance({
   worldId,
   type = "friends",
@@ -14,77 +19,97 @@ export async function createInstance({
   region?: "us" | "use" | "eu" | "jp";
   ownerId?: string;
   canRequestInvite?: boolean;
-}) {
-  const cookie = loadCookie();
-  if (!cookie) throw new Error("Not authenticated. Please log in first.");
-
-  const url = "https://api.vrchat.cloud/api/1/instances";
-
-  const body: any = {
-    worldId,
-    type,
-    region,
-    canRequestInvite,
-  };
-
+}): Promise<any> {
   // For non-public instances, ownerId is required
-  if (type !== "public") {
-    if (!ownerId) {
-      // Get the bot's own user ID if not provided
-      const currentUser = await getCurrentUser();
-      if (!currentUser || !currentUser.id) {
-        throw new Error("Failed to get current user ID for instance creation");
-      }
-      body.ownerId = currentUser.id;
-    } else {
-      body.ownerId = ownerId;
+  let finalOwnerId = ownerId;
+  if (type !== "public" && !finalOwnerId) {
+    // Get the bot's own user ID if not provided
+    const currentUser = await getCurrentUser();
+    if (!currentUser || !currentUser.id) {
+      throw new Error("Failed to get current user ID for instance creation");
     }
+    finalOwnerId = currentUser.id;
   }
 
-  const response = await vrchatFetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "User-Agent": USER_AGENT,
-      Cookie: cookie,
-    },
-    body: JSON.stringify(body),
-  });
+  try {
+    // Map type to InstanceAccessNormalType
+    const instanceType = type === "public" ? "public" :
+                        type === "hidden" ? "hidden" :
+                        type === "friends" ? "friends" :
+                        type === "private" ? "private" : "friends";
+    
+    // Map region to InstanceRegionType
+    const instanceRegion = (region === "us" ? "us" :
+                            region === "use" ? "use" :
+                            region === "eu" ? "eu" :
+                            region === "jp" ? "jp" : "us") as InstanceRegionType;
 
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Failed to create instance: ${response.status} ${text}`
-    );
+    return await vrchatApi.instanceApi.generateNormalInstance({
+      worldId: worldId as WorldIdType,
+      instanceType: instanceType as unknown as InstanceAccessNormalType,
+      region: instanceRegion,
+      ownerId: finalOwnerId,
+      // canRequestInvite is not a parameter in generateNormalInstance
+    });
+  } catch (error: any) {
+    if (error instanceof RequestError) {
+      throw new Error(
+        `Failed to create instance: ${error.statusCode} ${error.message}`,
+      );
+    }
+    throw error;
   }
-
-  return (await response.json()) as any;
 }
 
-export async function inviteUser(userId: string, instanceLocation: string) {
-  const cookie = loadCookie();
-  if (!cookie) throw new Error("Not authenticated. Please log in first.");
+/**
+ * Invite a user to an instance
+ */
+export async function inviteUser(
+  userId: string,
+  instanceLocation: string,
+): Promise<any> {
+  try {
+    return await vrchatApi.inviteApi.inviteUser({
+      userId,
+      instanceId: instanceLocation as InstanceIdType,
+    });
+  } catch (error: any) {
+    if (error instanceof RequestError) {
+      throw new Error(
+        `Failed to invite user: ${error.statusCode} ${error.message}`,
+      );
+    }
+    throw error;
+  }
+}
 
-  const url = `https://api.vrchat.cloud/api/1/invite/${userId}`;
-
-  const response = await vrchatFetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "User-Agent": USER_AGENT,
-      Cookie: cookie,
-    },
-    body: JSON.stringify({
-      instanceId: instanceLocation,
-    }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(
-      `Failed to invite user: ${response.status} ${text}`
-    );
+/**
+ * Get instance info by short name (e.g., from vrch.at links)
+ */
+export async function getInstanceInfoByShortName(
+  shortName: string,
+): Promise<any | null> {
+  if (!shortName) {
+    console.log("[VRChat Instance Lookup] No shortName provided");
+    return null;
   }
 
-  return (await response.json()) as any;
+  try {
+    return await vrchatApi.instanceApi.getInstanceByShortName({
+      shortName,
+    });
+  } catch (error: any) {
+    if (error instanceof RequestError && error.statusCode === 404) {
+      console.log(
+        `[VRChat Instance Lookup] Instance not found for shortName ${shortName}`,
+      );
+      return null;
+    }
+    if (error instanceof RequestError) {
+      throw new Error(
+        `Failed to fetch instance info by shortName: ${error.statusCode} ${error.message}`,
+      );
+    }
+    throw error;
+  }
 }
