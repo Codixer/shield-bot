@@ -50,21 +50,6 @@ export class VRChatStatusVerifyButtonHandler {
       vrcUserId,
       interaction,
     );
-
-    // Also store the message reference as fallback (for after 15 minutes)
-    if (updatedMessage) {
-      await prisma.vRChatAccount.updateMany({
-        where: {
-          vrcUserId,
-          user: { discordId },
-          accountType: { in: ["IN_VERIFICATION", "UNVERIFIED"] },
-        },
-        data: {
-          verificationMessageId: updatedMessage.id,
-          verificationChannelId: updatedMessage.channelId,
-        },
-      });
-    }
   }
 
   @ButtonComponent({ id: /vrchat-status-verify:(\d+):([a-zA-Z0-9\-_]+)/ })

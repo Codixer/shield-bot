@@ -38,10 +38,6 @@ export async function handleFriendAdd(content: any) {
         });
         const finalAccountType = hasMainAccount ? "ALT" : "MAIN";
 
-        // Get message reference before updating account
-        const messageId = vrcAccount.verificationMessageId;
-        const channelId = vrcAccount.verificationChannelId;
-
         await prisma.vRChatAccount.update({
             where: { id: vrcAccount.id },
             data: {
@@ -49,8 +45,6 @@ export async function handleFriendAdd(content: any) {
                 vrchatUsername,
                 usernameUpdatedAt: new Date(),
                 verificationGuildId: null, // Clear guild ID after verification is complete
-                verificationMessageId: null, // Clear message reference after updating
-                verificationChannelId: null,
             }
         });
 
@@ -63,8 +57,6 @@ export async function handleFriendAdd(content: any) {
         // Try to update the original verification message, fall back to DM if it fails
         const messageUpdated = await updateVerificationMessage(
             discordId,
-            messageId,
-            channelId,
             vrcUserId,
             vrchatUsername,
             vrcAccount.userId
@@ -223,23 +215,21 @@ async function buildVerificationSuccessEmbed(
 
 /**
  * Updates the original verification message when verification completes automatically
- * Tries stored interaction first (within 15 minutes), then falls back to message editing
+ * Uses stored interaction (valid for 15 minutes)
  * Returns true if successful, false otherwise
  */
 async function updateVerificationMessage(
     discordId: string | null | undefined,
-    messageId: string | null | undefined,
-    channelId: string | null | undefined,
     vrcUserId: string,
     vrchatUsername: string | null,
     userId: number
 ): Promise<boolean> {
     if (!discordId) {
-        // Can't use interaction without Discord ID, try message fallback
-        return await updateVerificationMessageFallback(messageId, channelId, vrcUserId, vrchatUsername, userId);
+        // Can't use interaction without Discord ID
+        return false;
     }
 
-    // Step 1: Try to use stored interaction (valid for 15 minutes)
+    // Try to use stored interaction (valid for 15 minutes)
     const storedInteraction = VerificationInteractionManager.getInteraction(discordId, vrcUserId);
     if (storedInteraction) {
         try {
@@ -262,63 +252,12 @@ async function updateVerificationMessage(
             return true;
         } catch (error) {
             console.warn(`[Update Verification Message] Failed to update via stored interaction:`, error);
-            // Fall through to message editing fallback
+            return false;
         }
     }
 
-    // Step 2: Fallback to message editing (for after 15 minutes or if interaction failed)
-    return await updateVerificationMessageFallback(messageId, channelId, vrcUserId, vrchatUsername, userId);
-}
-
-/**
- * Fallback method: Updates message by fetching it by ID
- * This works for non-ephemeral messages or after interaction expires
- */
-async function updateVerificationMessageFallback(
-    messageId: string | null | undefined,
-    channelId: string | null | undefined,
-    vrcUserId: string,
-    vrchatUsername: string | null,
-    userId: number
-): Promise<boolean> {
-    if (!messageId || !channelId || !bot) {
-        return false;
-    }
-
-    try {
-        const channel = await bot.channels.fetch(channelId).catch(() => null);
-        if (!channel || !channel.isTextBased()) {
-            return false;
-        }
-
-        const message = await channel.messages.fetch(messageId).catch(() => null);
-        if (!message) {
-            return false;
-        }
-
-        // Check if bot can edit this message
-        if (!message.editable) {
-            return false;
-        }
-
-        const user = await prisma.user.findUnique({ where: { id: userId } });
-        const { embed, components } = await buildVerificationSuccessEmbed(
-            vrcUserId,
-            vrchatUsername,
-            user?.discordId || null
-        );
-
-        await message.edit({
-            embeds: [embed],
-            components: components.length > 0 ? components : [],
-        });
-
-        console.log(`[Update Verification Message] Successfully updated verification message ${messageId} for ${vrcUserId}`);
-        return true;
-    } catch (error) {
-        console.warn(`[Update Verification Message] Failed to update message ${messageId}:`, error);
-        return false;
-    }
+    // Interaction expired or not found
+    return false;
 }
 
 /**
