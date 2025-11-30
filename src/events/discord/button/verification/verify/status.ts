@@ -38,10 +38,9 @@ export class VRChatStatusVerifyButtonHandler {
       .setLabel("Verify status")
       .setStyle(ButtonStyle.Success);
 
-    const updatedMessage = await interaction.update({
+    await interaction.update({
       embeds: [embed],
       components: [{ type: 1, components: [verifyBtn] }],
-      fetchReply: true,
     });
 
     // Store the interaction for later use (valid for 15 minutes)
