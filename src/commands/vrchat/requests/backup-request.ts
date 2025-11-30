@@ -129,13 +129,15 @@ export class VRChatBackupRequestCommand {
           : user.vrchatAccounts[0].vrcUserId;
         if (mainAccount) {
           const vrcUser = await getUserById(mainAccount.vrcUserId);
-          accountUsername = vrcUser?.displayName ?? null;
+          const userTyped = vrcUser as { displayName?: string } | null;
+          accountUsername = userTyped?.displayName ?? null;
         }
       }
     } else {
       // If account is provided, get its username from VRChat API
       const vrcUser = await getUserById(vrcUserId);
-      accountUsername = vrcUser?.displayName ?? null;
+      const userTyped = vrcUser as { displayName?: string } | null;
+      accountUsername = userTyped?.displayName ?? null;
     }
 
     if (!vrcUserId) {
@@ -202,7 +204,7 @@ ${roleMention}
 
     if (focused.name === "role") {
       // Get available roles from the guild
-      if (!interaction.guildId || !interaction.guild) return;
+      if (!interaction.guildId || !interaction.guild) {return;}
       const guild = interaction.guild;
       const choices = [];
 
@@ -218,13 +220,13 @@ ${roleMention}
 
     if (focused.name === "squad") {
       // Use the same logic as attendance system for squad channels
-      if (!interaction.guildId) return;
+      if (!interaction.guildId) {return;}
       const settings = await prisma.guildSettings.findUnique({
         where: { guildId: interaction.guildId },
       });
       const enrolled = (settings?.enrolledChannels as string[]) || [];
       const guild = interaction.guild;
-      if (!guild) return;
+      if (!guild) {return;}
       const choices = [];
       for (const channelId of enrolled) {
         const channel = guild.channels.cache.get(channelId);

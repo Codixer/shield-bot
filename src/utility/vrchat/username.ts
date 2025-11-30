@@ -30,7 +30,8 @@ export async function getVRChatUsername(
 
     // Cache is stale or doesn't exist, fetch from API
     const userInfo = await getUserById(vrcUserId);
-    const username = userInfo?.displayName || userInfo?.username;
+    const userTyped = userInfo as { displayName?: string; username?: string } | null;
+    const username = userTyped?.displayName || userTyped?.username;
 
     if (username && vrcAccount) {
       // Update cache

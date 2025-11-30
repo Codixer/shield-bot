@@ -2,11 +2,16 @@ import { prisma } from "../../../../main.js";
 import { groupRoleSyncManager } from "../../../../managers/groupRoleSync/groupRoleSyncManager.js";
 import { loggers } from "../../../../utility/logger.js";
 
-export async function handleGroupJoined(content: any) {
+interface GroupJoinedContent {
+  userId?: string;
+}
+
+export async function handleGroupJoined(content: unknown) {
+  const typedContent = content as GroupJoinedContent;
   loggers.vrchat.debug("Group Joined", { content });
 
   // content should have userId (VRChat user ID)
-  const vrcUserId = content.userId;
+  const vrcUserId = typedContent.userId;
   if (!vrcUserId) {
     loggers.vrchat.warn("No userId in event content");
     return;
@@ -37,7 +42,7 @@ export async function handleGroupJoined(content: any) {
 
   // Sync roles for each configured guild
   for (const settings of guildSettings) {
-    if (!settings.vrcGroupId) continue;
+    if (!settings.vrcGroupId) {continue;}
 
     try {
       await groupRoleSyncManager.handleGroupJoined(

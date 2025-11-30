@@ -73,7 +73,7 @@ export class WhitelistGeneration {
             .split(",")
             .map((p: string) => p.trim());
           permissions.forEach((permission: string) => {
-            if (permission) allPermissions.add(permission);
+            if (permission) {allPermissions.add(permission);}
           });
         }
       }
@@ -110,9 +110,10 @@ export class WhitelistGeneration {
       const updatePromises = accountsNeedingUpdate.map(async (account) => {
         try {
           const userInfo = await getUserById(account.vrcUserId);
+          const userTyped = userInfo as { displayName?: string; username?: string } | null;
           const vrchatUsername =
-            userInfo?.displayName ||
-            userInfo?.username ||
+            userTyped?.displayName ||
+            userTyped?.username ||
             account.vrcUserId;
 
           // Update the cached username in the database
@@ -135,7 +136,7 @@ export class WhitelistGeneration {
                 vrchatUsername;
             }
           }
-        } catch (error) {
+        } catch (_error) {
           // Log error but continue - we already have a fallback username
           // Using console.warn here as this is in a manager, not a command handler
           // In the future, this could use the logger utility

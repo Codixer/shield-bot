@@ -5,6 +5,7 @@ import {
   MessageFlags,
   InteractionContextType,
   ApplicationIntegrationType,
+  User,
 } from "discord.js";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
 import { AttendanceHostGuard } from "../../utility/guards.js";
@@ -37,7 +38,7 @@ export class VRChatAttendanceRemoveCommand {
       type: ApplicationCommandOptionType.User,
       required: true,
     })
-    user: any,
+    user: User,
     interaction: CommandInteraction,
   ) {
     const active =
@@ -51,7 +52,8 @@ export class VRChatAttendanceRemoveCommand {
     }
 
     const { eventId } = active;
-    await attendanceManager.forceRemoveUserFromEvent(eventId, user.id);
+    const dbUser = await attendanceManager.findOrCreateUserByDiscordId(user.id);
+    await attendanceManager.forceRemoveUserFromEvent(eventId, dbUser.id);
 
     await interaction.reply({
       content: `Completely removed <@${user.id}> from the event (no record kept)`,

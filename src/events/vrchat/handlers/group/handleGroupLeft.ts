@@ -2,11 +2,16 @@ import { prisma } from "../../../../main.js";
 import { groupRoleSyncManager } from "../../../../managers/groupRoleSync/groupRoleSyncManager.js";
 import { loggers } from "../../../../utility/logger.js";
 
-export async function handleGroupLeft(content: any) {
+interface GroupLeftContent {
+  userId?: string;
+}
+
+export async function handleGroupLeft(content: unknown) {
   loggers.vrchat.debug("Group Left", { content });
+  const typedContent = content as GroupLeftContent;
 
   // content should have userId (VRChat user ID)
-  const vrcUserId = content.userId;
+  const vrcUserId = typedContent.userId;
   if (!vrcUserId) {
     loggers.vrchat.warn("No userId in event content");
     return;
@@ -37,7 +42,7 @@ export async function handleGroupLeft(content: any) {
 
   // Log the leave for each configured guild
   for (const settings of guildSettings) {
-    if (!settings.vrcGroupId) continue;
+    if (!settings.vrcGroupId) {continue;}
 
     try {
       await groupRoleSyncManager.handleGroupLeft(

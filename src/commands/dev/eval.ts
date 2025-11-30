@@ -101,38 +101,32 @@ export class EvalCommand {
 
       // Execute the code
       // Using Function constructor for better isolation
-      let result: any;
+      // Check if code uses await - if so, wrap in async function
+      const hasAwait = code.includes("await");
+      const hasReturn = code.includes("return");
+      const endsWithSemicolon = code.trim().endsWith(";");
       
-      try {
-        // Check if code uses await - if so, wrap in async function
-        const hasAwait = code.includes("await");
-        const hasReturn = code.includes("return");
-        const endsWithSemicolon = code.trim().endsWith(";");
-        
-        let wrappedCode: string;
-        if (hasAwait) {
-          // Wrap in async IIFE for await support
-          wrappedCode = `(async () => { ${code} })()`;
-        } else if (!hasReturn && !endsWithSemicolon) {
-          // Wrap expression to return value
-          wrappedCode = `return (${code})`;
-        } else {
-          wrappedCode = code;
-        }
-        
-        const func = new Function(
-          ...Object.keys(context),
-          wrappedCode
-        );
-        
-        result = func(...Object.values(context));
-        
-        // If result is a promise, await it
-        if (result && typeof result.then === "function") {
-          result = await result;
-        }
-      } catch (error) {
-        throw error;
+      let wrappedCode: string;
+      if (hasAwait) {
+        // Wrap in async IIFE for await support
+        wrappedCode = `(async () => { ${code} })()`;
+      } else if (!hasReturn && !endsWithSemicolon) {
+        // Wrap expression to return value
+        wrappedCode = `return (${code})`;
+      } else {
+        wrappedCode = code;
+      }
+      
+      const func = new Function(
+        ...Object.keys(context),
+        wrappedCode
+      );
+      
+      let result = func(...Object.values(context));
+      
+      // If result is a promise, await it
+      if (result && typeof result.then === "function") {
+        result = await result;
       }
 
       const executionTime = Date.now() - startTime;
@@ -163,7 +157,7 @@ export class EvalCommand {
               resultString = resultString.substring(0, 1900) + "... (truncated)";
             }
           }
-        } catch (error) {
+        } catch {
           resultString = String(result);
           if (resultString.length > 1900) {
             resultString = resultString.substring(0, 1900) + "... (truncated)";
@@ -199,9 +193,9 @@ export class EvalCommand {
         .setTimestamp();
 
       await cmdInteraction.editReply({ embeds: [embed] });
-    } catch (error: any) {
-      const errorMessage = error?.message || String(error);
-      const errorStack = error?.stack || "";
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack || "" : "";
 
       const embed = new EmbedBuilder()
         .setTitle("❌ Evaluation Error")

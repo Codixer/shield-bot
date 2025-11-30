@@ -4,9 +4,18 @@ import { loggers } from "../../../../utility/logger.js";
 
 const whitelistManager = new WhitelistManager();
 
-export async function handleFriendUpdate(content: any) {
+interface FriendUpdateContent {
+  userId?: string;
+  user?: {
+    displayName?: string;
+    username?: string;
+  };
+}
+
+export async function handleFriendUpdate(content: unknown) {
   try {
-    const { userId, user } = content;
+    const typedContent = content as FriendUpdateContent;
+    const { userId, user } = typedContent;
 
     // Log the received content for debugging
     // console.log("[Friend Update] ", { userId, user });

@@ -3,6 +3,7 @@ import {
   CommandInteraction,
   ChannelType,
   ApplicationCommandOptionType,
+  GuildBasedChannel,
 } from "discord.js";
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
@@ -25,7 +26,7 @@ export class WhitelistSettingsCommand {
       channelTypes: [ChannelType.GuildText],
       required: false,
     })
-    channel: any,
+    channel: GuildBasedChannel | null,
     interaction: CommandInteraction,
   ): Promise<void> {
     try {
@@ -74,10 +75,10 @@ export class WhitelistSettingsCommand {
         content: `✅ Whitelist log channel has been set to <#${channel.id}>`,
         ephemeral: true,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.bot.error("Error setting log channel", error);
       await interaction.reply({
-        content: `❌ Failed to set log channel: ${error.message}`,
+        content: `❌ Failed to set log channel: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -120,13 +121,13 @@ export class WhitelistSettingsCommand {
         content: "✅ Whitelist log channel has been cleared.",
         ephemeral: true,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.bot.error(
         "Error clearing log channel",
         error,
       );
       await interaction.reply({
-        content: `❌ Failed to clear log channel: ${error.message}`,
+        content: `❌ Failed to clear log channel: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }

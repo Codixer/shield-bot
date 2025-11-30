@@ -79,12 +79,16 @@ bot.once("clientReady", async () => {
     } else {
       try {
         const env = getEnv();
+        if (!env.VRCHAT_USERNAME || !env.VRCHAT_PASSWORD) {
+          throw new Error("VRChat credentials are required but not set");
+        }
         const user = await loginAndGetCurrentUser(
-          env.VRCHAT_USERNAME!,
-          env.VRCHAT_PASSWORD!,
+          env.VRCHAT_USERNAME,
+          env.VRCHAT_PASSWORD,
         );
+        const userTyped = user as { displayName?: string; username?: string; id: string };
         loggers.vrchat.info(
-          `VRChat login successful: ${user.displayName} | ${user.username} | ${user.id}`,
+          `VRChat login successful: ${userTyped.displayName || ""} | ${userTyped.username || ""} | ${userTyped.id}`,
         );
       } catch (err) {
         loggers.vrchat.error("VRChat login failed", err);

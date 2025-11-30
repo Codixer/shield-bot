@@ -7,6 +7,7 @@ import {
   BaseInteraction,
   InteractionContextType,
   ApplicationIntegrationType,
+  User,
 } from "discord.js";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
 import { AttendanceHostGuard } from "../../utility/guards.js";
@@ -39,7 +40,7 @@ export class VRChatAttendanceAddCommand {
       type: ApplicationCommandOptionType.User,
       required: true,
     })
-    user: any,
+    user: User,
     @SlashOption({
       name: "squad",
       description: "Squad",
@@ -75,13 +76,13 @@ export class VRChatAttendanceAddCommand {
       const autoInteraction = interaction as AutocompleteInteraction;
       const focused = autoInteraction.options.getFocused(true);
       if (focused.name === "squad") {
-        if (!autoInteraction.guildId) return;
+        if (!autoInteraction.guildId) {return;}
         const settings = await prisma.guildSettings.findUnique({
           where: { guildId: autoInteraction.guildId },
         });
         const enrolled = (settings?.enrolledChannels as string[]) || [];
         const guild = autoInteraction.guild;
-        if (!guild) return;
+        if (!guild) {return;}
         const choices = [];
         for (const channelId of enrolled) {
           const channel = guild.channels.cache.get(channelId);
@@ -129,9 +130,9 @@ export class VRChatAttendanceAddCommand {
     const squadName = squadChannel?.name || squad;
 
     const modifiers: string[] = [];
-    if (asLead) modifiers.push("Lead");
-    if (asStaff) modifiers.push("Staff");
-    if (asLate) modifiers.push("Late");
+    if (asLead) {modifiers.push("Lead");}
+    if (asStaff) {modifiers.push("Staff");}
+    if (asLate) {modifiers.push("Late");}
 
     const modifierText =
       modifiers.length > 0 ? ` (${modifiers.join(", ")})` : "";

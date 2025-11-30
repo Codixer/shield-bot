@@ -3,6 +3,7 @@ import {
   CommandInteraction,
   ApplicationCommandOptionType,
   MessageFlags,
+  GuildBasedChannel,
 } from "discord.js";
 import {
   StaffGuard,
@@ -29,7 +30,7 @@ export class SettingsAttendanceSubGroup {
       type: ApplicationCommandOptionType.Channel,
       required: true,
     })
-    channel: any,
+    channel: GuildBasedChannel,
     interaction: CommandInteraction,
   ) {
     if (!interaction.guildId) {
@@ -91,7 +92,7 @@ export class SettingsAttendanceSubGroup {
       type: ApplicationCommandOptionType.Channel,
       required: true,
     })
-    channel: any,
+    channel: GuildBasedChannel,
     interaction: CommandInteraction,
   ) {
     if (!interaction.guildId) {

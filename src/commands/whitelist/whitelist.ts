@@ -3,6 +3,8 @@ import {
   CommandInteraction,
   EmbedBuilder,
   escapeMarkdown,
+  Role,
+  User,
 } from "discord.js";
 import { Pagination } from "@discordx/pagination";
 import { Discord, Slash, SlashGroup, SlashOption, Guard } from "discordx";
@@ -27,7 +29,7 @@ export class WhitelistCommands {
       required: true,
       type: ApplicationCommandOptionType.Role,
     })
-    discordRole: any,
+    discordRole: Role,
     @SlashOption({
       description:
         "Whitelist permissions (comma-separated): station, truavatar, trudoor, forceAvatar, forceDoor",
@@ -72,9 +74,16 @@ export class WhitelistCommands {
         return;
       }
 
+      if (!interaction.guildId) {
+        await interaction.reply({
+          content: "❌ This command can only be used in a server.",
+          ephemeral: true,
+        });
+        return;
+      }
       await whitelistManager.setupDiscordRoleMapping(
         discordRole.id,
-        interaction.guildId!,
+        interaction.guildId,
         permissionList,
       );
 
@@ -116,10 +125,13 @@ export class WhitelistCommands {
           try {
             const roleIds = member.roles.cache.map((role) => role.id);
             if (await whitelistManager.shouldUserBeWhitelisted(roleIds)) {
+              if (!interaction.guildId) {
+                continue;
+              }
               await whitelistManager.syncUserRolesFromDiscord(
                 member.id,
                 roleIds,
-                interaction.guildId!,
+                interaction.guildId,
               );
             }
           } catch (error) {
@@ -136,9 +148,9 @@ export class WhitelistCommands {
           whitelistManager.queueBatchedUpdate('bulk-role-setup', msg);
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       await interaction.reply({
-        content: `❌ Failed to setup role mapping: ${error.message}`,
+        content: `❌ Failed to setup role mapping: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -152,7 +164,7 @@ export class WhitelistCommands {
       required: true,
       type: ApplicationCommandOptionType.Role,
     })
-    discordRole: any,
+    discordRole: Role,
     interaction: CommandInteraction,
   ): Promise<void> {
     try {
@@ -201,10 +213,17 @@ export class WhitelistCommands {
               const hadAccessBefore = !!userBefore?.whitelistEntry;
 
               // Sync their roles (this will remove access if they no longer qualify)
+              if (!interaction.guild) {
+                await interaction.reply({
+                  content: "❌ This command can only be used in a server.",
+                  ephemeral: true,
+                });
+                return;
+              }
               await whitelistManager.syncUserRolesFromDiscord(
                 member.id,
                 roleIds,
-                interaction.guild!.id,
+                interaction.guild.id,
               );
 
               // Check their status after sync
@@ -241,9 +260,9 @@ export class WhitelistCommands {
           ephemeral: true,
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       await interaction.reply({
-        content: `❌ Failed to remove role mapping: ${error.message}`,
+        content: `❌ Failed to remove role mapping: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -267,21 +286,22 @@ export class WhitelistCommands {
         .setColor(0x0099ff);
 
       const roleList = roleMappings
-        .map((role: any) => {
-          const discordRole = role.discordRoleId
-            ? `<@&${role.discordRoleId}>`
+        .map((role) => {
+          const roleTyped = role as { id: number; discordRoleId: string | null; permissions: string | null; guildId: string };
+          const discordRole = roleTyped.discordRoleId
+            ? `<@&${roleTyped.discordRoleId}>`
             : "Not linked";
-          const permissions = role.permissions || "No permissions";
-          return `**Role ID: ${role.id}**\nDiscord: ${discordRole}\nPermissions: ${permissions}\nGuild: ${role.guildId}`;
+          const permissions = roleTyped.permissions || "No permissions";
+          return `**Role ID: ${roleTyped.id}**\nDiscord: ${discordRole}\nPermissions: ${permissions}\nGuild: ${roleTyped.guildId}`;
         })
         .join("\n\n");
 
       embed.setDescription(roleList);
 
       await interaction.reply({ embeds: [embed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await interaction.reply({
-        content: `❌ Failed to list role mappings: ${error.message}`,
+        content: `❌ Failed to list role mappings: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -295,7 +315,7 @@ export class WhitelistCommands {
       required: false,
       type: ApplicationCommandOptionType.User,
     })
-    user: any,
+    user: User | null,
     @SlashOption({
       description: "VRChat username to check",
       name: "vrchat_username",
@@ -308,7 +328,17 @@ export class WhitelistCommands {
     const targetUser = user || interaction.user;
 
     try {
-      let userInfo: any;
+      let userInfo: {
+        id?: number;
+        discordId?: string;
+        vrchatAccounts?: Array<{ vrchatUsername?: string | null }>;
+        whitelistEntry?: {
+          roleAssignments: Array<{
+            role: { permissions: string | null };
+            expiresAt: Date | null;
+          }>;
+        } | null;
+      } | null = null;
 
       if (targetUser) {
         userInfo = await whitelistManager.getUserByDiscordId(targetUser.id);
@@ -344,10 +374,10 @@ export class WhitelistCommands {
         });
       }
 
-      if (userInfo.vrchatAccount?.vrchatUsername) {
+      if (userInfo.vrchatAccounts && userInfo.vrchatAccounts.length > 0 && userInfo.vrchatAccounts[0]?.vrchatUsername) {
         embed.addFields({
           name: "VRChat Username",
-          value: userInfo.vrchatAccount.vrchatUsername,
+          value: userInfo.vrchatAccounts[0].vrchatUsername,
           inline: true,
         });
       }
@@ -399,9 +429,9 @@ export class WhitelistCommands {
       }
 
       await interaction.reply({ embeds: [embed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await interaction.reply({
-        content: `❌ Failed to get user info: ${error.message}`,
+        content: `❌ Failed to get user info: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -418,7 +448,7 @@ export class WhitelistCommands {
       required: true,
       type: ApplicationCommandOptionType.User,
     })
-    user: any,
+    user: User,
     interaction: CommandInteraction,
   ): Promise<void> {
     try {
@@ -436,17 +466,29 @@ export class WhitelistCommands {
         await whitelistManager.shouldUserBeWhitelisted(roleIds);
 
       if (shouldBeWhitelisted) {
+        if (!interaction.guild) {
+          await interaction.reply({
+            content: "❌ This command can only be used in a server.",
+            ephemeral: true,
+          });
+          return;
+        }
         await whitelistManager.syncUserRolesFromDiscord(
           user.id,
           roleIds,
-          interaction.guild!.id,
+          interaction.guild.id,
         );
 
         const userInfo = await whitelistManager.getUserByDiscordId(user.id);
+        const userTyped = userInfo as {
+          whitelistEntry?: {
+            roleAssignments: Array<{ role: { permissions: string | null } }>;
+          } | null;
+        } | null;
         
         // Extract permissions from role assignments properly
         const allPermissions = new Set<string>();
-        for (const assignment of userInfo?.whitelistEntry?.roleAssignments || []) {
+        for (const assignment of userTyped?.whitelistEntry?.roleAssignments || []) {
           if (assignment.role.permissions) {
             // Split comma-separated permissions and add to set
             const rolePermissions = assignment.role.permissions
@@ -478,9 +520,9 @@ export class WhitelistCommands {
           ephemeral: true,
         });
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       await interaction.reply({
-        content: `❌ Failed to sync user: ${error.message}`,
+        content: `❌ Failed to sync user: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -512,20 +554,26 @@ export class WhitelistCommands {
       for (let i = 0; i < whitelistEntries.length; i += pageSize) {
         const chunk = whitelistEntries.slice(i, i + pageSize);
         const description = chunk
-          .map((entry: any, index: number) => {
+          .map((entry, index: number) => {
+            const entryTyped = entry as {
+              discordId?: string;
+              vrchatUsername?: string;
+              vrcUserId?: string;
+              roles?: string[];
+            };
             const listIndex = i + index + 1;
-            const mention = entry.discordId
-              ? `<@${entry.discordId}>`
+            const mention = entryTyped.discordId
+              ? `<@${entryTyped.discordId}>`
               : "Unknown Discord user";
-            const vrchatDisplay = entry.vrchatUsername || "Unknown VRChat user";
-            const vrcLink = entry.vrcUserId
-              ? `https://vrchat.com/home/user/${encodeURIComponent(entry.vrcUserId)}`
+            const vrchatDisplay = entryTyped.vrchatUsername || "Unknown VRChat user";
+            const vrcLink = entryTyped.vrcUserId
+              ? `https://vrchat.com/home/user/${encodeURIComponent(entryTyped.vrcUserId)}`
               : null;
             const vrchatLine = vrcLink
               ? `[${vrchatDisplay}](${vrcLink})`
               : vrchatDisplay;
-            const whitelistRoles: string = entry.roles?.length
-              ? entry.roles
+            const whitelistRoles: string = entryTyped.roles?.length
+              ? entryTyped.roles
                   .map((role: string) => `\`${escapeMarkdown(role)}\``)
                   .join(", ")
               : "No whitelist permissions";
@@ -556,14 +604,14 @@ export class WhitelistCommands {
       });
 
       await pagination.send();
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (interaction.deferred || interaction.replied) {
         await interaction.editReply({
-          content: `❌ Failed to list users: ${error.message}`,
+          content: `❌ Failed to list users: ${error instanceof Error ? error.message : "Unknown error"}`,
         });
       } else {
         await interaction.reply({
-          content: `❌ Failed to list users: ${error.message}`,
+          content: `❌ Failed to list users: ${error instanceof Error ? error.message : "Unknown error"}`,
           ephemeral: true,
         });
       }
@@ -578,7 +626,7 @@ export class WhitelistCommands {
       required: true,
       type: ApplicationCommandOptionType.User,
     })
-    discordUser: any,
+    discordUser: User,
     interaction: CommandInteraction,
   ): Promise<void> {
     try {
@@ -616,7 +664,7 @@ export class WhitelistCommands {
       const vrchatAccounts =
         user.vrchatAccounts
           ?.map(
-            (account: any) => `${account.vrcUserId} (${account.accountType})`,
+            (account) => `${account.vrcUserId} (${account.accountType})`,
           )
           ?.join("\n") || "No verified VRChat accounts";
 
@@ -642,9 +690,9 @@ export class WhitelistCommands {
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await interaction.reply({
-        content: `❌ Failed to get user info: ${error.message}`,
+        content: `❌ Failed to get user info: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -683,9 +731,9 @@ export class WhitelistCommands {
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await interaction.reply({
-        content: `❌ Failed to get statistics: ${error.message}`,
+        content: `❌ Failed to get statistics: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -713,8 +761,8 @@ export class WhitelistCommands {
           interaction.guildId ?? undefined
         );
         repoUpdateSuccess = true;
-      } catch (repoError: any) {
-        repoUpdateError = repoError.message;
+      } catch (repoError: unknown) {
+        repoUpdateError = repoError instanceof Error ? repoError.message : "Unknown error";
         loggers.bot.warn("Failed to update GitHub repository", repoError);
       }
 
@@ -763,9 +811,9 @@ export class WhitelistCommands {
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await interaction.editReply({
-        content: `❌ Failed to generate whitelist: ${error.message}`,
+        content: `❌ Failed to generate whitelist: ${error instanceof Error ? error.message : "Unknown error"}`,
       });
     }
   }
@@ -785,9 +833,9 @@ export class WhitelistCommands {
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await interaction.reply({
-        content: `❌ Failed to cleanup: ${error.message}`,
+        content: `❌ Failed to cleanup: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -815,9 +863,9 @@ export class WhitelistCommands {
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       await interaction.editReply({
-        content: `❌ Failed to update repository: ${error.message}`,
+        content: `❌ Failed to update repository: ${error instanceof Error ? error.message : "Unknown error"}`,
       });
     }
   }
@@ -832,7 +880,7 @@ export class WhitelistCommands {
       required: false,
       type: ApplicationCommandOptionType.User,
     })
-    user: any,
+    user: User | null,
     @SlashOption({
       description: "VRChat username to validate (optional)",
       name: "vrchat_username",
@@ -867,23 +915,30 @@ export class WhitelistCommands {
           return;
         }
 
-        const vrcUser = searchResults[0];
+        const vrcUser = searchResults[0] as { id: string; displayName?: string };
         const userInfo = await whitelistManager.getUserByVrcUserId(vrcUser.id);
+        const userInfoTyped = userInfo as { discordId?: string } | null;
 
-        if (!userInfo) {
+        if (!userInfoTyped) {
           await interaction.editReply({
-            content: `❌ VRChat user **${vrcUser.displayName}** is not in the database.`,
+            content: `❌ VRChat user **${vrcUser.displayName || vrcUser.id}** is not in the database.`,
           });
           return;
         }
 
         // Look up the Discord user from the database
-        const discordUserId = userInfo.discordId;
+        const discordUserId = userInfoTyped.discordId;
+        if (!discordUserId) {
+          await interaction.editReply({
+            content: `❌ VRChat user **${vrcUser.displayName || vrcUser.id}** has no Discord account linked.`,
+          });
+          return;
+        }
         const member = await guild.members.fetch(discordUserId).catch(() => null);
 
         if (!member) {
           await interaction.editReply({
-            content: `❌ VRChat user **${vrcUser.displayName}** (Discord: <@${discordUserId}>) is not in this server.`,
+            content: `❌ VRChat user **${vrcUser.displayName || vrcUser.id}** (Discord: <@${discordUserId}>) is not in this server.`,
           });
           return;
         }
@@ -900,16 +955,21 @@ export class WhitelistCommands {
         );
 
         const userAfter = await whitelistManager.getUserByDiscordId(discordUserId);
-        const hasAccessAfter = !!userAfter?.whitelistEntry;
+        const userAfterTyped = userAfter as {
+          whitelistEntry?: {
+            roleAssignments: Array<{ role: { discordRoleId?: string | null; id: number } }>;
+          } | null;
+        } | null;
+        const hasAccessAfter = !!userAfterTyped?.whitelistEntry;
         const rolesAfter =
-          userAfter?.whitelistEntry?.roleAssignments?.map((a) => a.role.discordRoleId || a.role.id) ||
+          userAfterTyped?.whitelistEntry?.roleAssignments?.map((a) => a.role.discordRoleId || String(a.role.id)) ||
           [];
 
         const embed = new EmbedBuilder()
           .setTitle("✅ User Access Validation Complete")
           .setColor(hasAccessAfter ? 0x00ff00 : 0xff0000)
           .addFields(
-            { name: "VRChat Username", value: vrcUser.displayName, inline: true },
+            { name: "VRChat Username", value: vrcUser.displayName || vrcUser.id, inline: true },
             { name: "Discord User", value: `<@${discordUserId}>`, inline: true },
             {
               name: "Has Access",
@@ -1050,7 +1110,7 @@ export class WhitelistCommands {
         for (const whitelistEntry of whitelistedUsers) {
           try {
             const entry = whitelistEntry as { discordId?: string; vrchatUsername?: string };
-            if (!entry.discordId) continue;
+            if (!entry.discordId) {continue;}
 
             // Check if user is in the current guild members
             const isInGuild = members.has(entry.discordId);
@@ -1125,9 +1185,9 @@ export class WhitelistCommands {
           }
         }
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       await interaction.editReply({
-        content: `❌ Failed to validate access: ${error.message}`,
+        content: `❌ Failed to validate access: ${error instanceof Error ? error.message : "Unknown error"}`,
       });
     }
   }

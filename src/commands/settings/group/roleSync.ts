@@ -106,12 +106,12 @@ export class GroupRoleSyncCommand {
             userId: vrcAccount.vrcUserId,
             success: true,
           });
-        } catch (error: any) {
+        } catch (error: unknown) {
           syncedAccounts.push({
             username: vrcAccount.vrchatUsername || "Unknown",
             userId: vrcAccount.vrcUserId,
             success: false,
-            error: error.message,
+            error: error instanceof Error ? error.message : "Unknown error",
           });
         }
       }
@@ -155,10 +155,10 @@ export class GroupRoleSyncCommand {
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.vrchat.error("Error syncing roles", error);
       await interaction.editReply({
-        content: `❌ Failed to sync roles: ${error.message}`,
+        content: `❌ Failed to sync roles: ${error instanceof Error ? error.message : "Unknown error"}`,
       });
     }
   }

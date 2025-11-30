@@ -54,7 +54,7 @@ export class VRChatAttendancePasteCommand {
         const events = await attendanceManager.getAllEvents();
         const query = focused.value.toString().toLowerCase();
         const choices = events
-          .filter((event: any) => {
+          .filter((event) => {
             const idStr = `${event.id}`;
             const dateStr = event.date.toLocaleDateString();
             const hostId = event.host?.discordId || "";
@@ -66,17 +66,17 @@ export class VRChatAttendancePasteCommand {
             );
           })
           .slice(0, 25)
-          .map((event: any) => {
+          .map((event) => {
             const dateStr = event.date.toLocaleDateString();
             const hostId = event.host?.discordId || "Unknown";
             
             // Calculate total attendees
             const squadMemberIds = new Set(
-              event.squads.flatMap((squad: any) => 
-                squad.members.map((member: any) => member.userId)
+              event.squads.flatMap((squad) => 
+                squad.members.map((member) => member.userId)
               )
             );
-            const staffIds = new Set(event.staff.map((s: any) => s.userId));
+            const staffIds = new Set(event.staff.map((s) => s.userId));
             const allAttendeeIds = new Set([...squadMemberIds, ...staffIds]);
             const attendeeCount = allAttendeeIds.size;
             
@@ -154,8 +154,8 @@ export class VRChatAttendancePasteCommand {
       }
       
       // If only one exists, put it first
-      if (channelA) return -1;
-      if (channelB) return 1;
+      if (channelA) {return -1;}
+      if (channelB) {return 1;}
       
       // If neither exists, maintain original order
       return 0;
@@ -177,8 +177,8 @@ export class VRChatAttendancePasteCommand {
         let memberText = `<@${member.user.discordId}>`;
 
         const modifiers: string[] = [];
-        if (member.isLead && !member.hasLeft) modifiers.push("(Lead)");
-        if (member.isLate) modifiers.push("(Late)");
+        if (member.isLead && !member.hasLeft) {modifiers.push("(Lead)");}
+        if (member.isLate) {modifiers.push("(Late)");}
         if (member.isSplit && member.splitFrom) {
           // Try to get the channel name or mention from the splitFrom ID
           const splitFromChannel = cmdInteraction.guild?.channels.cache.get(member.splitFrom);

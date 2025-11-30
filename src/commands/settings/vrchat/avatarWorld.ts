@@ -81,10 +81,10 @@ export class VRChatSettingsCommand {
         content: `✅ Avatar world has been set to: \`${worldId}\``,
         ephemeral: true,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.bot.error("Error setting avatar world", error);
       await interaction.reply({
-        content: `❌ Failed to set avatar world: ${error.message}`,
+        content: `❌ Failed to set avatar world: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -127,13 +127,13 @@ export class VRChatSettingsCommand {
         content: "✅ Avatar world setting has been cleared.",
         ephemeral: true,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.bot.error(
         "Error clearing avatar world",
         error,
       );
       await interaction.reply({
-        content: `❌ Failed to clear avatar world: ${error.message}`,
+        content: `❌ Failed to clear avatar world: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }

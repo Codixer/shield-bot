@@ -45,8 +45,14 @@ export class VRChatAttendanceAutofillCommand {
     }
 
     // Get guild settings
+    if (!interaction.guildId) {
+      await interaction.editReply({
+        content: "This command can only be used in a server.",
+      });
+      return;
+    }
     const settings = await prisma.guildSettings.findUnique({
-      where: { guildId: interaction.guildId! },
+      where: { guildId: interaction.guildId },
     });
 
     if (!settings?.patrolChannelCategoryId) {
@@ -176,8 +182,8 @@ export class VRChatAttendanceAutofillCommand {
 
     // First pass: Process all category channels for staff detection
     const staffMembersInCategories = new Set<string>();
-    for (const [_channelId, channel] of allCategoryVoiceChannels) {
-      if (channel.type !== ChannelType.GuildVoice) continue;
+    for (const channel of allCategoryVoiceChannels.values()) {
+      if (channel.type !== ChannelType.GuildVoice) {continue;}
 
       const members = channel.members;
       for (const [memberId, member] of members) {
@@ -190,11 +196,11 @@ export class VRChatAttendanceAutofillCommand {
 
     // Second pass: Process enrolled channels for squad tracking
     for (const [channelId, channel] of voiceChannels) {
-      if (channel.type !== ChannelType.GuildVoice) continue;
+      if (channel.type !== ChannelType.GuildVoice) {continue;}
 
       const members = channel.members;
 
-      for (const [memberId, _member] of members) {
+      for (const memberId of members.keys()) {
         processedUsers.add(memberId);
         newMemberSquads.set(memberId, channelId);
 
@@ -274,10 +280,10 @@ export class VRChatAttendanceAutofillCommand {
     
     // Get list of users who should be exempt from auto-left tracking
     const exemptUserIds = new Set<string>();
-    if (event.host?.discordId) exemptUserIds.add(event.host.discordId);
-    if (event.cohost?.discordId) exemptUserIds.add(event.cohost.discordId);
+    if (event.host?.discordId) {exemptUserIds.add(event.host.discordId);}
+    if (event.cohost?.discordId) {exemptUserIds.add(event.cohost.discordId);}
     
-    for (const [discordId, _squadName] of currentMemberSquads) {
+    for (const discordId of currentMemberSquads.keys()) {
       // Skip marking as left if user is manually added (host/cohost)
       if (!processedUsers.has(discordId) && !exemptUserIds.has(discordId)) {
         const dbUser = await attendanceManager.findOrCreateUserByDiscordId(
@@ -328,8 +334,8 @@ export class VRChatAttendanceAutofillCommand {
       }
       
       // If only one exists, put it first
-      if (channelA) return -1;
-      if (channelB) return 1;
+      if (channelA) {return -1;}
+      if (channelB) {return 1;}
       
       // If neither exists, maintain original order
       return 0;
@@ -348,7 +354,7 @@ export class VRChatAttendanceAutofillCommand {
       // Get active members (not marked as left)
       const activeMembers = squad.members.filter((m) => !m.hasLeft);
 
-      if (activeMembers.length === 0) continue;
+      if (activeMembers.length === 0) {continue;}
 
       // Build options with Discord user mentions
       const options = await Promise.all(

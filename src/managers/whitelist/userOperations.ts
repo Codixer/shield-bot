@@ -97,7 +97,7 @@ export class WhitelistUserOperations {
         throw new Error(`VRChat user "${vrchatUsername}" not found.`);
       }
 
-      const vrcUser = searchResults[0];
+      const vrcUser = searchResults[0] as { id: string };
 
       // Find the corresponding user in our database
       const user = await prisma.user.findFirst({
@@ -131,13 +131,13 @@ export class WhitelistUserOperations {
   async removeUserByDiscordId(discordId: string): Promise<boolean> {
     try {
       const user = await prisma.user.findUnique({ where: { discordId } });
-      if (!user) return false;
+      if (!user) {return false;}
 
       await prisma.whitelistEntry.delete({
         where: { userId: user.id },
       });
       return true;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }
@@ -147,7 +147,7 @@ export class WhitelistUserOperations {
    */
   async removeUserByVrcUserId(vrcUserId: string): Promise<boolean> {
     const user = await this.getUserByVrcUserId(vrcUserId);
-    if (!user) return false;
+    if (!user) {return false;}
 
     return await this.removeUserByDiscordId(user.discordId);
   }

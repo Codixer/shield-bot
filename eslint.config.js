@@ -5,6 +5,22 @@ import tsparser from "@typescript-eslint/parser";
 export default [
   js.configs.recommended,
   {
+    files: ["**/*.js"],
+    languageOptions: {
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        fetch: "readonly",
+        NodeJS: "readonly",
+      },
+    },
+  },
+  {
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parser: tsparser,
@@ -12,6 +28,17 @@ export default [
         ecmaVersion: "latest",
         sourceType: "module",
         project: "./tsconfig.json",
+      },
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        fetch: "readonly",
+        NodeJS: "readonly",
       },
     },
     plugins: {
@@ -25,8 +52,10 @@ export default [
         {
           argsIgnorePattern: "^_",
           varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
         },
       ],
+      "no-unused-vars": "off", // Use TypeScript version instead
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/no-non-null-assertion": "warn",
       
@@ -40,6 +69,8 @@ export default [
       // Best practices
       "no-throw-literal": "warn",
       "prefer-promise-reject-errors": "warn",
+      "no-useless-catch": "error",
+      "no-empty": "error",
     },
   },
   {

@@ -4,6 +4,7 @@ import {
   ApplicationCommandOptionType,
   EmbedBuilder,
   Colors,
+  Role,
 } from "discord.js";
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
@@ -31,7 +32,7 @@ export class GroupRoleMappingCommand {
       type: ApplicationCommandOptionType.Role,
       required: true,
     })
-    discordRole: any,
+    discordRole: Role,
     @SlashOption({
       name: "vrc_role_id",
       description: "VRChat group role ID to assign (e.g., grol_xxx)",
@@ -109,10 +110,10 @@ export class GroupRoleMappingCommand {
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.bot.error("Error mapping role", error);
       await interaction.reply({
-        content: `❌ Failed to map role: ${error.message}`,
+        content: `❌ Failed to map role: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -129,7 +130,7 @@ export class GroupRoleMappingCommand {
       type: ApplicationCommandOptionType.Role,
       required: true,
     })
-    discordRole: any,
+    discordRole: Role,
     @SlashOption({
       name: "vrc_role_id",
       description: "VRChat group role ID to unmap (e.g., grol_xxx)",
@@ -180,10 +181,10 @@ export class GroupRoleMappingCommand {
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.bot.error("Error unmapping role", error);
       await interaction.reply({
-        content: `❌ Failed to unmap role: ${error.message}`,
+        content: `❌ Failed to unmap role: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -222,7 +223,10 @@ export class GroupRoleMappingCommand {
         if (!groupedMappings.has(mapping.vrcGroupRoleId)) {
           groupedMappings.set(mapping.vrcGroupRoleId, []);
         }
-        groupedMappings.get(mapping.vrcGroupRoleId)!.push(mapping.discordRoleId);
+        const roleList = groupedMappings.get(mapping.vrcGroupRoleId);
+        if (roleList) {
+          roleList.push(mapping.discordRoleId);
+        }
       }
 
       const mappingList = Array.from(groupedMappings.entries())
@@ -246,10 +250,10 @@ export class GroupRoleMappingCommand {
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.bot.error("Error listing mappings", error);
       await interaction.reply({
-        content: `❌ Failed to list mappings: ${error.message}`,
+        content: `❌ Failed to list mappings: ${error instanceof Error ? error.message : "Unknown error"}`,
         ephemeral: true,
       });
     }
@@ -315,10 +319,10 @@ export class GroupRoleMappingCommand {
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.bot.error("Error fetching roles", error);
       await interaction.editReply({
-        content: `❌ Failed to fetch roles: ${error.message}`,
+        content: `❌ Failed to fetch roles: ${error instanceof Error ? error.message : "Unknown error"}`,
       });
     }
   }

@@ -13,16 +13,17 @@ import { loggers } from "../../utility/logger.js";
  */
 export class GroupRoleSyncManager {
   // Cache for group roles to avoid repeated API calls
-  private roleCache: Map<string, any[]> = new Map();
+  private roleCache: Map<string, unknown[]> = new Map();
 
   /**
    * Get all roles for a group (with caching)
    * @param groupId VRChat group ID
    * @returns Array of role objects with id, name, order, etc.
    */
-  private async getGroupRolesWithCache(groupId: string): Promise<any[]> {
-    if (this.roleCache.has(groupId)) {
-      return this.roleCache.get(groupId)!;
+  private async getGroupRolesWithCache(groupId: string): Promise<unknown[]> {
+    const cached = this.roleCache.get(groupId);
+    if (cached) {
+      return cached;
     }
 
     const roles = await getGroupRoles(groupId);
@@ -69,7 +70,10 @@ export class GroupRoleSyncManager {
       // Fetch all group roles to get their order values
       const allRoles = await this.getGroupRolesWithCache(groupId);
       const roleOrderMap = new Map(
-        allRoles.map((role: any) => [role.id, role.order]),
+        allRoles.map((role) => {
+          const roleTyped = role as { id: string; order: number };
+          return [roleTyped.id, roleTyped.order];
+        }),
       );
 
       // Find the LOWEST order (highest rank) among the member's roles
@@ -237,7 +241,10 @@ export class GroupRoleSyncManager {
         if (!vrcRoleToDiscordRoles.has(mapping.vrcGroupRoleId)) {
           vrcRoleToDiscordRoles.set(mapping.vrcGroupRoleId, []);
         }
-        vrcRoleToDiscordRoles.get(mapping.vrcGroupRoleId)!.push(mapping.discordRoleId);
+        const roleList = vrcRoleToDiscordRoles.get(mapping.vrcGroupRoleId);
+        if (roleList) {
+          roleList.push(mapping.discordRoleId);
+        }
       }
 
       // Determine which VRChat roles should be added and removed based on Discord roles
@@ -263,7 +270,7 @@ export class GroupRoleSyncManager {
         for (const roleId of vrcRolesToAdd) {
           try {
             await addRoleToGroupMember(groupId, vrcUserId, roleId);
-          } catch (error: any) {
+          } catch (error: unknown) {
             loggers.vrchat.error(
               `Failed to add VRChat role ${roleId}`,
               error,
@@ -276,7 +283,7 @@ export class GroupRoleSyncManager {
         for (const roleId of vrcRolesToRemove) {
           try {
             await removeRoleFromGroupMember(groupId, vrcUserId, roleId);
-          } catch (error: any) {
+          } catch (error: unknown) {
             loggers.vrchat.error(
               `Failed to remove VRChat role ${roleId}`,
               error,

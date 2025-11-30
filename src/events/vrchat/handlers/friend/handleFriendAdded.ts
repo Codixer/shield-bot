@@ -7,9 +7,15 @@ import { sendWhitelistLog, getUserWhitelistRoles } from '../../../../utility/vrc
 import { VerificationInteractionManager } from '../../../../managers/verification/verificationInteractionManager.js';
 import { loggers } from '../../../../utility/logger.js';
 
-export async function handleFriendAdd(content: any) {
+interface FriendAddContent {
+  userId?: string;
+  id?: string;
+}
+
+export async function handleFriendAdd(content: unknown) {
+  const typedContent = content as FriendAddContent;
     // content should include the VRChat user ID of the new friend
-    const vrcUserId = content.userId || content.id;
+    const vrcUserId = typedContent.userId || typedContent.id;
     if (!vrcUserId) {
         loggers.vrchat.warn('No VRChat user ID found in event', { content });
         return;
@@ -28,7 +34,8 @@ export async function handleFriendAdd(content: any) {
         // Get VRChat username for caching
         try {
             const userInfo = await getUserById(vrcUserId);
-            vrchatUsername = userInfo?.displayName || userInfo?.username;
+            const userTyped = userInfo as { displayName?: string; username?: string } | null;
+            vrchatUsername = userTyped?.displayName || userTyped?.username || null;
         } catch (e) {
             loggers.vrchat.warn(`Failed to fetch username for ${vrcUserId}`, e);
         }
@@ -128,7 +135,7 @@ async function buildVerificationSuccessEmbed(
     vrcUserId: string,
     vrchatUsername: string | null,
     discordId: string | null
-): Promise<{ embed: EmbedBuilder; components: any[] }> {
+): Promise<{ embed: EmbedBuilder; components: ActionRowBuilder[] }> {
     const embed = new EmbedBuilder()
         .setTitle("✅ Verification Successful")
         .setDescription(
@@ -138,7 +145,7 @@ async function buildVerificationSuccessEmbed(
         .setFooter({ text: "S.H.I.E.L.D. Bot - Verification System" })
         .setTimestamp();
 
-    const components: any[] = [];
+    const components: ActionRowBuilder[] = [];
 
     if (discordId) {
         // Check if there's a VRChat group configured for any guild
@@ -161,8 +168,8 @@ async function buildVerificationSuccessEmbed(
                     ].length;
                     hasOnlyDefaultRole = totalRoles <= 1;
                 }
-            } catch (error) {
-                loggers.vrchat.debug(`Could not check group membership for ${vrcUserId}`, error);
+            } catch (_error) {
+                loggers.vrchat.debug(`Could not check group membership for ${vrcUserId}`, _error);
             }
 
             if (isInGroup) {
@@ -243,7 +250,7 @@ async function updateVerificationMessage(
             // Use interaction.editReply() to update the ephemeral message
             await storedInteraction.editReply({
                 embeds: [embed],
-                components: components.length > 0 ? components : [],
+                components: components.length > 0 ? components as unknown as readonly (import("discord.js").APIMessageTopLevelComponent | import("discord.js").JSONEncodable<import("discord.js").APIMessageTopLevelComponent> | import("discord.js").TopLevelComponentData | import("discord.js").ActionRowData<import("discord.js").ActionRowComponentData>)[] : [],
             });
 
             // Remove the interaction since we've used it
@@ -251,8 +258,8 @@ async function updateVerificationMessage(
 
             loggers.vrchat.info(`Successfully updated via stored interaction for ${vrcUserId}`);
             return true;
-        } catch (error) {
-            loggers.vrchat.warn(`Failed to update via stored interaction`, error);
+        } catch (_error) {
+            loggers.vrchat.warn(`Failed to update via stored interaction`, _error);
             return false;
         }
     }
@@ -289,7 +296,7 @@ async function sendDMConfirmation(userId: number, vrcUserId: string, vrchatUsern
                 where: { vrcGroupId: { not: null } },
             });
 
-            const components: any[] = [];
+            const components: ActionRowBuilder[] = [];
             if (guildSettings?.vrcGroupId) {
                 // Check if user is already in the group
                 let isInGroup = false;
@@ -307,9 +314,9 @@ async function sendDMConfirmation(userId: number, vrcUserId: string, vrchatUsern
                         // If they have 1 or fewer roles, they likely only have the default role
                         hasOnlyDefaultRole = totalRoles <= 1;
                     }
-                } catch (error) {
+                } catch (_error) {
                     // User is not in group or error checking - treat as not in group
-                    loggers.vrchat.debug(`Could not check group membership for ${vrcUserId}`, error);
+                    loggers.vrchat.debug(`Could not check group membership for ${vrcUserId}`, _error);
                 }
 
                 if (isInGroup) {
@@ -384,14 +391,14 @@ async function sendDMConfirmation(userId: number, vrcUserId: string, vrchatUsern
 
             await discordUser.send({ 
                 embeds: [embed],
-                components: components.length > 0 ? components : undefined,
+                components: components.length > 0 ? components as unknown as readonly (import("discord.js").APIMessageTopLevelComponent | import("discord.js").JSONEncodable<import("discord.js").APIMessageTopLevelComponent> | import("discord.js").TopLevelComponentData | import("discord.js").ActionRowData<import("discord.js").ActionRowComponentData>)[] : undefined,
             });
             loggers.vrchat.info(`Successfully sent verification confirmation DM to ${user.discordId}`);
-        } catch (dmError: any) {
+        } catch (dmError: unknown) {
             // If DM fails (user has DMs disabled, etc.), log but don't throw
             loggers.vrchat.warn(`Failed to send DM to ${user.discordId}`, dmError);
         }
-    } catch (error) {
-        loggers.vrchat.error('Error in sendDMConfirmation', error);
+    } catch (_error) {
+        loggers.vrchat.error('Error in sendDMConfirmation', _error);
     }
 }

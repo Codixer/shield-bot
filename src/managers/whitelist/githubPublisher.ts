@@ -33,11 +33,11 @@ export class GitHubPublisher {
       process.env.GITHUB_REPO_DECODED_FILE_PATH || "whitelist.txt";
 
     if (!token)
-      throw new Error("GITHUB_TOKEN environment variable is required");
+      {throw new Error("GITHUB_TOKEN environment variable is required");}
     if (!owner)
-      throw new Error("GITHUB_REPO_OWNER environment variable is required");
+      {throw new Error("GITHUB_REPO_OWNER environment variable is required");}
     if (!repo)
-      throw new Error("GITHUB_REPO_NAME environment variable is required");
+      {throw new Error("GITHUB_REPO_NAME environment variable is required");}
 
     const apiBase = `https://api.github.com`;
 
@@ -65,14 +65,14 @@ export class GitHubPublisher {
     const ref = await gh(`/repos/${owner}/${repo}/git/refs/heads/${branch}`);
     const latestCommitSha = (ref as { object?: { sha?: string } })?.object?.sha;
     if (!latestCommitSha)
-      throw new Error("Failed to resolve latest commit sha");
+      {throw new Error("Failed to resolve latest commit sha");}
 
     // Step 2: Get base tree of that commit
     const latestCommit = await gh(
       `/repos/${owner}/${repo}/git/commits/${latestCommitSha}`,
     );
     const baseTreeSha = (latestCommit as { tree?: { sha?: string } })?.tree?.sha;
-    if (!baseTreeSha) throw new Error("Failed to resolve base tree sha");
+    if (!baseTreeSha) {throw new Error("Failed to resolve base tree sha");}
 
     // Step 3: Create blobs for both files
     const [encodedBlob, decodedBlob] = await Promise.all([
@@ -88,7 +88,7 @@ export class GitHubPublisher {
     const encodedBlobSha = (encodedBlob as { sha?: string })?.sha;
     const decodedBlobSha = (decodedBlob as { sha?: string })?.sha;
     if (!encodedBlobSha || !decodedBlobSha)
-      throw new Error("Failed to create blobs for whitelist files");
+      {throw new Error("Failed to create blobs for whitelist files");}
 
     // Step 4: Create a new tree with both updated files
     const newTree = await gh(`/repos/${owner}/${repo}/git/trees`, {
@@ -112,7 +112,7 @@ export class GitHubPublisher {
       }),
     });
     const newTreeSha = (newTree as { sha?: string })?.sha;
-    if (!newTreeSha) throw new Error("Failed to create new tree");
+    if (!newTreeSha) {throw new Error("Failed to create new tree");}
 
     // Step 5: Create a new commit (optionally PGP-signed)
     const message =
@@ -200,16 +200,16 @@ export class GitHubPublisher {
       tree: newTreeSha,
       parents: [latestCommitSha],
     };
-    if (author) commitBody.author = author;
-    if (committer) commitBody.committer = committer;
-    if (signature) commitBody.signature = signature;
+    if (author) {commitBody.author = author;}
+    if (committer) {commitBody.committer = committer;}
+    if (signature) {commitBody.signature = signature;}
 
     const newCommit = await gh(`/repos/${owner}/${repo}/git/commits`, {
       method: "POST",
       body: JSON.stringify(commitBody),
     });
     const newCommitSha = (newCommit as { sha?: string })?.sha;
-    if (!newCommitSha) throw new Error("Failed to create new commit");
+    if (!newCommitSha) {throw new Error("Failed to create new commit");}
 
     // Step 6: Update branch reference
     await gh(`/repos/${owner}/${repo}/git/refs/heads/${branch}`, {

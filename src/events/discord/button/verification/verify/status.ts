@@ -98,7 +98,8 @@ export class VRChatStatusVerifyButtonHandler {
       });
       userInfo = null;
     }
-    if (!userInfo || !userInfo.statusDescription) {
+    const userTyped = userInfo as { statusDescription?: string } | null;
+    if (!userTyped || !userTyped.statusDescription) {
       const embed = new EmbedBuilder()
         .setTitle("❌ Status Fetch Error")
         .setDescription(
@@ -112,9 +113,9 @@ export class VRChatStatusVerifyButtonHandler {
       return;
     }
     // Check if the statusDescription contains the verification code
-    if (userInfo.statusDescription.includes(vrcAccount.verificationCode)) {
+    if (userTyped.statusDescription.includes(vrcAccount.verificationCode)) {
       // Update username cache and promote from IN_VERIFICATION to MAIN/ALT
-      const vrchatUsername = userInfo?.displayName || userInfo?.username;
+      const vrchatUsername = (userTyped as { displayName?: string; username?: string }).displayName || (userTyped as { displayName?: string; username?: string }).username;
 
       // Determine final account type based on whether user has a MAIN account
       const hasMainAccount = await prisma.vRChatAccount.findFirst({

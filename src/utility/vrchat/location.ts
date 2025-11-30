@@ -5,6 +5,7 @@ import { RequestError, InstanceIdType, WorldIdType } from "vrc-ts";
 import { vrchatApi } from "./index.js";
 import { getInstanceInfoByShortName } from "./instance.js";
 import { loggers } from "../logger.js";
+import type { VRChatInstance } from "./types.js";
 
 /**
  * Find friend instance or world from database
@@ -23,9 +24,9 @@ export async function findFriendInstanceOrWorld(userId: string) {
 /**
  * Get friend instance info
  */
-export async function getFriendInstanceInfo(userId: string): Promise<any | null> {
+export async function getFriendInstanceInfo(userId: string): Promise<VRChatInstance | null> {
   const record = await findFriendInstanceOrWorld(userId);
-  if (!record) return null;
+  if (!record) {return null;}
 
   // Handle special values
   if (
@@ -45,11 +46,12 @@ export async function getFriendInstanceInfo(userId: string): Promise<any | null>
   if (record.location === "private" && record.worldId && record.senderUserId) {
     // record.worldId is a full instance URL (worlduuid:instanceUuid~...)
     try {
-      return await vrchatApi.instanceApi.getInstance({
+      const result = await vrchatApi.instanceApi.getInstance({
         worldId: record.worldId.split(":")[0] as WorldIdType, // Extract worldId from full instance string
         instanceId: record.worldId as InstanceIdType,
       });
-    } catch (error: any) {
+      return result as VRChatInstance;
+    } catch (error: unknown) {
       if (error instanceof RequestError && error.statusCode === 404) {
         loggers.vrchat.debug(
           `Private instance not found for user ${userId}`,
@@ -80,11 +82,12 @@ export async function getFriendInstanceInfo(userId: string): Promise<any | null>
 
   try {
     const instanceIdFull = `${worldId}:${instanceId}`;
-    return await vrchatApi.instanceApi.getInstance({
+    const result = await vrchatApi.instanceApi.getInstance({
       worldId: worldId as WorldIdType,
       instanceId: instanceIdFull as InstanceIdType,
     });
-  } catch (error: any) {
+    return result as VRChatInstance;
+  } catch (error: unknown) {
     if (error instanceof RequestError && error.statusCode === 404) {
       loggers.vrchat.debug(
         `Instance not found for user ${userId}`,

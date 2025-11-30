@@ -1,4 +1,3 @@
-/* eslint-disable no-undef */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { logger, LogLevel, loggers } from "./logger.js";
 

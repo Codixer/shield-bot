@@ -3,14 +3,15 @@
 import { RequestError, NotificationIdType } from "vrc-ts";
 import { vrchatApi } from "./index.js";
 import { prisma } from "../../main.js";
+import type { VRChatUser } from "./types.js";
 
 /**
  * Send a friend request to a user
  */
-export async function sendFriendRequest(userId: string): Promise<any> {
+export async function sendFriendRequest(userId: string): Promise<unknown> {
   try {
     return await vrchatApi.friendApi.sendFriendRequest({ userId });
-  } catch (error: any) {
+  } catch (error: unknown) {
     // If already friends, unfriend and try again
     if (error instanceof RequestError && error.statusCode === 400) {
       await unfriendUser(userId);
@@ -23,7 +24,7 @@ export async function sendFriendRequest(userId: string): Promise<any> {
 /**
  * Unfriend a user
  */
-export async function unfriendUser(userId: string): Promise<any> {
+export async function unfriendUser(userId: string): Promise<unknown> {
   return await vrchatApi.friendApi.unfriend({ userId });
 }
 
@@ -35,7 +36,7 @@ export async function unfriendUser(userId: string): Promise<any> {
 export async function loginAndGetCurrentUser(
   username: string,
   password: string,
-): Promise<any> {
+): Promise<VRChatUser> {
   // Set credentials in the API instance before calling login
   vrchatApi.username = username;
   vrchatApi.password = password;
@@ -48,7 +49,7 @@ export async function loginAndGetCurrentUser(
     throw new Error("Login successful but current user is not available");
   }
   
-  return vrchatApi.currentUser;
+  return vrchatApi.currentUser as VRChatUser;
 }
 
 /**
@@ -57,11 +58,11 @@ export async function loginAndGetCurrentUser(
 export async function isLoggedInAndVerified(): Promise<boolean> {
   try {
     const user = vrchatApi.currentUser;
-    if (!user || !user.id) return false;
+    if (!user || !user.id) {return false;}
     
     // Check verification status using correct property names
-    if (user.twoFactorAuthEnabled && user.hasEmail && user.emailVerified) return true;
-    if (!user.twoFactorAuthEnabled && user.id) return true;
+    if (user.twoFactorAuthEnabled && user.hasEmail && user.emailVerified) {return true;}
+    if (!user.twoFactorAuthEnabled && user.id) {return true;}
     return false;
   } catch {
     return false;
@@ -81,21 +82,22 @@ export async function searchUsers({
   n?: number;
   offset?: number;
   developerType?: string;
-}): Promise<any> {
-  if (!search) throw new Error("Search query is required");
+}): Promise<VRChatUser[]> {
+  if (!search) {throw new Error("Search query is required");}
   
-  return await vrchatApi.userApi.searchAllUsers({
+  const result = await vrchatApi.userApi.searchAllUsers({
     search,
     n,
     offset,
     // developerType is not a parameter in searchAllUsers
   });
+  return (result as { data?: VRChatUser[] })?.data || [];
 }
 
 /**
  * Accept a friend request notification
  */
-export async function acceptFriendRequest(notificationId: string): Promise<any> {
+export async function acceptFriendRequest(notificationId: string): Promise<unknown> {
   return await vrchatApi.notificationApi.acceptFriendRequest({
     notificationId: notificationId as NotificationIdType,
   });
@@ -104,12 +106,12 @@ export async function acceptFriendRequest(notificationId: string): Promise<any> 
 /**
  * Get user by ID
  */
-export async function getUserById(userId: string): Promise<any | null> {
-  if (!userId) throw new Error("User ID is required");
+export async function getUserById(userId: string): Promise<VRChatUser | null> {
+  if (!userId) {throw new Error("User ID is required");}
   
   try {
     return await vrchatApi.userApi.getUserById({ userId });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof RequestError && error.statusCode === 404) {
       return null;
     }
@@ -120,16 +122,16 @@ export async function getUserById(userId: string): Promise<any | null> {
 /**
  * Get current logged in user
  */
-export async function getCurrentUser(): Promise<any | null> {
+export async function getCurrentUser(): Promise<VRChatUser | null> {
   try {
     // Try to get from cache first
     if (vrchatApi.currentUser) {
-      return vrchatApi.currentUser;
+      return vrchatApi.currentUser as VRChatUser;
     }
     
     // If not cached, fetch from API
-    return await vrchatApi.authApi.getCurrentUser();
-  } catch (error: any) {
+    return (await vrchatApi.authApi.getCurrentUser()) as VRChatUser;
+  } catch (error: unknown) {
     if (error instanceof RequestError && error.statusCode === 401) {
       return null;
     }
@@ -148,7 +150,7 @@ export async function getVRChatAccountStatus(discordId: string) {
 
   const boundAccounts = user?.vrchatAccounts || [];
   const verifiedAccounts = boundAccounts.filter(
-    (acc: any) => acc.accountType === "MAIN" || acc.accountType === "ALT",
+    (acc) => acc.accountType === "MAIN" || acc.accountType === "ALT",
   );
 
   return {

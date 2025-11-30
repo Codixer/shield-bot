@@ -161,9 +161,9 @@ export class GroupBulkRoleSyncCommand {
 
             await interaction.editReply({ embeds: [progressEmbed] });
           }
-        } catch (error: any) {
+        } catch (error: unknown) {
           results.failed++;
-          const errorMsg = `${vrcAccount.vrchatUsername || vrcAccount.vrcUserId}: ${error.message}`;
+          const errorMsg = `${vrcAccount.vrchatUsername || vrcAccount.vrcUserId}: ${error instanceof Error ? error.message : "Unknown error"}`;
           if (results.errors.length < 5) {
             // Only store first 5 errors
             results.errors.push(errorMsg);
@@ -213,10 +213,10 @@ export class GroupBulkRoleSyncCommand {
       }
 
       await interaction.editReply({ embeds: [finalEmbed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.vrchat.error("BulkRoleSync error", error);
       await interaction.editReply({
-        content: `❌ Failed to perform bulk sync: ${error.message}`,
+        content: `❌ Failed to perform bulk sync: ${error instanceof Error ? error.message : "Unknown error"}`,
       });
     }
   }

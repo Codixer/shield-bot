@@ -115,8 +115,8 @@ export class InviteMessageManager {
             slot,
             message: newMsg,
           });
-        } catch (e: any) {
-          if (e.message && e.message.includes("429")) {
+        } catch (e: unknown) {
+          if (e instanceof Error && e.message && e.message.includes("429")) {
             // Cooldown, skip
             continue;
           } else {
@@ -304,8 +304,9 @@ export async function syncAllInviteMessages(userId?: string) {
   let actualUserId = userId;
   if (!actualUserId) {
     const user = await getCurrentUser();
-    if (!user || !user.id) throw new Error("No logged-in VRChat user found.");
-    actualUserId = user.id;
+    const userTyped = user as { id: string } | null;
+    if (!userTyped?.id) {throw new Error("No logged-in VRChat user found.");}
+    actualUserId = userTyped.id;
   }
   // TypeScript: actualUserId is now guaranteed to be a string
   for (const type of Object.values(InviteMessageType)) {

@@ -3,12 +3,18 @@ import { EmbedBuilder, Colors, TextChannel } from "discord.js";
 import { getGroupMember, getGroupRoles } from "../../../../utility/vrchat/groups.js";
 import { loggers } from "../../../../utility/logger.js";
 
-export async function handleGroupMemberUpdated(content: any) {
+interface GroupMemberUpdatedContent {
+  userId?: string;
+  groupId?: string;
+}
+
+export async function handleGroupMemberUpdated(content: unknown) {
   loggers.vrchat.debug("Group Member Updated event received", { content });
+  const typedContent = content as GroupMemberUpdatedContent;
 
   // content should have userId (VRChat user ID) and groupId
-  const vrcUserId = content.userId;
-  const groupId = content.groupId;
+  const vrcUserId = typedContent.userId;
+  const groupId = typedContent.groupId;
 
   if (!vrcUserId) {
     loggers.vrchat.warn("No userId in event content - skipping");
@@ -61,21 +67,22 @@ export async function handleGroupMemberUpdated(content: any) {
   );
 
   // Fetch current group member info and roles
-  let groupMember: any = null;
-  let allRoles: any[] = [];
+  let groupMember: unknown = null;
+  let allRoles: Array<{ id: string; name: string }> = [];
   let currentRoleNames: string[] = [];
 
   if (groupId) {
     try {
       loggers.vrchat.debug(`Fetching group member and roles info...`);
       groupMember = await getGroupMember(groupId, vrcUserId);
-      allRoles = (await getGroupRoles(groupId)) as unknown[];
+      allRoles = (await getGroupRoles(groupId)) as Array<{ id: string; name: string }>;
 
       // Map role IDs to names
-      const roleMap = new Map(allRoles.map((r: any) => [r.id, r.name]));
+      const roleMap = new Map(allRoles.map((r) => [r.id, r.name]));
+      const memberTyped = groupMember as { roleIds?: string[]; mRoleIds?: string[] } | null;
       const memberRoleIds = [
-        ...(groupMember?.roleIds || []),
-        ...(groupMember?.mRoleIds || []),
+        ...(memberTyped?.roleIds || []),
+        ...(memberTyped?.mRoleIds || []),
       ];
       currentRoleNames = memberRoleIds
         .map((id) => roleMap.get(id))

@@ -2,6 +2,7 @@ import { Discord, Guard, Slash, SlashGroup } from "discordx";
 import {
   CommandInteraction,
   MessageFlags,
+  GuildMember,
 } from "discord.js";
 import { bot } from "../../../main.js";
 import { PatrolTimerManager } from "../../../managers/patrol/patrolTimerManager.js";
@@ -26,9 +27,9 @@ export class SettingsPatrolSubGroup {
       "Set tracked voice category to your current voice channel's parent.",
   })
   async setupPatrolCategory(interaction: CommandInteraction) {
-    if (!interaction.guildId || !interaction.guild) return;
+    if (!interaction.guildId || !interaction.guild) {return;}
 
-    const member = interaction.member as any;
+    const member = interaction.member as GuildMember;
     const voice = member.voice?.channel;
     if (!voice || voice.type !== 2 || !voice.parentId) {
       await interaction.reply({

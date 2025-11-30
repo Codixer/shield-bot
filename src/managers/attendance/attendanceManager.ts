@@ -18,9 +18,9 @@ export class AttendanceManager {
     squadName: string,
   ) {
     if (!userId)
-      throw new Error(
+      {throw new Error(
         "User ID is undefined. Make sure the user exists in the database.",
-      );
+      );}
     let squad = await prisma.squad.findFirst({
       where: { eventId, name: squadName },
     });
@@ -148,7 +148,7 @@ export class AttendanceManager {
   // Find or create a user by Discord ID
   async findOrCreateUserByDiscordId(discordId: string | undefined) {
     if (!discordId)
-      throw new Error("Discord ID is undefined. Cannot find or create user.");
+      {throw new Error("Discord ID is undefined. Cannot find or create user.");}
     let user = await prisma.user.findUnique({ where: { discordId } });
     if (!user) {
       user = await prisma.user.create({ data: { discordId } });

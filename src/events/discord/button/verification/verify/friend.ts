@@ -29,18 +29,18 @@ export class VRChatFriendVerifyButtonHandler {
     try {
       await sendFriendRequest(vrcUserId);
       friendRequestSent = true;
-    } catch (err: any) {
-      if (err.message && err.message.includes("400")) {
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message && err.message.includes("400")) {
         // Already friends, unfriend and try again
         try {
           await unfriendUser(vrcUserId);
           await sendFriendRequest(vrcUserId);
           friendRequestSent = true;
-        } catch (err2: any) {
-          errorMsg = err2.message || "Failed to unfriend and re-friend user.";
+        } catch (_err2: unknown) {
+          errorMsg = _err2 instanceof Error ? _err2.message : "Failed to unfriend and re-friend user.";
         }
       } else {
-        errorMsg = err.message || "Failed to send friend request.";
+        errorMsg = err instanceof Error ? err.message : "Failed to send friend request.";
       }
     }
     let embed;
@@ -107,7 +107,8 @@ export class VRChatFriendVerifyButtonHandler {
       let vrchatUsername = vrcAccount.vrchatUsername;
       try {
         const userInfo = await getUserById(vrcUserId);
-        vrchatUsername = userInfo?.displayName || userInfo?.username;
+        const userTyped = userInfo as { displayName?: string; username?: string } | null;
+        vrchatUsername = userTyped?.displayName || userTyped?.username || null;
 
         // Update username if it's different or if it's been more than a week
         const oneWeekAgo = new Date();

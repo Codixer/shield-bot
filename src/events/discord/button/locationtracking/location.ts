@@ -18,9 +18,9 @@ export class LocationTrackingButtonHandler {
       where: { discordId },
       include: { vrchatAccounts: true },
     });
-    if (!user || !user.vrchatAccounts) return;
+    if (!user || !user.vrchatAccounts) {return;}
     const verifiedAccounts = user.vrchatAccounts.filter(
-      (acc: any) => acc.accountType === "MAIN" || acc.accountType === "ALT",
+      (acc) => acc.accountType === "MAIN" || acc.accountType === "ALT",
     );
     // Update consent in DB
     if (action === "tracking") {
@@ -55,9 +55,10 @@ export class LocationTrackingButtonHandler {
       ));
       try {
         const userInfo = await getUserById(acc.vrcUserId);
-        usernames[acc.vrcUserId] = userInfo?.displayName || acc.vrcUserId;
-        friendsMap[acc.vrcUserId] = userInfo?.isFriend ?? true;
-      } catch (e) {
+        const userTyped = userInfo as { displayName?: string; isFriend?: boolean } | null;
+        usernames[acc.vrcUserId] = userTyped?.displayName || acc.vrcUserId;
+        friendsMap[acc.vrcUserId] = userTyped?.isFriend ?? true;
+      } catch {
         usernames[acc.vrcUserId] = acc.vrcUserId;
         friendsMap[acc.vrcUserId] = true;
       }

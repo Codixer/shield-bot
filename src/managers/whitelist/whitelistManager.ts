@@ -373,7 +373,7 @@ export class WhitelistManager {
 
     for (const line of lines) {
       const [vrchatUsername, roleNames] = line.split(":");
-      if (!vrchatUsername) continue;
+      if (!vrchatUsername) {continue;}
 
       try {
         // Add user to whitelist
@@ -387,7 +387,7 @@ export class WhitelistManager {
               // Note: This needs to be updated to use roleId instead of roleName
               // TODO: Look up role by Discord role ID or other identifier
               loggers.bot.warn(`Role assignment by name is deprecated: ${roleName}`);
-            } catch (error) {
+            } catch (_error) {
               // Ignore role assignment errors for now
             }
           }

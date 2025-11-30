@@ -13,6 +13,7 @@ import {
 } from "discord.js";
 import { Discord, ButtonComponent, Guard } from "discordx";
 import { prisma } from "../../../../main.js";
+import type { User, VRChatAccount } from "../../../../generated/prisma/client.js";
 import { unfriendUser } from "../../../../utility/vrchat/user.js";
 import { StaffGuard } from "../../../../utility/guards.js";
 import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
@@ -56,7 +57,7 @@ export class VRCStaffAccountManagerButtonHandler {
 
       // Find the specific VRChat account
       const vrcAccount = user.vrchatAccounts.find(
-        (acc: any) => acc.vrcUserId === vrcUserId,
+        (acc) => acc.vrcUserId === vrcUserId,
       );
       if (!vrcAccount) {
         await interaction.reply({
@@ -99,8 +100,8 @@ export class VRCStaffAccountManagerButtonHandler {
             flags: MessageFlags.Ephemeral,
           });
       }
-    } catch (error) {
-      loggers.bot.error("Error in staff account manager button handler", error);
+    } catch (_error) {
+      loggers.bot.error("Error in staff account manager button handler", _error);
       await interaction.reply({
         content:
           "❌ An error occurred while processing your request. Please try again later.",
@@ -111,14 +112,14 @@ export class VRCStaffAccountManagerButtonHandler {
 
   private async handleSetMain(
     interaction: ButtonInteraction,
-    user: any,
-    vrcAccount: any,
+    user: User & { vrchatAccounts: VRChatAccount[] },
+    vrcAccount: VRChatAccount,
     vrcUserId: string,
     targetDiscordId: string,
   ) {
     // Check if user already has a MAIN account
     const currentMain = user.vrchatAccounts.find(
-      (acc: any) => acc.accountType === "MAIN",
+      (acc) => acc.accountType === "MAIN",
     );
 
     if (currentMain && currentMain.vrcUserId !== vrcUserId) {
@@ -160,10 +161,10 @@ export class VRCStaffAccountManagerButtonHandler {
           );
         }
       }
-    } catch (error) {
+    } catch (_error) {
       loggers.bot.error(
         `Failed to sync whitelist for ${targetDiscordId}`,
-        error,
+        _error,
       );
     }
 
@@ -172,7 +173,7 @@ export class VRCStaffAccountManagerButtonHandler {
 
   private async handleSetAlt(
     interaction: ButtonInteraction,
-    vrcAccount: any,
+    vrcAccount: VRChatAccount,
     vrcUserId: string,
     targetDiscordId: string,
   ) {
@@ -207,10 +208,10 @@ export class VRCStaffAccountManagerButtonHandler {
           );
         }
       }
-    } catch (error) {
+    } catch (_error) {
       loggers.bot.error(
         `Failed to sync whitelist for ${targetDiscordId}`,
-        error,
+        _error,
       );
     }
 
@@ -219,7 +220,7 @@ export class VRCStaffAccountManagerButtonHandler {
 
   private async handleDelete(
     interaction: ButtonInteraction,
-    vrcAccount: any,
+    vrcAccount: VRChatAccount,
     vrcUserId: string,
     targetDiscordId: string,
   ) {
@@ -250,7 +251,9 @@ export class VRCStaffAccountManagerButtonHandler {
       const accountTypeBeforeDelete = vrcAccount.accountType;
       try {
         rolesBeforeDelete = await getUserWhitelistRoles(targetDiscordId);
-      } catch {}
+      } catch (_error) {
+        // Ignore errors when fetching roles before delete
+      }
 
       // Update whitelist after account deletion
       try {
@@ -290,8 +293,8 @@ export class VRCStaffAccountManagerButtonHandler {
       }
 
       await this.updateStaffAccountManagerMessage(interaction, targetDiscordId);
-    } catch (error) {
-      loggers.bot.error("Error deleting VRChat account", error);
+    } catch (_error) {
+      loggers.bot.error("Error deleting VRChat account", _error);
       await interaction.reply({
         content:
           "❌ An error occurred while deleting the account. The account may have been partially removed.",
@@ -326,10 +329,10 @@ export class VRCStaffAccountManagerButtonHandler {
 
     // Separate verified and unverified accounts
     const verifiedAccounts = user.vrchatAccounts.filter(
-      (acc: any) => acc.accountType === "MAIN" || acc.accountType === "ALT",
+      (acc) => acc.accountType === "MAIN" || acc.accountType === "ALT",
     );
     const unverifiedAccounts = user.vrchatAccounts.filter(
-      (acc: any) => acc.accountType === "UNVERIFIED",
+      (acc) => acc.accountType === "UNVERIFIED",
     );
 
     if (verifiedAccounts.length === 0 && unverifiedAccounts.length === 0) {

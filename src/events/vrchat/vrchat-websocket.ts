@@ -1,6 +1,7 @@
 import { VRCWebSocket, EventType } from "vrc-ts";
 import { vrchatApi } from "../../utility/vrchat/index.js";
 import { loggers } from "../../utility/logger.js";
+import type { VRChatWebSocketData } from "../../utility/vrchat/types.js";
 import {
   handleFriendActive,
   handleFriendDelete,
@@ -33,10 +34,11 @@ export function stopVRChatWebSocketListener() {
     try {
       // vrc-ts WebSocket may have different cleanup methods
       // Try to close/cleanup if methods exist
-      if (typeof (ws as any).close === "function") {
-        (ws as any).close();
-      } else if (typeof (ws as any).disconnect === "function") {
-        (ws as any).disconnect();
+      const wsWithMethods = ws as { close?: () => void; disconnect?: () => void };
+      if (typeof wsWithMethods.close === "function") {
+        wsWithMethods.close();
+      } else if (typeof wsWithMethods.disconnect === "function") {
+        wsWithMethods.disconnect();
       }
     } catch (error) {
       loggers.vrchat.error("Error disconnecting WebSocket", error);
@@ -81,88 +83,95 @@ export function startVRChatWebSocketListener() {
     });
 
     // Friend Events
-    ws.on(EventType.Friend_Add, async (data: any) => {
+    ws.on(EventType.Friend_Add, async (data: unknown) => {
       try {
         // vrc-ts provides data in a structured format
         // Map to our handler's expected format
+        const typedData = data as VRChatWebSocketData;
         await handleFriendAdd({
-          userId: data.user?.id || data.userId,
-          user: data.user,
+          userId: typedData.user?.id || typedData.userId || "",
+          user: typedData.user,
         });
       } catch (err) {
         loggers.vrchat.error("Error handling friend-add", err);
       }
     });
 
-    ws.on(EventType.Friend_Delete, async (data: any) => {
+    ws.on(EventType.Friend_Delete, async (data: unknown) => {
       try {
+        const typedData = data as VRChatWebSocketData;
         await handleFriendDelete({
-          userId: data.user?.id || data.userId,
-          user: data.user,
+          userId: typedData.user?.id || typedData.userId || "",
+          user: typedData.user,
         });
       } catch (err) {
         loggers.vrchat.error("Error handling friend-delete", err);
       }
     });
 
-    ws.on(EventType.Friend_Online, async (data: any) => {
+    ws.on(EventType.Friend_Online, async (data: unknown) => {
       try {
         // Map vrc-ts event data to our handler format
+        const typedData = data as VRChatWebSocketData;
         await handleFriendOnline({
-          userId: data.user?.id || data.userId,
-          location: data.location,
-          worldId: data.worldId,
-          travelingToLocation: data.travelingToLocation,
-          user: data.user,
+          userId: typedData.user?.id || typedData.userId || "",
+          location: typedData.location,
+          worldId: typedData.worldId,
+          travelingToLocation: typedData.travelingToLocation,
+          user: typedData.user,
         });
       } catch (err) {
         loggers.vrchat.error("Error handling friend-online", err);
       }
     });
 
-    ws.on(EventType.Friend_Active, async (data: any) => {
+    ws.on(EventType.Friend_Active, async (data: unknown) => {
       try {
+        const typedData = data as VRChatWebSocketData;
         await handleFriendActive({
-          userId: data.user?.id || data.userId,
-          location: data.location,
-          worldId: data.worldId,
-          user: data.user,
+          userId: typedData.user?.id || typedData.userId || "",
+          location: typedData.location,
+          worldId: typedData.worldId,
+          user: typedData.user,
         });
       } catch (err) {
         loggers.vrchat.error("Error handling friend-active", err);
       }
     });
 
-    ws.on(EventType.Friend_Offline, async (data: any) => {
+    ws.on(EventType.Friend_Offline, async (data: unknown) => {
       try {
+        const typedData = data as VRChatWebSocketData;
         await handleFriendOffline({
-          userId: data.user?.id || data.userId,
-          user: data.user,
+          userId: typedData.user?.id || typedData.userId || "",
+          user: typedData.user,
         });
       } catch (err) {
         loggers.vrchat.error("Error handling friend-offline", err);
       }
     });
 
-    ws.on(EventType.Friend_Update, async (data: any) => {
+    ws.on(EventType.Friend_Update, async (data: unknown) => {
       try {
+        const typedData = data as VRChatWebSocketData;
         await handleFriendUpdate({
-          userId: data.user?.id || data.userId,
-          user: data.user,
+          userId: typedData.user?.id || typedData.userId || "",
+          user: typedData.user,
         });
       } catch (err) {
         loggers.vrchat.error("Error handling friend-update", err);
       }
     });
 
-    ws.on(EventType.Friend_Location, async (data: any) => {
+    ws.on(EventType.Friend_Location, async (data: unknown) => {
       try {
+        const typedData = data as VRChatWebSocketData;
         await handleFriendLocation({
-          userId: data.user?.id || data.userId,
-          location: data.location,
-          worldId: data.worldId,
-          travelingToLocation: data.travelingToLocation,
-          user: data.user,
+          userId: typedData.user?.id || typedData.userId || "",
+          location: typedData.location,
+          worldId: typedData.worldId,
+          travelingToLocation: typedData.travelingToLocation,
+          user: typedData.user,
         });
       } catch (err) {
         loggers.vrchat.error("Error handling friend-location", err);
@@ -170,7 +179,7 @@ export function startVRChatWebSocketListener() {
     });
 
     // Notification Events
-    ws.on(EventType.Notification, async (data: any) => {
+    ws.on(EventType.Notification, async (data: unknown) => {
       try {
         // vrc-ts notification format may differ, adapt as needed
         await handleNotification(data);
@@ -179,7 +188,7 @@ export function startVRChatWebSocketListener() {
       }
     });
 
-    ws.on(EventType.Notification_V2, async (data: any) => {
+    ws.on(EventType.Notification_V2, async (data: unknown) => {
       try {
         // Handle v2 notifications
         await handleNotification(data);
@@ -189,24 +198,25 @@ export function startVRChatWebSocketListener() {
     });
 
     // Error handling
-    ws.on(EventType.Error, (error: any) => {
+    ws.on(EventType.Error, (error: unknown) => {
       loggers.vrchat.error("VRChat WebSocket error", error);
     });
 
     // Connection events - vrc-ts WebSocket may use different event names
     // The WebSocket should connect automatically when created
     // Listen for connection events if available
-    if (typeof (ws as any).on === "function") {
+    const wsWithEvents = ws as { on?: (event: string, handler: () => void) => void };
+    if (typeof wsWithEvents.on === "function") {
       try {
-        (ws as any).on("open", () => {
+        wsWithEvents.on("open", () => {
           loggers.vrchat.info("Connected to VRChat WebSocket");
         });
 
-        (ws as any).on("close", () => {
+        wsWithEvents.on("close", () => {
           loggers.vrchat.warn("VRChat WebSocket disconnected");
           ws = null;
         });
-      } catch (error) {
+      } catch {
         // Event listeners may not be available in this format
         loggers.vrchat.debug("Could not set up connection event listeners");
       }

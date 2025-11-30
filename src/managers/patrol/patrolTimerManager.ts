@@ -35,18 +35,18 @@ export class PatrolTimerManager {
     }
 
     // Load persisted active sessions
-    const activeSessions = await (
-      prisma as any
-    ).activeVoicePatrolSession.findMany();
+    const activeSessions = await prisma.activeVoicePatrolSession.findMany();
     for (const session of activeSessions) {
       if (!this.tracked.has(session.guildId))
-        this.tracked.set(session.guildId, new Map());
-      const guildMap = this.tracked.get(session.guildId)!;
-      guildMap.set(session.userId, {
-        userId: session.userId,
-        channelId: session.channelId,
-        startedAt: session.startedAt,
-      });
+        {this.tracked.set(session.guildId, new Map());}
+      const guildMap = this.tracked.get(session.guildId);
+      if (guildMap) {
+        guildMap.set(session.userId, {
+          userId: session.userId,
+          channelId: session.channelId,
+          startedAt: session.startedAt,
+        });
+      }
     }
 
     // On startup, scan current voice states and resume tracking for members
@@ -65,28 +65,26 @@ export class PatrolTimerManager {
 
   // Settings helpers
   async getSettings(guildId: string) {
-    let settings = await (prisma as any).guildSettings.findUnique({
+    let settings = await prisma.guildSettings.findUnique({
       where: { guildId },
     });
     if (!settings) {
-      settings = await (prisma as any).guildSettings.create({
+      settings = await prisma.guildSettings.create({
         data: { guildId },
       });
     }
     // One-time backfill from legacy VoicePatrolSettings table if present
-    if (!settings.patrolBotuserRoleId || !settings.patrolChannelCategoryId) {
+    if (!settings.patrolChannelCategoryId) {
       try {
-        const rows = await (prisma as any)
-          .$queryRaw`SELECT botuserRoleId, channelCategoryId FROM VoicePatrolSettings WHERE guildId = ${guildId} LIMIT 1`;
+        const rows = await prisma
+          .$queryRaw`SELECT channelCategoryId FROM VoicePatrolSettings WHERE guildId = ${guildId} LIMIT 1`;
         const legacy = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
         if (legacy) {
-          const patch: any = {};
-          if (legacy.botuserRoleId && !settings.patrolBotuserRoleId)
-            patch.patrolBotuserRoleId = legacy.botuserRoleId as string;
+          const patch: Record<string, unknown> = {};
           if (legacy.channelCategoryId && !settings.patrolChannelCategoryId)
-            patch.patrolChannelCategoryId = legacy.channelCategoryId as string;
+            {patch.patrolChannelCategoryId = legacy.channelCategoryId as string;}
           if (Object.keys(patch).length > 0) {
-            settings = await (prisma as any).guildSettings.update({
+            settings = await prisma.guildSettings.update({
               where: { guildId },
               data: patch,
             });
@@ -98,7 +96,6 @@ export class PatrolTimerManager {
     }
     return settings as {
       guildId: string;
-      patrolBotuserRoleId?: string | null;
       patrolChannelCategoryId?: string | null;
       promotionChannelId?: string | null;
       promotionMinHours?: number | null;
@@ -106,17 +103,14 @@ export class PatrolTimerManager {
     };
   }
 
-  async setBotuserRole(guildId: string, roleId: string | null) {
-    await this.getSettings(guildId); // ensure row
-    await (prisma as any).guildSettings.update({
-      where: { guildId },
-      data: { patrolBotuserRoleId: roleId ?? null },
-    });
+  async setBotuserRole(_guildId: string, _roleId: string | null) {
+    // patrolBotuserRoleId field was removed from schema
+    // This method is kept for backward compatibility but does nothing
   }
 
   async setCategory(guildId: string, categoryId: string | null) {
     await this.getSettings(guildId); // ensure row
-    await (prisma as any).guildSettings.update({
+    await prisma.guildSettings.update({
       where: { guildId },
       data: { patrolChannelCategoryId: categoryId ?? null },
     });
@@ -127,26 +121,26 @@ export class PatrolTimerManager {
   async handleVoiceStateUpdate(oldState: VoiceState, newState: VoiceState) {
     try {
       const guild = newState.guild || oldState.guild;
-      if (!guild) return;
+      if (!guild) {return;}
       const guildId = guild.id;
       const member = newState.member || oldState.member;
-      if (!member || member.user.bot) return;
+      if (!member || member.user.bot) {return;}
       const settings = await this.getSettings(guildId);
-      if (!settings.patrolChannelCategoryId) return; // not configured
+      if (!settings.patrolChannelCategoryId) {return;} // not configured
 
       const leftChannelId = oldState.channelId;
       const joinedChannelId = newState.channelId;
 
       // Ensure map
-      if (!this.tracked.has(guildId)) this.tracked.set(guildId, new Map());
+      if (!this.tracked.has(guildId)) {this.tracked.set(guildId, new Map());}
       // Map is created above, using it for channel checks
       // const _guildMap = this.tracked.get(guildId)!;
 
       // Helper to check if a channel is in tracked category
       const isInTrackedCategory = (cid: string | null | undefined) => {
-        if (!cid) return false;
+        if (!cid) {return false;}
         const ch = guild.channels.cache.get(cid);
-        if (!ch || ch.type !== ChannelType.GuildVoice) return false;
+        if (!ch || ch.type !== ChannelType.GuildVoice) {return false;}
         return (
           (ch as VoiceChannel).parentId === settings.patrolChannelCategoryId
         );
@@ -162,7 +156,9 @@ export class PatrolTimerManager {
 
       // If joining a tracked channel, start tracking
       if (nowTracked && (!wasTracked || leftChannelId !== joinedChannelId)) {
-        this.startTracking(guildId, member, joinedChannelId!);
+        if (joinedChannelId) {
+          this.startTracking(guildId, member, joinedChannelId);
+        }
       }
     } catch (err) {
       loggers.patrol.error("voiceStateUpdate error", err);
@@ -174,21 +170,22 @@ export class PatrolTimerManager {
     member: GuildMember,
     channelId: string,
   ) {
-    if (member.user.bot) return;
-    if (!this.tracked.has(guildId)) this.tracked.set(guildId, new Map());
-    const guildMap = this.tracked.get(guildId)!;
+    if (member.user.bot) {return;}
+    if (!this.tracked.has(guildId)) {this.tracked.set(guildId, new Map());}
+    const guildMap = this.tracked.get(guildId);
+    if (!guildMap) {return;}
     // Avoid clobbering an existing tracking session (e.g., during startup scan)
-    if (guildMap.has(member.id)) return;
+    if (guildMap.has(member.id)) {return;}
     const startedAt = new Date();
     guildMap.set(member.id, { userId: member.id, channelId, startedAt });
     // Persist to DB
-    (prisma as any).activeVoicePatrolSession
+    prisma.activeVoicePatrolSession
       .upsert({
         where: { guildId_userId: { guildId, userId: member.id } },
         update: { channelId, startedAt },
         create: { guildId, userId: member.id, channelId, startedAt },
       })
-      .catch((err: any) =>
+      .catch((err: unknown) =>
         loggers.patrol.error("Failed to persist session", err),
       );
     // console.log(`[PatrolTimer] Start ${member.user.tag} in ${channelId}`);
@@ -196,20 +193,20 @@ export class PatrolTimerManager {
 
   private async stopTrackingAndPersist(guildId: string, member: GuildMember) {
     const guildMap = this.tracked.get(guildId);
-    if (!guildMap) return;
+    if (!guildMap) {return;}
     const tracked = guildMap.get(member.id);
-    if (!tracked) return;
+    if (!tracked) {return;}
     
     guildMap.delete(member.id);
     
     // Don't persist time if user is paused
     if (this.isUserPaused(guildId, member.id)) {
       // Delete persisted session
-      await (prisma as any).activeVoicePatrolSession
+      await prisma.activeVoicePatrolSession
         .deleteMany({
           where: { guildId, userId: member.id },
         })
-        .catch((err: any) =>
+        .catch((err: unknown) =>
           loggers.patrol.error("Failed to delete session", err),
         );
       return;
@@ -218,19 +215,19 @@ export class PatrolTimerManager {
     // If switching channels within same category, we still finalize from old channel
     const nowMs = Date.now();
     const delta = nowMs - tracked.startedAt.getTime();
-    if (delta < 3000) return; // ignore very short joins; parity with original impl
+    if (delta < 3000) {return;} // ignore very short joins; parity with original impl
     // Delete persisted session
-    await (prisma as any).activeVoicePatrolSession
+    await prisma.activeVoicePatrolSession
       .deleteMany({
         where: { guildId, userId: member.id },
       })
-      .catch((err: any) =>
+      .catch((err: unknown) =>
         loggers.patrol.error("Failed to delete session", err),
       );
     // Ensure a corresponding User row exists for this Discord ID
     await this.ensureUser(member.id);
     // Upsert DB row and increment time
-    await (prisma as any).voicePatrolTime.upsert({
+    await prisma.voicePatrolTime.upsert({
       where: { guildId_userId: { guildId, userId: member.id } },
       update: { totalMs: { increment: BigInt(delta) } },
       create: { guildId, userId: member.id, totalMs: BigInt(delta) },
@@ -251,7 +248,7 @@ export class PatrolTimerManager {
   /** Scan the guild's voice channels within the tracked category and resume tracking for present members. */
   private async resumeActiveForGuild(guild: Guild): Promise<void> {
     const settings = await this.getSettings(guild.id);
-    if (!settings.patrolChannelCategoryId) return;
+    if (!settings.patrolChannelCategoryId) {return;}
 
     // Find all voice channels under the tracked category
     const voiceChannels = guild.channels.cache.filter(
@@ -260,14 +257,14 @@ export class PatrolTimerManager {
         (c as VoiceChannel).parentId === settings.patrolChannelCategoryId,
     );
 
-    if (!voiceChannels.size) return;
+    if (!voiceChannels.size) {return;}
 
     const trackedUsers = new Set<string>();
 
     for (const ch of voiceChannels.values()) {
       // ch.members contains members currently connected to this voice channel
       for (const member of ch.members.values()) {
-        if (member.user.bot) continue;
+        if (member.user.bot) {continue;}
         trackedUsers.add(member.id);
         this.startTracking(guild.id, member, ch.id);
       }
@@ -285,11 +282,11 @@ export class PatrolTimerManager {
           } else {
             // Member not in cache, perhaps left guild, just delete session
             guildMap.delete(userId);
-            await (prisma as any).activeVoicePatrolSession
+            await prisma.activeVoicePatrolSession
               .deleteMany({
                 where: { guildId: guild.id, userId },
               })
-              .catch((err: any) =>
+              .catch((err: unknown) =>
                 loggers.patrol.error("Failed to delete session", err),
               );
           }
@@ -302,7 +299,7 @@ export class PatrolTimerManager {
   async getCurrentTrackedList(guildId: string) {
     const guildMap = this.tracked.get(guildId);
     if (!guildMap)
-      return [] as Array<{ userId: string; ms: number; channelId: string }>;
+      {return [] as Array<{ userId: string; ms: number; channelId: string }>;}
     const now = Date.now();
     const arr: Array<{ userId: string; ms: number; channelId: string }> = [];
     for (const tu of guildMap.values()) {
@@ -320,7 +317,7 @@ export class PatrolTimerManager {
   }
 
   async getTop(guildId: string, limit?: number) {
-    const rows = await (prisma as any).voicePatrolTime.findMany({
+    const rows = await prisma.voicePatrolTime.findMany({
       where: { guildId },
       orderBy: { totalMs: "desc" },
       take: undefined, // we'll sort after adding live deltas
@@ -339,7 +336,7 @@ export class PatrolTimerManager {
         // Only add delta if user is not paused
         if (!this.isUserPaused(guildId, tu.userId)) {
           const delta = now - tu.startedAt.getTime();
-          if (delta > 0) byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+          if (delta > 0) {byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;}
         }
       }
     }
@@ -365,7 +362,7 @@ export class PatrolTimerManager {
     month: number,
     limit?: number,
   ) {
-    const rows = await (prisma as any).voicePatrolMonthlyTime.findMany({
+    const rows = await prisma.voicePatrolMonthlyTime.findMany({
       where: { guildId, year, month },
       orderBy: { totalMs: "desc" },
       take: undefined,
@@ -387,7 +384,7 @@ export class PatrolTimerManager {
     const guildMap = this.tracked.get(guildId);
     const byUser: Record<string, number> = {};
 
-    for (const r of rows) byUser[r.userId] = Number(r.totalMs);
+    for (const r of rows) {byUser[r.userId] = Number(r.totalMs);}
 
     if (guildMap) {
       for (const tu of guildMap.values()) {
@@ -395,7 +392,7 @@ export class PatrolTimerManager {
         if (!this.isUserPaused(guildId, tu.userId)) {
           const startMs = Math.max(tu.startedAt.getTime(), monthStart);
           const delta = Math.max(0, nowMs - startMs);
-          if (delta > 0) byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+          if (delta > 0) {byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;}
         }
       }
     }
@@ -417,7 +414,7 @@ export class PatrolTimerManager {
     year: number,
     month: number,
   ) {
-    const row = await (prisma as any).voicePatrolMonthlyTime.findUnique({
+    const row = await prisma.voicePatrolMonthlyTime.findUnique({
       where: { guildId_userId_year_month: { guildId, userId, year, month } },
     });
     let base = row?.totalMs ? Number(row.totalMs) : 0;
@@ -447,8 +444,8 @@ export class PatrolTimerManager {
       (m) => !m.user.bot && m.voice?.channelId === channelId,
     );
     const ids = members.map((m) => m.id);
-    if (ids.length === 0) return [] as any[];
-    const rows = await (prisma as any).voicePatrolTime.findMany({
+    if (ids.length === 0) {return [];}
+    const rows = await prisma.voicePatrolTime.findMany({
       where: { guildId: guild.id, userId: { in: ids } },
       orderBy: { totalMs: "desc" },
     });
@@ -462,12 +459,12 @@ export class PatrolTimerManager {
     }
     if (guildMap) {
       for (const tu of guildMap.values()) {
-        if (tu.channelId !== channelId) continue; // only add deltas for this channel
-        if (!ids.includes(tu.userId)) continue;
+        if (tu.channelId !== channelId) {continue;} // only add deltas for this channel
+        if (!ids.includes(tu.userId)) {continue;}
         // Only add delta if user is not paused
         if (!this.isUserPaused(guild.id, tu.userId)) {
           const delta = now - tu.startedAt.getTime();
-          if (delta > 0) byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+          if (delta > 0) {byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;}
         }
       }
     }
@@ -485,11 +482,11 @@ export class PatrolTimerManager {
   async reset(guildId: string, userId?: string) {
     if (userId) {
       // Clear database records
-      await (prisma as any).voicePatrolTime.updateMany({
+      await prisma.voicePatrolTime.updateMany({
         where: { guildId, userId },
         data: { totalMs: BigInt(0) },
       });
-      await (prisma as any).activeVoicePatrolSession.deleteMany({
+      await prisma.activeVoicePatrolSession.deleteMany({
         where: { guildId, userId },
       });
       
@@ -505,11 +502,11 @@ export class PatrolTimerManager {
       }
     } else {
       // Clear database records for all users
-      await (prisma as any).voicePatrolTime.updateMany({
+      await prisma.voicePatrolTime.updateMany({
         where: { guildId },
         data: { totalMs: BigInt(0) },
       });
-      await (prisma as any).activeVoicePatrolSession.deleteMany({
+      await prisma.activeVoicePatrolSession.deleteMany({
         where: { guildId },
       });
       
@@ -527,7 +524,7 @@ export class PatrolTimerManager {
   }
 
   async getUserTotal(guildId: string, userId: string) {
-    const row = await (prisma as any).voicePatrolTime.findUnique({
+    const row = await prisma.voicePatrolTime.findUnique({
       where: { guildId_userId: { guildId, userId } },
     });
     let base = row?.totalMs ? Number(row.totalMs) : 0;
@@ -560,7 +557,10 @@ export class PatrolTimerManager {
     if (!this.pausedUsers.has(guildId)) {
       this.pausedUsers.set(guildId, new Set());
     }
-    this.pausedUsers.get(guildId)!.add(userId);
+    const pausedSet = this.pausedUsers.get(guildId);
+    if (pausedSet) {
+      pausedSet.add(userId);
+    }
     
     return true;
   }
@@ -617,7 +617,7 @@ export class PatrolTimerManager {
    * Check if a user is paused (either individually or guild-wide).
    */
   isUserPaused(guildId: string, userId: string): boolean {
-    if (this.pausedGuilds.has(guildId)) return true;
+    if (this.pausedGuilds.has(guildId)) {return true;}
     const paused = this.pausedUsers.get(guildId);
     return paused ? paused.has(userId) : false;
   }
@@ -646,28 +646,28 @@ export class PatrolTimerManager {
     const targetMonth = month ?? (now.getUTCMonth() + 1);
     
     // Update all-time total
-    const row = await (prisma as any).voicePatrolTime.findUnique({
+    const row = await prisma.voicePatrolTime.findUnique({
       where: { guildId_userId: { guildId, userId } },
     });
     
     const currentTotal = row?.totalMs ? Number(row.totalMs) : 0;
     const newTotal = Math.max(0, currentTotal + deltaMs); // Don't go below 0
     
-    await (prisma as any).voicePatrolTime.upsert({
+    await prisma.voicePatrolTime.upsert({
       where: { guildId_userId: { guildId, userId } },
       update: { totalMs: BigInt(newTotal) },
       create: { guildId, userId, totalMs: BigInt(newTotal) },
     });
 
     // Also adjust specified month's total
-    const monthRow = await (prisma as any).voicePatrolMonthlyTime.findUnique({
+    const monthRow = await prisma.voicePatrolMonthlyTime.findUnique({
       where: { guildId_userId_year_month: { guildId, userId, year: targetYear, month: targetMonth } },
     });
     
     const currentMonthTotal = monthRow?.totalMs ? Number(monthRow.totalMs) : 0;
     const newMonthTotal = Math.max(0, currentMonthTotal + deltaMs);
     
-    await (prisma as any).voicePatrolMonthlyTime.upsert({
+    await prisma.voicePatrolMonthlyTime.upsert({
       where: { guildId_userId_year_month: { guildId, userId, year: targetYear, month: targetMonth } },
       update: { totalMs: BigInt(newMonthTotal) },
       create: { guildId, userId, year: targetYear, month: targetMonth, totalMs: BigInt(newMonthTotal) },
@@ -686,7 +686,7 @@ export class PatrolTimerManager {
     }>
   > {
     // Get all records for this guild
-    const records = await (prisma as any).voicePatrolMonthlyTime.findMany({
+    const records = await prisma.voicePatrolMonthlyTime.findMany({
       where: { guildId },
       select: {
         year: true,
@@ -708,9 +708,11 @@ export class PatrolTimerManager {
           totalMs: BigInt(0),
         });
       }
-      const yearData = yearMap.get(record.year)!;
-      yearData.userIds.add(record.userId);
-      yearData.totalMs += record.totalMs;
+      const yearData = yearMap.get(record.year);
+      if (yearData) {
+        yearData.userIds.add(record.userId);
+        yearData.totalMs += record.totalMs;
+      }
     }
 
     // Convert to array and sort by year descending
@@ -738,12 +740,12 @@ export class PatrolTimerManager {
       totalHours: number;
     }>
   > {
-    const where: any = { guildId };
+    const where: { guildId: string; year?: number } = { guildId };
     if (year !== undefined) {
       where.year = year;
     }
 
-    const records = await (prisma as any).voicePatrolMonthlyTime.findMany({
+    const records = await prisma.voicePatrolMonthlyTime.findMany({
       where,
       select: {
         year: true,
@@ -769,9 +771,11 @@ export class PatrolTimerManager {
           totalMs: BigInt(0),
         });
       }
-      const monthData = monthMap.get(key)!;
-      monthData.userIds.add(record.userId);
-      monthData.totalMs += record.totalMs;
+      const monthData = monthMap.get(key);
+      if (monthData) {
+        monthData.userIds.add(record.userId);
+        monthData.totalMs += record.totalMs;
+      }
     }
 
     // Convert to array and sort by year/month descending
@@ -783,7 +787,7 @@ export class PatrolTimerManager {
         totalHours: Math.floor(Number(data.totalMs) / 1000 / 60 / 60),
       }))
       .sort((a, b) => {
-        if (a.year !== b.year) return b.year - a.year;
+        if (a.year !== b.year) {return b.year - a.year;}
         return b.month - a.month;
       });
   }
@@ -791,7 +795,7 @@ export class PatrolTimerManager {
   // Internals
   private async ensureUser(discordId: string) {
     try {
-      await (prisma as any).user.upsert({
+      await prisma.user.upsert({
         where: { discordId },
         create: { discordId },
         update: {},
@@ -819,7 +823,7 @@ export class PatrolTimerManager {
       }
 
       // Check if user has already been promoted (notification already sent)
-      const existingPromotion = await (prisma as any).voicePatrolPromotion.findUnique({
+      const existingPromotion = await prisma.voicePatrolPromotion.findUnique({
         where: { guildId_userId: { guildId, userId: member.id } },
       });
       
@@ -851,7 +855,7 @@ export class PatrolTimerManager {
         await sentMessage.react('❌');
 
         // Record the promotion to prevent duplicate notifications
-        await (prisma as any).voicePatrolPromotion.create({
+        await prisma.voicePatrolPromotion.create({
           data: {
             guildId,
             userId: member.id,
@@ -885,7 +889,7 @@ export class PatrolTimerManager {
       const segmentEndMs = Math.min(endMs, nextMonthStart.getTime());
       const segDelta = segmentEndMs - curStart.getTime();
       if (segDelta > 0) {
-        await (prisma as any).voicePatrolMonthlyTime.upsert({
+        await prisma.voicePatrolMonthlyTime.upsert({
           where: {
             guildId_userId_year_month: {
               guildId,

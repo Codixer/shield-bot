@@ -53,7 +53,7 @@ export class SettingsRolesManagementSubGroup {
     role: Role,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId || !interaction.guild) return;
+    if (!interaction.guildId || !interaction.guild) {return;}
 
     try {
       const settings = await prisma.guildSettings.findUnique({
@@ -61,7 +61,7 @@ export class SettingsRolesManagementSubGroup {
       });
 
       const fieldName = getFieldName(type);
-      const settingsAny = settings as any; // Type assertion for dynamic access
+      const settingsAny = settings as Record<string, unknown>; // Type assertion for dynamic access
       const currentRoles = settingsAny?.[fieldName]
         ? (settingsAny[fieldName] as string[])
         : [];
@@ -123,7 +123,7 @@ export class SettingsRolesManagementSubGroup {
     role: Role,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId || !interaction.guild) return;
+    if (!interaction.guildId || !interaction.guild) {return;}
 
     try {
       const settings = await prisma.guildSettings.findUnique({
@@ -131,7 +131,7 @@ export class SettingsRolesManagementSubGroup {
       });
 
       const fieldName = getFieldName(type);
-      const settingsAny = settings as any; // Type assertion for dynamic access
+      const settingsAny = settings as Record<string, unknown>; // Type assertion for dynamic access
 
       if (!settingsAny?.[fieldName] || !Array.isArray(settingsAny[fieldName])) {
         await interaction.reply({
@@ -177,7 +177,7 @@ export class SettingsRolesManagementSubGroup {
     description: "Show current role mappings for this server.",
   })
   async rolesStatus(interaction: CommandInteraction) {
-    if (!interaction.guildId || !interaction.guild) return;
+    if (!interaction.guildId || !interaction.guild) {return;}
 
     try {
       const settings = await prisma.guildSettings.findUnique({
@@ -203,9 +203,13 @@ export class SettingsRolesManagementSubGroup {
         if (!roleIds || !Array.isArray(roleIds) || roleIds.length === 0) {
           return "Not configured";
         }
+        if (!interaction.guild) {
+          return "Not available (not in a server)";
+        }
+        const guild = interaction.guild;
         return roleIds
           .map((roleId) => {
-            const role = interaction.guild!.roles.cache.get(roleId);
+            const role = guild.roles.cache.get(roleId);
             return role ? `<@&${role.id}>` : `Role ID: ${roleId}`;
           })
           .join(", ");

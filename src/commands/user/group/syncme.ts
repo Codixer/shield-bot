@@ -82,16 +82,17 @@ export class GroupSelfRoleSyncCommand {
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.vrchat.error("Self Role Sync error", error);
 
       let errorMessage = "Failed to sync roles. Please try again later.";
-      if (error.message?.includes("not in group")) {
+      if (error instanceof Error && error.message?.includes("not in group")) {
         errorMessage =
           "You are not a member of the VRChat group yet. Please join the group first using `/group join`.";
       } else if (
-        error.message?.includes("403") ||
-        error.message?.includes("401")
+        error instanceof Error &&
+        (error.message?.includes("403") ||
+        error.message?.includes("401"))
       ) {
         errorMessage = "Bot does not have permission to manage group roles.";
       }

@@ -9,8 +9,8 @@ export class PatrolButtonHandlers {
   @ButtonComponent({ id: /patrol-wipe-confirm:(\d+):(true|false)/ })
   @Guard(StaffGuard)
   async handleWipeConfirm(interaction: ButtonInteraction) {
-    if (!interaction.guildId) return;    
-    const [_, userId, _ephemeralStr] = interaction.customId.split(":");
+    if (!interaction.guildId) {return;}    
+    const [, userId] = interaction.customId.split(":");
     
     // Check permissions again
     const member = interaction.member as GuildMember;
@@ -33,7 +33,7 @@ export class PatrolButtonHandlers {
 
   @ButtonComponent({ id: /patrol-wipe-cancel:(\d+)/ })
   async handleWipeCancel(interaction: ButtonInteraction) {
-    const [_, userId] = interaction.customId.split(":");
+    const [, userId] = interaction.customId.split(":");
     
     await interaction.update({
       content: `❌ Cancelled wipe operation for <@${userId}>.`,

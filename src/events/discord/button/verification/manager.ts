@@ -55,14 +55,14 @@ export class VRChatVerifyManagerButtonHandler {
       let userInfo = null;
       try {
         userInfo = await getUserById(vrcUserId);
-      } catch (e) {
+      } catch {
         // Ignore errors
       }
 
       const embed = new EmbedBuilder()
         .setTitle("✅ Account Verified")
         .setDescription(
-          `**${userInfo?.displayName || vrcUserId}** has been verified as **${newAccountType}**.`,
+          `**${(userInfo as { displayName?: string } | null)?.displayName || vrcUserId}** has been verified as **${newAccountType}**.`,
         )
         .setColor(Colors.Green)
         .setFooter({ text: "VRChat Verification Management" });
@@ -133,7 +133,7 @@ export class VRChatVerifyManagerButtonHandler {
       let userInfo = null;
       try {
         userInfo = await getUserById(vrcUserId);
-      } catch (e) {
+      } catch {
         // Ignore errors
       }
 
@@ -202,7 +202,7 @@ export class VRChatVerifyManagerButtonHandler {
       let userInfo = null;
       try {
         userInfo = await getUserById(vrcUserId);
-      } catch (e) {
+      } catch {
         // Ignore errors
       }
 
@@ -261,7 +261,7 @@ export class VRChatVerifyManagerButtonHandler {
       let userInfo = null;
       try {
         userInfo = await getUserById(vrcUserId);
-      } catch (e) {
+      } catch {
         // Ignore errors
       }
 

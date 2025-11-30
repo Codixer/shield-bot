@@ -3,58 +3,66 @@ import { hasFriendLocationConsent } from "../../../../utility/vrchat.js";
 import { updateUsernameCache } from "../../../../utility/vrchat/usernameCache.js";
 import { loggers } from "../../../../utility/logger.js";
 
-export async function handleFriendLocation(content: any) {
+interface FriendLocationContent {
+  userId?: string;
+  location?: string;
+  worldId?: string;
+  travelingToLocation?: string;
+}
+
+export async function handleFriendLocation(content: unknown) {
+  const typedContent = content as FriendLocationContent;
   // Ignore if the location is "travelling"
-  if (content.location === "travelling") {
+  if (typedContent.location === "travelling") {
     return;
   }
 
   // Update username cache for this user (if it's been a week or more)
-  if (content.userId) {
-    updateUsernameCache(content.userId).catch((e) =>
+  if (typedContent.userId) {
+    updateUsernameCache(typedContent.userId).catch((e) =>
       loggers.vrchat.warn(
-        `Username cache update failed for ${content.userId}`,
+        `Username cache update failed for ${typedContent.userId}`,
         e,
       ),
     );
   }
 
   // Check consent: only track if the user has allowed the sender to track them
-  if (content.userId) {
-    const consent = await hasFriendLocationConsent(content.userId);
+  if (typedContent.userId) {
+    const consent = await hasFriendLocationConsent(typedContent.userId);
     if (!consent) {
-      // console.log(`[Friend Location] No consent: Not allowed to track ${content.userId}`);
+      // console.log(`[Friend Location] No consent: Not allowed to track ${typedContent.userId}`);
       return;
     }
   }
   // Extract instanceId and worldId
-  let instanceId = content.location;
-  let worldId = content.worldId || null;
-  if (content.location && content.location.includes(":")) {
-    const parts = content.location.split(":");
-    worldId = parts[0];
+  let instanceId = typedContent.location;
+  let worldId: string | null = typedContent.worldId || null;
+  if (typedContent.location && typedContent.location.includes(":")) {
+    const parts = typedContent.location.split(":");
+    worldId = parts[0] || null;
     instanceId = parts[1];
   }
   // Upsert friend location event in the database
   await prisma.friendLocation.upsert({
-    where: { vrcUserId: content.userId },
+    where: { vrcUserId: typedContent.userId || "" },
     update: {
-      location: instanceId,
+      location: instanceId || undefined,
       worldId: worldId,
-      travelingTo: content.travelingToLocation || null,
+      travelingTo: typedContent.travelingToLocation || null,
       eventTime: new Date(),
       senderUserId: null,
     },
     create: {
-      vrcUserId: content.userId,
-      location: instanceId,
+      vrcUserId: typedContent.userId || "",
+      location: instanceId || "",
       worldId: worldId,
-      travelingTo: content.travelingToLocation || null,
+      travelingTo: typedContent.travelingToLocation || null,
       eventTime: new Date(),
       senderUserId: null,
     },
   });
   loggers.vrchat.debug(
-    `Upserted friend location: ${content.userId}, ${instanceId}, ${worldId}`,
+    `Upserted friend location: ${typedContent.userId}, ${instanceId}, ${worldId}`,
   );
 }

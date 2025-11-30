@@ -41,7 +41,7 @@ export class VRChatAvatarInviteCommand {
         type: ApplicationCommandOptionType.Channel,
         required: true,
       })
-      channel: any,
+      channel: unknown,
     interaction: CommandInteraction,
   ) {
     await interaction.deferReply();

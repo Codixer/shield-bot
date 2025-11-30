@@ -192,7 +192,8 @@ export class VRChatVerifyButtonHandler {
   private async getVRChatUsername(vrcUserId: string): Promise<string | null> {
     try {
       const userInfo = await getUserById(vrcUserId);
-      return userInfo?.displayName || userInfo?.username || null;
+      const userTyped = userInfo as { displayName?: string; username?: string } | null;
+      return userTyped?.displayName || userTyped?.username || null;
     } catch (error) {
       loggers.vrchat.warn(`Failed to fetch username for ${vrcUserId}`, error);
       return null;

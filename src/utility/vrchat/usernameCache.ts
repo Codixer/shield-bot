@@ -31,7 +31,8 @@ export async function updateUsernameCache(vrcUserId: string): Promise<void> {
 
     // Fetch current username from VRChat API
     const userInfo = await getUserById(vrcUserId);
-    const currentUsername = userInfo?.displayName || userInfo?.username;
+    const userTyped = userInfo as { displayName?: string; username?: string } | null;
+    const currentUsername = userTyped?.displayName || userTyped?.username;
 
     if (!currentUsername) {
       loggers.vrchat.warn(

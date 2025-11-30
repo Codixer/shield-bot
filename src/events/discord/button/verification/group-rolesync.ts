@@ -77,14 +77,14 @@ export class VRChatGroupRoleSyncButtonHandler {
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.vrchat.error("Error syncing roles", error);
 
       let errorMessage = "Failed to sync roles. Please try again later.";
-      if (error.message?.includes("not in group")) {
+      if (error instanceof Error && error.message?.includes("not in group")) {
         errorMessage =
           "You are not a member of the VRChat group yet. Please join the group first.";
-      } else if (error.message?.includes("403") || error.message?.includes("401")) {
+      } else if (error instanceof Error && (error.message?.includes("403") || error.message?.includes("401"))) {
         errorMessage = "Bot does not have permission to manage group roles.";
       }
 

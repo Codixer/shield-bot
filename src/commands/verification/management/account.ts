@@ -13,6 +13,7 @@ import {
 } from "discord.js";
 import { VRChatLoginGuard } from "../../../utility/guards.js";
 import { getUserById, searchUsers } from "../../../utility/vrchat.js";
+import type { VRChatUser } from "../../../utility/vrchat/types.js";
 
 @Discord()
 @SlashGroup({
@@ -61,10 +62,10 @@ export class VRChatVerifyAccountCommand {
     }
 
     // Fetch user details from VRChat API using the userId directly
-    let userInfo: any = null;
+    let userInfo: VRChatUser | null = null;
     try {
       userInfo = await getUserById(userId);
-    } catch (e) {
+    } catch {
       userInfo = null;
     }
     if (!userInfo) {
@@ -130,7 +131,7 @@ export class VRChatVerifyAccountCommand {
 
       // Filter and sort results based on relevance to the query
       const filteredUsers = users
-        .filter((user: any) => {
+        .filter((user: VRChatUser) => {
           const displayName = user.displayName?.toLowerCase() || "";
           const userId = user.id?.toLowerCase() || "";
           const queryLower = query.toLowerCase();
@@ -140,7 +141,7 @@ export class VRChatVerifyAccountCommand {
             displayName.includes(queryLower) || userId.includes(queryLower)
           );
         })
-        .sort((a: any, b: any) => {
+        .sort((a: VRChatUser, b: VRChatUser) => {
           const queryLower = query.toLowerCase();
           const aDisplayName = a.displayName?.toLowerCase() || "";
           const bDisplayName = b.displayName?.toLowerCase() || "";
@@ -148,36 +149,36 @@ export class VRChatVerifyAccountCommand {
           const bUserId = b.id?.toLowerCase() || "";
 
           // Prioritize exact matches in display name
-          if (aDisplayName === queryLower) return -1;
-          if (bDisplayName === queryLower) return 1;
+          if (aDisplayName === queryLower) {return -1;}
+          if (bDisplayName === queryLower) {return 1;}
 
           // Then prioritize matches that start with the query in display name
           if (
             aDisplayName.startsWith(queryLower) &&
             !bDisplayName.startsWith(queryLower)
           )
-            return -1;
+            {return -1;}
           if (
             bDisplayName.startsWith(queryLower) &&
             !aDisplayName.startsWith(queryLower)
           )
-            return 1;
+            {return 1;}
 
           // Then prioritize exact matches in user ID
-          if (aUserId === queryLower) return -1;
-          if (bUserId === queryLower) return 1;
+          if (aUserId === queryLower) {return -1;}
+          if (bUserId === queryLower) {return 1;}
 
           // Then prioritize matches that start with the query in user ID
           if (aUserId.startsWith(queryLower) && !bUserId.startsWith(queryLower))
-            return -1;
+            {return -1;}
           if (bUserId.startsWith(queryLower) && !aUserId.startsWith(queryLower))
-            return 1;
+            {return 1;}
 
           // Finally, sort alphabetically by display name
           return aDisplayName.localeCompare(bDisplayName);
         });
 
-      const choices = filteredUsers.slice(0, 25).map((user: any) => {
+      const choices = filteredUsers.slice(0, 25).map((user: VRChatUser) => {
         // VRChat display names are max 16 characters, but truncate just in case
         const displayName =
           user.displayName?.slice(0, 16) ||
@@ -193,7 +194,7 @@ export class VRChatVerifyAccountCommand {
       });
 
       return await interaction.respond(choices);
-    } catch (e) {
+    } catch {
       return await interaction.respond([]);
     }
   }

@@ -1,4 +1,5 @@
 import { Discord, On, ArgsOf } from "discordx";
+import { Role } from "discord.js";
 import { WhitelistManager } from "../../../managers/whitelist/whitelistManager.js";
 import { prisma } from "../../../main.js";
 import { sendWhitelistLog } from "../../../utility/vrchat/whitelistLogger.js";
@@ -29,17 +30,17 @@ export class WhitelistRoleSync {
     const roleMappings = await whitelistManager.getDiscordRoleMappings();
     for (const mapping of roleMappings) {
       const mappingTyped = mapping as { discordRoleId?: string; permissions?: string };
-      if (!mappingTyped.discordRoleId) continue;
+      if (!mappingTyped.discordRoleId) {continue;}
       if (discordRoleIds.includes(mappingTyped.discordRoleId)) {
         // Note: name field was removed, using discordRoleId as identifier
         roles.push(mappingTyped.discordRoleId);
         const perms = mappingTyped.permissions;
         if (perms)
-          for (const p of perms
+          {for (const p of perms
             .split(",")
             .map((s: string) => s.trim())
             .filter(Boolean))
-            permissions.add(p);
+            {permissions.add(p);}}
       }
     }
     return { roles, permissions };
@@ -60,7 +61,7 @@ export class WhitelistRoleSync {
       if (oldMember.partial) {
         try {
           fullOldMember = await oldMember.fetch();
-        } catch (error) {
+        } catch {
           loggers.bot.warn(
             `Could not fetch full member data for ${oldMember.id}, using available data`,
           );
@@ -70,9 +71,9 @@ export class WhitelistRoleSync {
 
       // Only process if roles changed
       const oldRoleIds =
-        fullOldMember.roles?.cache?.map((role: any) => role.id) || [];
+        fullOldMember.roles?.cache?.map((role: Role) => role.id) || [];
       const newRoleIds =
-        newMember.roles?.cache?.map((role: any) => role.id) || [];
+        newMember.roles?.cache?.map((role: Role) => role.id) || [];
 
       loggers.bot.debug(
         `Role comparison for ${newMember.displayName}: old=${oldRoleIds.length}, new=${newRoleIds.length}`,
@@ -103,7 +104,7 @@ export class WhitelistRoleSync {
       // Get current role assignments by Discord role ID for comparison
       const currentWhitelistRoles =
         currentUser?.whitelistEntry?.roleAssignments?.map(
-          (a: any) => a.role.discordRoleId || a.role.id,
+          (a) => a.role.discordRoleId || a.role.id,
         ) || [];
       const {
         roles: expectedWhitelistRoles,
@@ -202,7 +203,7 @@ export class WhitelistRoleSync {
   @On({ event: "guildMemberAdd" })
   async onGuildMemberAdd([member]: ArgsOf<"guildMemberAdd">): Promise<void> {
     try {
-      const roleIds = member.roles.cache.map((role: any) => role.id);
+      const roleIds = member.roles.cache.map((role: Role) => role.id);
 
       loggers.bot.info(
         `New member ${member.displayName} joined with ${roleIds.length} roles`,

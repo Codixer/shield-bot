@@ -5,6 +5,7 @@ import {
   MessageFlags,
   InteractionContextType,
   ApplicationIntegrationType,
+  User,
 } from "discord.js";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
 
@@ -41,14 +42,14 @@ export class VRChatAttendanceCreateCommand {
       type: ApplicationCommandOptionType.User,
       required: false,
     })
-    host: any,
+    host: User | null,
     @SlashOption({
       name: "cohost",
       description: "Event co-host",
       type: ApplicationCommandOptionType.User,
       required: false,
     })
-    cohost: any,
+    cohost: User | null,
     interaction: CommandInteraction,
   ) {
     let eventDate: Date;
@@ -65,7 +66,7 @@ export class VRChatAttendanceCreateCommand {
           });
           return;
         }
-      } catch (error) {
+      } catch {
         await interaction.reply({
           content: "Invalid date format. Please use YYYY-MM-DD or 'today'.",
           flags: MessageFlags.Ephemeral,

@@ -18,6 +18,7 @@ import { unfriendUser } from "../../../../utility/vrchat/user.js";
 import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
 import { sendWhitelistLog, getUserWhitelistRoles } from "../../../../utility/vrchat/whitelistLogger.js";
 import { loggers } from "../../../../utility/logger.js";
+import type { User, VRChatAccount } from "../../../../generated/prisma/client.js";
 
 @Discord()
 export class VRCAccountManagerButtonHandler {
@@ -55,7 +56,7 @@ export class VRCAccountManagerButtonHandler {
 
       // Find the specific VRChat account
       const vrcAccount = user.vrchatAccounts.find(
-        (acc: any) => acc.vrcUserId === vrcUserId,
+        (acc) => acc.vrcUserId === vrcUserId,
       );
       if (!vrcAccount) {
         await interaction.reply({
@@ -94,13 +95,13 @@ export class VRCAccountManagerButtonHandler {
 
   private async handleSetMain(
     interaction: ButtonInteraction,
-    user: any,
-    vrcAccount: any,
+    user: User & { vrchatAccounts: VRChatAccount[] },
+    vrcAccount: VRChatAccount,
     vrcUserId: string,
   ) {
     // Check if user already has a MAIN account
     const currentMain = user.vrchatAccounts.find(
-      (acc: any) => acc.accountType === "MAIN",
+      (acc) => acc.accountType === "MAIN",
     );
 
     if (currentMain && currentMain.vrcUserId !== vrcUserId) {
@@ -154,7 +155,7 @@ export class VRCAccountManagerButtonHandler {
 
   private async handleSetAlt(
     interaction: ButtonInteraction,
-    vrcAccount: any,
+    vrcAccount: VRChatAccount,
     vrcUserId: string,
   ) {
     // Set this account as ALT
@@ -200,7 +201,7 @@ export class VRCAccountManagerButtonHandler {
 
   private async handleDelete(
     interaction: ButtonInteraction,
-    vrcAccount: any,
+    vrcAccount: VRChatAccount,
     vrcUserId: string,
   ) {
     try {
@@ -231,7 +232,9 @@ export class VRCAccountManagerButtonHandler {
       const accountTypeBeforeDelete = vrcAccount.accountType;
       try {
         rolesBeforeDelete = await getUserWhitelistRoles(discordId);
-      } catch {}
+      } catch (_error) {
+        // Ignore errors when fetching roles before delete
+      }
 
       // Update whitelist after account deletion
       try {
@@ -305,7 +308,7 @@ export class VRCAccountManagerButtonHandler {
 
     // Filter to only verified accounts
     const verifiedAccounts = user.vrchatAccounts.filter(
-      (acc: any) => acc.accountType === "MAIN" || acc.accountType === "ALT",
+      (acc) => acc.accountType === "MAIN" || acc.accountType === "ALT",
     );
 
     if (verifiedAccounts.length === 0) {

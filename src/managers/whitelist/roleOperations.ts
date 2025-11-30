@@ -35,7 +35,7 @@ export class WhitelistRoleOperations {
         },
       });
       return true;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }
@@ -91,9 +91,13 @@ export class WhitelistRoleOperations {
         where: { userId: user.id },
       });
 
+      if (!whitelistEntry) {
+        throw new Error("Whitelist entry not found after upsert");
+      }
+
       return await prisma.whitelistRoleAssignment.create({
         data: {
-          whitelistId: whitelistEntry!.id,
+          whitelistId: whitelistEntry.id,
           roleId: role.id,
           assignedBy,
           expiresAt,
@@ -111,12 +115,12 @@ export class WhitelistRoleOperations {
   ): Promise<boolean> {
     try {
       const user = await prisma.user.findUnique({ where: { discordId } });
-      if (!user) return false;
+      if (!user) {return false;}
 
       const role = await prisma.whitelistRole.findUnique({
         where: { id: roleId },
       });
-      if (!role) return false;
+      if (!role) {return false;}
 
       const result = await prisma.whitelistRoleAssignment.deleteMany({
         where: {
@@ -126,7 +130,7 @@ export class WhitelistRoleOperations {
       });
 
       return result.count > 0;
-    } catch (error) {
+    } catch (_error) {
       return false;
     }
   }

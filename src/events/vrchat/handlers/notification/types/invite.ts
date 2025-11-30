@@ -1,16 +1,27 @@
 import { prisma } from "../../../../../main.js";
 import { loggers } from "../../../../../utility/logger.js";
 
-export async function handleInviteNotification(content: any) {
+interface InviteNotificationContent {
+  details?: { worldId?: string; worldName?: string };
+  worldId?: string;
+  senderUserId?: string;
+  senderUsername?: string;
+  receiverUserId?: string;
+}
+
+export async function handleInviteNotification(content: unknown) {
   loggers.vrchat.debug("Invite notification", { content });
+  const typedContent = content as InviteNotificationContent;
   // Extract worldId from details if present
   const worldId =
-    content.details?.worldId || content.worldId || "[WORLD ID NOT FOUND]";
-  const senderUserId = content.senderUserId || null;
-  const senderUsername =
-    content.senderUsername || "[SENDER USERNAME NOT FOUND]";
+    typedContent.details?.worldId || typedContent.worldId || "[WORLD ID NOT FOUND]";
+  const senderUserId = typedContent.senderUserId;
+  if (!senderUserId) {
+    loggers.vrchat.warn("Invite notification missing senderUserId");
+    return;
+  }
   const receiverUserId =
-    content.receiverUserId || "[RECEIVER USER ID NOT FOUND]";
+    typedContent.receiverUserId || "[RECEIVER USER ID NOT FOUND]";
   // Always treat location as private for invites
   const location = "private";
   // Store invite info in the database
@@ -38,8 +49,7 @@ export async function handleInviteNotification(content: any) {
     loggers.vrchat.error("Failed to store invite in database", err);
   }
   // Message for users
-  const worldName = content.details?.worldName || "[WORLD NAME NOT FOUND]";
-  const sender = senderUsername || senderUserId || "[SENDER NOT FOUND]";
+  const worldName = typedContent.details?.worldName || "[WORLD NAME NOT FOUND]";
   loggers.vrchat.debug(
     `User has been invited to: ${worldName} (World ID: ${worldId}). This is a private instance.`,
   );

@@ -60,7 +60,7 @@ export class VRChatAttendanceDeleteCommand {
 
         const choices = await Promise.all(
           events
-            .filter((event: any) => {
+            .filter((event) => {
               const eventStr = `${event.id}`;
               const dateStr = event.date.toLocaleDateString();
               return (
@@ -69,14 +69,14 @@ export class VRChatAttendanceDeleteCommand {
               );
             })
             .slice(0, 25)
-            .map(async (event: any) => {
+            .map(async (event) => {
               // Calculate total attendees: unique users from squads + staff
               const squadMemberIds = new Set(
-                event.squads.flatMap((squad: any) => 
-                  squad.members.map((member: any) => member.userId)
+                event.squads.flatMap((squad) => 
+                  squad.members.map((member) => member.userId)
                 )
               );
-              const staffIds = new Set(event.staff.map((s: any) => s.userId));
+              const staffIds = new Set(event.staff.map((s) => s.userId));
               const allAttendeeIds = new Set([...squadMemberIds, ...staffIds]);
               const attendeeCount = allAttendeeIds.size;
 

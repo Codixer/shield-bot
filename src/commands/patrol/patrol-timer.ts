@@ -66,7 +66,7 @@ export class PatrolTimerCommands {
     ephemeral: boolean = true,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId || !interaction.guild) return;
+    if (!interaction.guildId || !interaction.guild) {return;}
     const list = await patrolTimer.getCurrentTrackedList(interaction.guildId);
     
     if (list.length === 0) {
@@ -143,10 +143,10 @@ export class PatrolTimerCommands {
     ephemeral: boolean = true,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
     const member = interaction.member as GuildMember;
     const now = new Date();
-    let rows: any[];
+    let rows: Array<{ userId: string; totalMs: bigint | number }>;
     if (here) {
       const channelId = member.voice?.channelId;
       if (!channelId) {
@@ -156,12 +156,19 @@ export class PatrolTimerCommands {
         });
         return;
       }
-      rows = await patrolTimer.getTopForChannel(interaction.guild!, channelId);
+      if (!interaction.guild) {
+        await interaction.reply({
+          content: "This command can only be used in a server.",
+          flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+        });
+        return;
+      }
+      rows = await patrolTimer.getTopForChannel(interaction.guild, channelId);
     } else {
       const y = year ? parseInt(year) : now.getUTCFullYear();
       const m = month ? parseInt(month) : now.getUTCMonth() + 1;
-      rows = await (patrolTimer as any).getTopByMonth(
-        interaction.guildId,
+      rows = await (patrolTimer as { getTopByMonth: (guildId: string, year: number, month: number, limit?: number) => Promise<Array<{ userId: string; totalMs: bigint | number }>> }).getTopByMonth(
+        interaction.guildId!,
         y,
         m,
         limit ? parseInt(limit) : undefined,
@@ -175,7 +182,7 @@ export class PatrolTimerCommands {
       return;
     }
     const lines = rows.map(
-      (r: any, idx: number) =>
+      (r: { userId: string; totalMs: bigint | number }, idx: number) =>
         `${idx + 1}. <@${r.userId}> — ${msToReadable(Number(r.totalMs))}`,
     );
     await interaction.reply({
@@ -206,7 +213,7 @@ export class PatrolTimerCommands {
     ephemeral: boolean = true,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
     // Member check ensures interaction is in a guild
     void (interaction.member as GuildMember);
 
@@ -287,7 +294,7 @@ export class PatrolTimerCommands {
     ephemeralOption: boolean | undefined,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
     const member = interaction.member as GuildMember;
 
     // Check if user is staff
@@ -353,7 +360,7 @@ export class PatrolTimerCommands {
         return;
       }
 
-      total = await (patrolTimer as any).getUserTotalForMonth(
+      total = await patrolTimer.getUserTotalForMonth(
         interaction.guildId,
         targetUserId,
         y,
@@ -384,11 +391,11 @@ export class PatrolTimerCommands {
     // Check if user is staff - if not, only show their own data
     const isStaff = await userHasPermissionFromRoles(member, PermissionLevel.STAFF);
 
-    let years: any[];
+    let years: Array<{ year: number; userCount: number; totalHours: number }>;
 
     if (isStaff) {
       // Staff can see all years
-      years = await (patrolTimer as any).getAvailableYears(interaction.guildId);
+      years = await (patrolTimer as { getAvailableYears: (guildId: string) => Promise<Array<{ year: number; userCount: number; totalHours: number }>> }).getAvailableYears(interaction.guildId);
     } else {
       // Non-staff can only see years where they have data
       const userRecords = await prisma.voicePatrolMonthlyTime.findMany({
@@ -408,7 +415,10 @@ export class PatrolTimerCommands {
         if (!yearMap.has(record.year)) {
           yearMap.set(record.year, { totalMs: BigInt(0) });
         }
-        yearMap.get(record.year)!.totalMs += record.totalMs;
+        const yearData = yearMap.get(record.year);
+        if (yearData) {
+          yearData.totalMs += record.totalMs;
+        }
       }
 
       // Convert to the expected format
@@ -421,7 +431,7 @@ export class PatrolTimerCommands {
         .sort((a, b) => b.year - a.year);
     }
 
-    const choices = years.map((y: any) => ({
+    const choices = years.map((y) => ({
       name: isStaff 
         ? `${y.year} — ${y.userCount} users, ${y.totalHours}h`
         : `${y.year} — ${y.totalHours}h (your time)`,
@@ -452,17 +462,17 @@ export class PatrolTimerCommands {
     // Check if user is staff - if not, only show their own data
     const isStaff = await userHasPermissionFromRoles(member, PermissionLevel.STAFF);
 
-    let months: any[];
+    let months: Array<{ year: number; month: number; userCount: number; totalHours: number }>;
 
     if (isStaff) {
       // Staff can see all months
-      months = await (patrolTimer as any).getAvailableMonths(
+      months = await (patrolTimer as { getAvailableMonths: (guildId: string, year?: number) => Promise<Array<{ year: number; month: number; userCount: number; totalHours: number }>> }).getAvailableMonths(
         interaction.guildId,
         year,
       );
     } else {
       // Non-staff can only see months where they have data
-      const where: any = {
+      const where: { guildId: string; userId: string; year?: number } = {
         guildId: interaction.guildId,
         userId: member.id,
       };
@@ -490,7 +500,10 @@ export class PatrolTimerCommands {
             totalMs: BigInt(0),
           });
         }
-        monthMap.get(key)!.totalMs += record.totalMs;
+        const monthData = monthMap.get(key);
+        if (monthData) {
+          monthData.totalMs += record.totalMs;
+        }
       }
 
       // Convert to the expected format
@@ -502,12 +515,12 @@ export class PatrolTimerCommands {
           totalHours: Math.floor(Number(data.totalMs) / 1000 / 60 / 60),
         }))
         .sort((a, b) => {
-          if (a.year !== b.year) return b.year - a.year;
+          if (a.year !== b.year) {return b.year - a.year;}
           return b.month - a.month;
         });
     }
 
-    const choices = months.map((m: any) => ({
+    const choices = months.map((m) => ({
       name: isStaff
         ? `${MONTH_NAMES[m.month - 1]} ${m.year} — ${m.userCount} users, ${m.totalHours}h`
         : `${MONTH_NAMES[m.month - 1]} ${m.year} — ${m.totalHours}h (your time)`,
@@ -572,7 +585,7 @@ export class PatrolTimerCommands {
     ephemeral: boolean = true,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
 
     // Parse the time string
     const parseResult = parseTimeString(time);
@@ -645,7 +658,7 @@ export class PatrolPauseCommands {
     ephemeral: boolean = true,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
 
     const success = await patrolTimer.pauseGuild(interaction.guildId);
     if (!success) {
@@ -682,7 +695,7 @@ export class PatrolPauseCommands {
     ephemeral: boolean = true,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
 
     const success = await patrolTimer.pauseUser(interaction.guildId, user.id);
     if (!success) {
@@ -722,7 +735,7 @@ export class PatrolUnpauseCommands {
     ephemeral: boolean = true,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
 
     await patrolTimer.unpauseGuild(interaction.guildId);
     await interaction.reply({
@@ -752,7 +765,7 @@ export class PatrolUnpauseCommands {
     ephemeral: boolean = true,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
 
     await patrolTimer.unpauseUser(interaction.guildId, user.id);
     await interaction.reply({
@@ -769,10 +782,10 @@ function msToReadable(ms: number) {
   const minutes = Math.floor((s % 3600) / 60);
   const seconds = s % 60;
   const parts: string[] = [];
-  if (days) parts.push(`${days}d`);
-  if (hours) parts.push(`${hours}h`);
-  if (minutes) parts.push(`${minutes}m`);
-  if (seconds || parts.length === 0) parts.push(`${seconds}s`);
+  if (days) {parts.push(`${days}d`);}
+  if (hours) {parts.push(`${hours}h`);}
+  if (minutes) {parts.push(`${minutes}m`);}
+  if (seconds || parts.length === 0) {parts.push(`${seconds}s`);}
   return parts.join(" ");
 }
 

@@ -12,6 +12,7 @@ import {
 import { VRChatLoginGuard } from "../../../utility/guards.js";
 import { getUserById, searchUsers } from "../../../utility/vrchat.js";
 import { prisma } from "../../../main.js";
+import type { VRChatUser } from "../../../utility/vrchat/types.js";
 
 @Discord()
 @SlashGroup({
@@ -60,10 +61,10 @@ export class VRChatVerifyStatusCommand {
     }
 
     // Fetch user details from VRChat API using the userId directly
-    let userInfo: any = null;
+    let userInfo: VRChatUser | null = null;
     try {
       userInfo = await getUserById(userId);
-    } catch (e) {
+    } catch {
       userInfo = null;
     }
     if (!userInfo) {
@@ -82,7 +83,7 @@ export class VRChatVerifyStatusCommand {
     });
 
     let statusText = "Not verified";
-    let statusColor: any = Colors.Red;
+    let statusColor: number = Colors.Red;
     let statusEmoji = "❌";
 
     if (vrchatAccount) {
@@ -132,12 +133,12 @@ export class VRChatVerifyStatusCommand {
     }
     try {
       const users = await searchUsers({ search: query, n: 25 });
-      const choices = users.map((user: any) => ({
+      const choices = users.map((user: VRChatUser) => ({
         name: `${user.displayName} (${user.id})`,
         value: user.id,
       }));
       return await interaction.respond(choices);
-    } catch (e) {
+    } catch {
       return await interaction.respond([]);
     }
   }

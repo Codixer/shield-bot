@@ -5,6 +5,7 @@ import {
   MessageFlags,
   InteractionContextType,
   ApplicationIntegrationType,
+  User,
 } from "discord.js";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
 import { AttendanceHostGuard } from "../../utility/guards.js";
@@ -33,7 +34,7 @@ export class VRChatAttendanceUnleadCommand {
       type: ApplicationCommandOptionType.User,
       required: true,
     })
-    user: any,
+    user: User,
     interaction: CommandInteraction,
   ) {
     const active =

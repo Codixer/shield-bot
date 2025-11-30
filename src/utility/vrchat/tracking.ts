@@ -101,11 +101,11 @@ export async function resolveWorldDisplay({
   world?: string;
   vrcUserId: string;
   accountUsername?: string | null;
-  findFriendInstanceOrWorld: any;
-  getFriendInstanceInfo: any;
-  getInstanceInfoByShortName: any;
-  getUserById: any;
-  hasFriendLocationConsent: any;
+  findFriendInstanceOrWorld: (vrcUserId: string) => Promise<{ location?: string | null; worldId?: string | null; senderUserId?: string | null } | null>;
+  getFriendInstanceInfo: (instanceId: string) => Promise<{ world?: { name?: string } } | null>;
+  getInstanceInfoByShortName: (shortName: string) => Promise<{ world?: { name?: string }; instanceId?: string; id?: string; worldId?: string; location?: string; shortName?: string; secureName?: string } | null>;
+  getUserById: (vrcUserId: string) => Promise<{ isFriend?: boolean } | null>;
+  hasFriendLocationConsent: (vrcUserId: string) => Promise<boolean>;
 }): Promise<{
   worldText: string;
   worldName: string;
@@ -127,25 +127,26 @@ export async function resolveWorldDisplay({
       const instanceInfo = await getInstanceInfoByShortName(shortName);
       worldName = instanceInfo?.world?.name || "[WORLD NAME NOT FOUND]";
       let instanceId = instanceInfo?.instanceId || instanceInfo?.id || "";
-      if (typeof instanceId !== "string") instanceId = String(instanceId);
+      if (typeof instanceId !== "string") {instanceId = String(instanceId);}
       instanceNumber = extractInstanceNumber(instanceId);
       if (instanceNumber) {
         worldName += ` (Instance #${instanceNumber})`;
       }
-      if (instanceId.includes("nonce")) {
+      if (instanceInfo && instanceId.includes("nonce") && instanceInfo.worldId) {
         joinLink = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${instanceId}`;
       } else if (
         instanceInfo?.location &&
         typeof instanceInfo.location === "string" &&
-        instanceInfo.location.includes("nonce")
+        instanceInfo.location.includes("nonce") &&
+        instanceInfo.worldId
       ) {
         joinLink = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${instanceInfo.location}`;
-      } else if (instanceInfo.shortName) {
+      } else if (instanceInfo?.shortName) {
         joinLink = `https://vrch.at/${instanceInfo.shortName}`;
-      } else if (instanceInfo.secureName) {
+      } else if (instanceInfo?.secureName) {
         joinLink = `https://vrch.at/${instanceInfo.secureName}`;
       }
-      if (!joinLink) joinLink = world;
+      if (!joinLink) {joinLink = world;}
       worldText = `[${worldName}](${joinLink})`;
       return { worldText, worldName, joinLink, instanceNumber };
     }

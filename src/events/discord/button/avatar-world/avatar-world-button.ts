@@ -42,14 +42,15 @@ export class VRChatAvatarInviteButtonHandler {
 
       // Use the MAIN account, or first ALT if no MAIN exists
       const mainAccount = user.vrchatAccounts.find(
-        (acc: any) => acc.accountType === "MAIN"
+        (acc) => acc.accountType === "MAIN"
       );
       const vrcAccount = mainAccount || user.vrchatAccounts[0];
 
       // Check if user is friends with the bot
       const vrcUser = await getUserById(vrcAccount.vrcUserId);
+      const userTyped = vrcUser as { isFriend?: boolean } | null;
 
-      if (!vrcUser || !vrcUser.isFriend) {
+      if (!userTyped || !userTyped.isFriend) {
         await interaction.editReply({
           content:
             "❌ You must be friends with the bot to use this feature.\n\n" +
@@ -59,7 +60,8 @@ export class VRChatAvatarInviteButtonHandler {
       }
 
       // Check if user's status is "ask me" (orange/invite me)
-      if (vrcUser.status !== "ask me") {
+      const statusTyped = userTyped as { status?: string } | null;
+      if (!statusTyped || statusTyped.status !== "ask me") {
         const statusEmojiMap: Record<string, string> = {
           "active": "🟢",
           "join me": "🟢", 
@@ -67,12 +69,13 @@ export class VRChatAvatarInviteButtonHandler {
           "busy": "🔴",
           "offline": "⚫"
         };
-        const statusEmoji = statusEmojiMap[vrcUser.status as string] || "❓";
+        const currentStatus = statusTyped?.status || "unknown";
+        const statusEmoji = statusEmojiMap[currentStatus] || "❓";
 
         await interaction.editReply({
           content:
             `❌ Your VRChat status must be set to **Ask Me** (🟠) to receive an invite.\n\n` +
-            `Your current status: **${vrcUser.status}** ${statusEmoji}\n\n` +
+            `Your current status: **${currentStatus}** ${statusEmoji}\n\n` +
             `Please change your status to "Ask Me" in VRChat and try again.`,
         });
         return;

@@ -28,16 +28,16 @@ export class WhitelistAPI {
       }
       ctx.set("Cache-Control", "public, max-age=86400");
       ctx.set("ETag", etag);
-      if (lastModified) ctx.set("Last-Modified", lastModified);
+      if (lastModified) {ctx.set("Last-Modified", lastModified);}
       ctx.body = {
         success: true,
         data: encodedWhitelist,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       ctx.status = 500;
       ctx.body = {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       };
     }
   }
@@ -62,16 +62,16 @@ export class WhitelistAPI {
       }
       ctx.set("Cache-Control", "public, max-age=86400");
       ctx.set("ETag", etag);
-      if (lastModified) ctx.set("Last-Modified", lastModified);
+      if (lastModified) {ctx.set("Last-Modified", lastModified);}
       ctx.body = {
         success: true,
         data: encodedWhitelist,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       ctx.status = 500;
       ctx.body = {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       };
     }
   }
@@ -96,16 +96,16 @@ export class WhitelistAPI {
       }
       ctx.set("Cache-Control", "public, max-age=86400");
       ctx.set("ETag", etag);
-      if (lastModified) ctx.set("Last-Modified", lastModified);
+      if (lastModified) {ctx.set("Last-Modified", lastModified);}
       ctx.body = {
         success: true,
         data: content,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       ctx.status = 500;
       ctx.body = {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       };
     }
   }
@@ -130,16 +130,16 @@ export class WhitelistAPI {
       }
       ctx.set("Cache-Control", "public, max-age=86400");
       ctx.set("ETag", etag);
-      if (lastModified) ctx.set("Last-Modified", lastModified);
+      if (lastModified) {ctx.set("Last-Modified", lastModified);}
       ctx.body = {
         success: true,
         data: content,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       ctx.status = 500;
       ctx.body = {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       };
     }
   }
@@ -158,11 +158,11 @@ export class WhitelistAPI {
           guildId: defaultGuildId,
         },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       ctx.status = 500;
       ctx.body = {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       };
     }
   }
@@ -181,11 +181,11 @@ export class WhitelistAPI {
           guildId,
         },
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       ctx.status = 500;
       ctx.body = {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : "Unknown error occurred",
       };
     }
   }

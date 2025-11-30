@@ -66,10 +66,10 @@ export class VRChatStaffManagerCommand {
 
     // Separate verified and unverified accounts
     const verifiedAccounts = user.vrchatAccounts.filter(
-      (acc: any) => acc.accountType === "MAIN" || acc.accountType === "ALT",
+      (acc) => acc.accountType === "MAIN" || acc.accountType === "ALT",
     );
     const unverifiedAccounts = user.vrchatAccounts.filter(
-      (acc: any) => acc.accountType === "UNVERIFIED",
+      (acc) => acc.accountType === "UNVERIFIED",
     );
 
     if (verifiedAccounts.length === 0 && unverifiedAccounts.length === 0) {

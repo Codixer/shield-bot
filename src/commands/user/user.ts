@@ -5,6 +5,7 @@ import {
   MessageFlags,
   InteractionContextType,
   ApplicationIntegrationType,
+  User,
 } from "discord.js";
 import {
   getUserPermissionLevelFromRoles,
@@ -32,10 +33,10 @@ export class UserCommands {
       type: ApplicationCommandOptionType.User,
       required: false,
     })
-    user: any,
+    user: User | null,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
 
     const targetUserId = user?.id || interaction.user.id;
 

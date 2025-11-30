@@ -211,7 +211,7 @@ export async function getVRChatAccountInfo(discordId: string): Promise<{
     });
 
     const account = user?.vrchatAccounts?.[0];
-    if (!account) return null;
+    if (!account) {return null;}
 
     return {
       vrchatUsername: account.vrchatUsername || undefined,

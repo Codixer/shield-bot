@@ -88,14 +88,14 @@ export class VRChatGroupInviteButtonHandler {
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });
-    } catch (error: any) {
+    } catch (error: unknown) {
       loggers.vrchat.error("Error sending group invite", error);
 
       let errorMessage = "Failed to send group invite. Please try again later.";
-      if (error.message?.includes("400")) {
+      if (error instanceof Error && error.message?.includes("400")) {
         errorMessage =
           "You may already be in the group, have a pending invite, or the group settings don't allow invites.";
-      } else if (error.message?.includes("404")) {
+      } else if (error instanceof Error && error.message?.includes("404")) {
         errorMessage = "The VRChat group was not found.";
       }
 

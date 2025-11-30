@@ -36,7 +36,7 @@ export class SettingsPatrolPromotionCommands {
     channel: Channel,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
 
     // Verify it's a text channel
     if (
@@ -77,7 +77,7 @@ export class SettingsPatrolPromotionCommands {
     role: Role,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
 
     // Update settings
     await prisma.guildSettings.upsert({
@@ -108,7 +108,7 @@ export class SettingsPatrolPromotionCommands {
     hours: number,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
 
     // Update settings
     await prisma.guildSettings.upsert({
@@ -128,7 +128,7 @@ export class SettingsPatrolPromotionCommands {
     description: "View current promotion settings",
   })
   async view(interaction: CommandInteraction) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
 
     const settings = await prisma.guildSettings.findUnique({
       where: { guildId: interaction.guildId },
@@ -169,7 +169,7 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
     description: "Disable the promotion notification system",
   })
   async disable(interaction: CommandInteraction) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
 
     await prisma.guildSettings.update({
       where: { guildId: interaction.guildId },
@@ -196,12 +196,12 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
       type: ApplicationCommandOptionType.User,
       required: true,
     })
-    user: any,
+    user: User,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) return;
+    if (!interaction.guildId) {return;}
 
-    const deleted = await (prisma as any).voicePatrolPromotion.deleteMany({
+    const deleted = await prisma.voicePatrolPromotion.deleteMany({
       where: {
         guildId: interaction.guildId,
         userId: user.id,
@@ -235,7 +235,7 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
     user: User,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId || !interaction.guild) return;
+    if (!interaction.guildId || !interaction.guild) {return;}
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -270,7 +270,7 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
       }
 
       // Check if already promoted
-      const existingPromotion = await (prisma as any).voicePatrolPromotion.findUnique({
+      const existingPromotion = await prisma.voicePatrolPromotion.findUnique({
         where: { guildId_userId: { guildId: interaction.guildId, userId: user.id } },
       });
 
@@ -312,7 +312,7 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
       await sentMessage.react('❌');
 
       // Record the promotion
-      await (prisma as any).voicePatrolPromotion.create({
+      await prisma.voicePatrolPromotion.create({
         data: {
           guildId: interaction.guildId,
           userId: user.id,
@@ -338,7 +338,7 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
     description: "Check all users with recruit role for promotion eligibility",
   })
   async checkAll(interaction: CommandInteraction) {
-    if (!interaction.guildId || !interaction.guild) return;
+    if (!interaction.guildId || !interaction.guild) {return;}
 
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -387,10 +387,10 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
       }
 
       // Get all existing promotions
-      const existingPromotions = await (prisma as any).voicePatrolPromotion.findMany({
+      const existingPromotions = await prisma.voicePatrolPromotion.findMany({
         where: { guildId: interaction.guildId },
       });
-      const promotedUserIds = new Set(existingPromotions.map((p: any) => p.userId));
+      const promotedUserIds = new Set(existingPromotions.map((p) => p.userId));
 
       // Check each recruit
       const eligible: Array<{ userId: string; hours: number }> = [];
@@ -399,7 +399,7 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
 
       for (const [userId, member] of recruits) {
         // Skip bots
-        if (member.user.bot) continue;
+        if (member.user.bot) {continue;}
 
         // Check if already promoted
         if (promotedUserIds.has(userId)) {

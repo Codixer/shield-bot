@@ -7,6 +7,7 @@ import {
   BaseInteraction,
   InteractionContextType,
   ApplicationIntegrationType,
+  User,
 } from "discord.js";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
 import { AttendanceHostGuard } from "../../utility/guards.js";
@@ -39,7 +40,7 @@ export class VRChatAttendanceSplitCommand {
       type: ApplicationCommandOptionType.User,
       required: true,
     })
-    user: any,
+    user: User,
     @SlashOption({
       name: "squad",
       description: "Squad",
@@ -54,13 +55,13 @@ export class VRChatAttendanceSplitCommand {
       const autoInteraction = interaction as AutocompleteInteraction;
       const focused = autoInteraction.options.getFocused(true);
       if (focused.name === "squad") {
-        if (!autoInteraction.guildId) return;
+        if (!autoInteraction.guildId) {return;}
         const settings = await prisma.guildSettings.findUnique({
           where: { guildId: autoInteraction.guildId },
         });
         const enrolled = (settings?.enrolledChannels as string[]) || [];
         const guild = autoInteraction.guild;
-        if (!guild) return;
+        if (!guild) {return;}
         const choices = [];
         for (const channelId of enrolled) {
           const channel = guild.channels.cache.get(channelId);

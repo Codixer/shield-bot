@@ -13,7 +13,7 @@ export class DiscordSync {
     discordId: string,
     discordRoleIds: string[],
     guildId?: string,
-    removeUserFromWhitelistIfNoRoles?: (discordId: string) => Promise<void>,
+    removeUserFromWhitelistIfNoRoles?: (_discordId: string) => Promise<void>,
   ): Promise<void> {
     // Ensure user exists in database first
     const user = await prisma.user.findUnique({ 
@@ -94,7 +94,11 @@ export class DiscordSync {
     });
 
     // Get current role assignments
-    const existingAssignments = whitelistEntry!.roleAssignments || [];
+    if (!whitelistEntry) {
+      loggers.bot.warn(`Whitelist entry not found for user ${discordId}`);
+      return;
+    }
+    const existingAssignments = whitelistEntry.roleAssignments || [];
     const existingRoleIds = new Set(existingAssignments.map((a) => a.roleId));
     const newRoleIds = new Set(validMappedRoles.map((r) => r.id));
 
@@ -113,7 +117,7 @@ export class DiscordSync {
     for (const role of rolesToAdd) {
       await prisma.whitelistRoleAssignment.create({
         data: {
-          whitelistId: whitelistEntry!.id,
+          whitelistId: whitelistEntry.id,
           roleId: role.id,
           assignedBy: "Discord Role Sync",
         },
@@ -142,8 +146,8 @@ export class DiscordSync {
    */
   async ensureUnverifiedAccountAccess(
     discordId: string,
-    getDiscordRoleMappings: (guildId?: string) => Promise<unknown[]>,
-    syncAndPublishAfterVerification: (discordId: string, botOverride?: unknown) => Promise<void>,
+    getDiscordRoleMappings: (_guildId?: string) => Promise<unknown[]>,
+    syncAndPublishAfterVerification: (_discordId: string, _botOverride?: unknown) => Promise<void>,
   ): Promise<void> {
     // Get user with VRChat accounts
     const user = await prisma.user.findUnique({
@@ -192,7 +196,7 @@ export class DiscordSync {
       // First try cache across all guilds (no API calls)
       for (const guild of bot.guilds.cache.values()) {
         member = guild.members.cache.get(discordId);
-        if (member) break;
+        if (member) {break;}
       }
 
       // If not in cache, try to fetch from verification guild or first guild
@@ -231,7 +235,7 @@ export class DiscordSync {
         return;
       }
 
-      const roleIds: string[] = (member as { roles: { cache: { map: (fn: (role: unknown) => string) => string[] } } }).roles.cache.map((role: unknown) => (role as { id: string }).id);
+      const roleIds: string[] = (member as { roles: { cache: { map: (_fn: (_role: unknown) => string) => string[] } } }).roles.cache.map((_role: unknown) => (_role as { id: string }).id);
       if (!roleIds.length) {
         loggers.bot.debug(
           `Discord user ${discordId} has no roles; skipping full sync`,
@@ -267,13 +271,13 @@ export class DiscordSync {
   async syncAndPublishAfterVerification(
     discordId: string,
     botOverride: unknown,
-    getDiscordRoleMappings: (guildId?: string) => Promise<unknown[]>,
-    syncUserRolesFromDiscord: (discordId: string, roleIds: string[], guildId?: string) => Promise<void>,
-    getUserByDiscordId: (discordId: string) => Promise<unknown>,
-    getUserWhitelistRoles: (discordId: string) => Promise<string[]>,
-    queueBatchedUpdate: (discordId: string, commitMessage?: string) => void,
+    getDiscordRoleMappings: (_guildId?: string) => Promise<unknown[]>,
+    syncUserRolesFromDiscord: (_discordId: string, _roleIds: string[], _guildId?: string) => Promise<void>,
+    getUserByDiscordId: (_discordId: string) => Promise<unknown>,
+    getUserWhitelistRoles: (_discordId: string) => Promise<string[]>,
+    queueBatchedUpdate: (_discordId: string, _commitMessage?: string) => void,
   ): Promise<void> {
-    const activeBot = (botOverride ?? bot) as { guilds?: { cache?: { values: () => IterableIterator<unknown> }; fetch: (guildId: string) => Promise<unknown> } };
+    const activeBot = (botOverride ?? bot) as { guilds?: { cache?: { values: () => IterableIterator<unknown> }; fetch: (_guildId: string) => Promise<unknown> } };
     const guildManager = activeBot?.guilds;
     if (!guildManager) {
       loggers.bot.warn(
@@ -288,8 +292,8 @@ export class DiscordSync {
       if (guildManager.cache) {
         for (const guild of guildManager.cache.values()) {
           try {
-            member = await (guild as { members: { fetch: (id: string) => Promise<unknown> } }).members.fetch(discordId);
-            if (member) break;
+            member = await (guild as { members: { fetch: (_id: string) => Promise<unknown> } }).members.fetch(discordId);
+            if (member) {break;}
           } catch {
             // Not in this guild; continue searching
           }
@@ -299,7 +303,7 @@ export class DiscordSync {
       // Fallback: explicitly fetch the primary guild if member still not found
       if (!member) {
         try {
-          const fallbackGuild = await guildManager.fetch(fallbackGuildId) as { members: { fetch: (id: string) => Promise<unknown> } } | null;
+          const fallbackGuild = await guildManager.fetch(fallbackGuildId) as { members: { fetch: (_id: string) => Promise<unknown> } } | null;
           if (fallbackGuild) {
             try {
               member = await fallbackGuild.members.fetch(discordId);
@@ -322,7 +326,7 @@ export class DiscordSync {
         return;
       }
 
-      const roleIds: string[] = (member as { roles: { cache: { map: (fn: (role: unknown) => string) => string[] } } }).roles.cache.map((role: unknown) => (role as { id: string }).id);
+      const roleIds: string[] = (member as { roles: { cache: { map: (_fn: (_role: unknown) => string) => string[] } } }).roles.cache.map((_role: unknown) => (_role as { id: string }).id);
       if (!roleIds.length) {
         loggers.bot.debug(
           `Discord user ${discordId} has no roles; skipping whitelist sync`,
@@ -359,7 +363,7 @@ export class DiscordSync {
             .split(",")
             .map((s) => s.trim())
             .filter(Boolean))
-            permSet.add(p);
+            {permSet.add(p);}
         }
       }
       const permissions = Array.from(permSet).sort();

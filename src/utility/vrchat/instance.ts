@@ -4,6 +4,7 @@ import { RequestError, InstanceRegionType, InstanceAccessNormalType, WorldIdType
 import { vrchatApi } from "./index.js";
 import { getCurrentUser } from "./user.js";
 import { loggers } from "../logger.js";
+import type { VRChatInstance } from "./types.js";
 
 /**
  * Create a VRChat instance
@@ -26,7 +27,7 @@ export async function createInstance({
   if (type !== "public" && !finalOwnerId) {
     // Get the bot's own user ID if not provided
     const currentUser = await getCurrentUser();
-    if (!currentUser || !currentUser.id) {
+    if (!currentUser?.id) {
       throw new Error("Failed to get current user ID for instance creation");
     }
     finalOwnerId = currentUser.id;
@@ -63,7 +64,7 @@ export async function createInstance({
     }
 
     return await vrchatApi.instanceApi.generateNormalInstance(request as Parameters<typeof vrchatApi.instanceApi.generateNormalInstance>[0]);
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof RequestError) {
       throw new Error(
         `Failed to create instance: ${error.statusCode} ${error.message}`,
@@ -79,13 +80,13 @@ export async function createInstance({
 export async function inviteUser(
   userId: string,
   instanceLocation: string,
-): Promise<any> {
+): Promise<unknown> {
   try {
     return await vrchatApi.inviteApi.inviteUser({
       userId,
       instanceId: instanceLocation as InstanceIdType,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error instanceof RequestError) {
       throw new Error(
         `Failed to invite user: ${error.statusCode} ${error.message}`,
@@ -100,17 +101,18 @@ export async function inviteUser(
  */
 export async function getInstanceInfoByShortName(
   shortName: string,
-): Promise<any | null> {
+): Promise<VRChatInstance | null> {
   if (!shortName) {
     loggers.vrchat.debug("No shortName provided for instance lookup");
     return null;
   }
 
   try {
-    return await vrchatApi.instanceApi.getInstanceByShortName({
+    const result = await vrchatApi.instanceApi.getInstanceByShortName({
       shortName,
     });
-  } catch (error: any) {
+    return result as VRChatInstance;
+  } catch (error: unknown) {
     if (error instanceof RequestError && error.statusCode === 404) {
       loggers.vrchat.debug(
         `Instance not found for shortName ${shortName}`,
