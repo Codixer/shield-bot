@@ -3,17 +3,11 @@
 
 import { RequestError } from "vrc-ts";
 import fetch from "node-fetch";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
 import { vrchatApi, USER_AGENT } from "./index.js";
 import type { InviteMessage } from "../../managers/messages/InviteMessageManager.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const COOKIE_FILE = path.resolve(__dirname, "../../../.vrchat_cookies/cookies.json");
-
 /**
- * Get cookies from vrc-ts cookie file for authenticated requests
+ * Get cookies from vrc-ts cookie manager for authenticated requests
  */
 async function getAuthenticatedHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
@@ -21,37 +15,34 @@ async function getAuthenticatedHeaders(): Promise<Record<string, string>> {
     "Content-Type": "application/json",
   };
 
-  // Read cookies from vrc-ts cookie file
+  // Get cookies from vrc-ts cookie manager
   try {
-    if (fs.existsSync(COOKIE_FILE)) {
-      const cookieData = JSON.parse(fs.readFileSync(COOKIE_FILE, "utf-8"));
-      // vrc-ts stores cookies in a specific format
-      // Try to extract cookie string from the stored data
-      if (cookieData && typeof cookieData === "object") {
-        // vrc-ts may store cookies as an array or object
-        if (Array.isArray(cookieData)) {
-          const cookieString = cookieData
-            .map((c: any) => `${c.name || c.key}=${c.value}`)
-            .join("; ");
-          if (cookieString) {
-            headers["Cookie"] = cookieString;
-          }
-        } else if (cookieData.cookies) {
-          // If cookies are nested
-          const cookieString = cookieData.cookies
-            .map((c: any) => `${c.name || c.key}=${c.value}`)
-            .join("; ");
-          if (cookieString) {
-            headers["Cookie"] = cookieString;
-          }
-        } else if (cookieData.cookie) {
-          // If stored as a single cookie string
-          headers["Cookie"] = cookieData.cookie;
-        }
+    // Check if user is authenticated
+    if (!vrchatApi.isAuthentificated && !vrchatApi.currentUser) {
+      throw new Error("Not authenticated. Please log in first.");
+    }
+
+    // Get cookies from vrc-ts instanceCookie manager
+    const cookies = vrchatApi.instanceCookie.getCookies();
+    
+    if (cookies && cookies.length > 0) {
+      // Format cookies as HTTP Cookie header string
+      // VRCCookie format: { name: string, value: string, domain?: string, path?: string, ... }
+      const cookieString = cookies
+        .map((c: any) => `${c.name}=${c.value}`)
+        .join("; ");
+      
+      if (cookieString) {
+        headers["Cookie"] = cookieString;
+      } else {
+        throw new Error("No valid cookies found in vrc-ts cookie manager");
       }
+    } else {
+      throw new Error("No cookies available from vrc-ts cookie manager");
     }
   } catch (error) {
-    console.warn("[VRChat Messages] Could not read cookies from vrc-ts cookie file:", error);
+    console.error("[VRChat Messages] Could not get cookies from vrc-ts:", error);
+    throw new Error(`Failed to get authentication cookies: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   return headers;
@@ -85,8 +76,9 @@ export async function updateInviteMessage({
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
       throw new Error(
-        `Failed to update invite message: ${response.status} ${response.statusText}`,
+        `Failed to update invite message: ${response.status} ${response.statusText} - ${errorText}`,
       );
     }
 
@@ -123,8 +115,9 @@ export async function listInviteMessages({
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
       throw new Error(
-        `Failed to list invite messages: ${response.status} ${response.statusText}`,
+        `Failed to list invite messages: ${response.status} ${response.statusText} - ${errorText}`,
       );
     }
 
