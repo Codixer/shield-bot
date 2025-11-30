@@ -17,10 +17,11 @@ import {
   loginAndGetCurrentUser,
 } from "./utility/vrchat.js";
 import { startVRChatWebSocketListener, stopVRChatWebSocketListener } from "./events/vrchat/vrchat-websocket.js";
-import {
-  syncAllInviteMessages,
-  syncInviteMessageIfDifferent,
-} from "./managers/messages/InviteMessageManager.js";
+// Invite message functionality removed - not in use
+// import {
+//   syncAllInviteMessages,
+//   syncInviteMessageIfDifferent,
+// } from "./managers/messages/InviteMessageManager.js";
 import { initializeSchedules } from "./schedules/schedules.js";
 import { PrismaMariaDb } from '@prisma/adapter-mariadb'
 import { whitelistManager } from "./managers/whitelist/whitelistManager.js";
@@ -97,10 +98,10 @@ bot.once("clientReady", async () => {
   if (vrchatIsRunning) {
     console.log("[VRChat] VRChat is running");
     startVRChatWebSocketListener();
-    // Sync invite messages in background, but handle errors
-    syncAllInviteMessages().catch((err) => {
-      console.error("[VRChat] Failed to sync invite messages:", err);
-    });
+    // Invite message sync removed - not in use
+    // syncAllInviteMessages().catch((err) => {
+    //   console.error("[VRChat] Failed to sync invite messages:", err);
+    // });
   } else {
     console.log("[VRChat] VRChat is not running");
   }

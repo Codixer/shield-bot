@@ -1,5 +1,5 @@
 import { getUserById } from '../../../../utility/vrchat.js';
-import { inviteUserToGroup } from '../../../../utility/vrchat/groups.js';
+import { inviteUserToGroup, getGroupMember } from '../../../../utility/vrchat/groups.js';
 import { whitelistManager } from '../../../../managers/whitelist/whitelistManager.js';
 import { prisma, bot } from '../../../../main.js';
 import { EmbedBuilder, Colors, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
@@ -135,32 +135,94 @@ async function sendDMConfirmation(userId: number, vrcUserId: string, vrchatUsern
 
             const components: any[] = [];
             if (guildSettings?.vrcGroupId) {
-                // Add buttons for group invite and role sync
-                // Format: grp-inv:{discordId}:{vrcUserId}
-                const joinGroupButton = new ButtonBuilder()
-                    .setCustomId(`grp-inv:${user.discordId}:${vrcUserId}`)
-                    .setLabel("Join Group")
-                    .setStyle(ButtonStyle.Primary)
-                    .setEmoji("🛡️");
-
-                // Format: grp-sync:{discordId}:{vrcUserId}
-                const syncRolesButton = new ButtonBuilder()
-                    .setCustomId(`grp-sync:${user.discordId}:${vrcUserId}`)
-                    .setLabel("Sync Roles")
-                    .setStyle(ButtonStyle.Secondary)
-                    .setEmoji("🔄");
-
-                components.push(
-                    new ActionRowBuilder().addComponents(joinGroupButton, syncRolesButton)
-                );
-
-                const currentDescription = embed.data.description || "";
-                const additionalText = `\n\n**SHIELD VRChat Group**\n• Click **Join Group** to receive an invite\n• Click **Sync Roles** to update your VRChat group roles based on your Discord roles`;
-                const newDescription = currentDescription + additionalText;
+                // Check if user is already in the group
+                let isInGroup = false;
+                let hasOnlyDefaultRole = false;
                 
-                // Ensure we don't exceed Discord's 4096 character limit for embed descriptions
-                if (newDescription.length <= 4096) {
-                    embed.setDescription(newDescription);
+                try {
+                    const groupMember = await getGroupMember(guildSettings.vrcGroupId, vrcUserId);
+                    if (groupMember) {
+                        isInGroup = true;
+                        // Check if they only have the default/everyone role (0 or 1 role total)
+                        const totalRoles = [
+                            ...(groupMember.roleIds || []),
+                            ...(groupMember.mRoleIds || []),
+                        ].length;
+                        // If they have 1 or fewer roles, they likely only have the default role
+                        hasOnlyDefaultRole = totalRoles <= 1;
+                    }
+                } catch (error) {
+                    // User is not in group or error checking - treat as not in group
+                    console.debug(`[DM Confirmation] Could not check group membership for ${vrcUserId}:`, error);
+                }
+
+                if (isInGroup) {
+                    if (hasOnlyDefaultRole) {
+                        // User is in group but only has default role - prompt to sync
+                        const syncRolesButton = new ButtonBuilder()
+                            .setCustomId(`grp-sync:${user.discordId}:${vrcUserId}`)
+                            .setLabel("Sync Roles")
+                            .setStyle(ButtonStyle.Primary)
+                            .setEmoji("🔄");
+
+                        components.push(
+                            new ActionRowBuilder().addComponents(syncRolesButton)
+                        );
+
+                        const currentDescription = embed.data.description || "";
+                        const additionalText = `\n\n**SHIELD VRChat Group**\n✅ You're already in the group!\n• Click **Sync Roles** to update your VRChat group roles based on your Discord roles`;
+                        const newDescription = currentDescription + additionalText;
+                        
+                        if (newDescription.length <= 4096) {
+                            embed.setDescription(newDescription);
+                        }
+                    } else {
+                        // User is in group and has roles - just show sync option
+                        const syncRolesButton = new ButtonBuilder()
+                            .setCustomId(`grp-sync:${user.discordId}:${vrcUserId}`)
+                            .setLabel("Sync Roles")
+                            .setStyle(ButtonStyle.Secondary)
+                            .setEmoji("🔄");
+
+                        components.push(
+                            new ActionRowBuilder().addComponents(syncRolesButton)
+                        );
+
+                        const currentDescription = embed.data.description || "";
+                        const additionalText = `\n\n**SHIELD VRChat Group**\n✅ You're already in the group!\n• Click **Sync Roles** to update your VRChat group roles based on your Discord roles`;
+                        const newDescription = currentDescription + additionalText;
+                        
+                        if (newDescription.length <= 4096) {
+                            embed.setDescription(newDescription);
+                        }
+                    }
+                } else {
+                    // User is not in group - show invite button
+                    const joinGroupButton = new ButtonBuilder()
+                        .setCustomId(`grp-inv:${user.discordId}:${vrcUserId}`)
+                        .setLabel("Join Group")
+                        .setStyle(ButtonStyle.Primary)
+                        .setEmoji("🛡️");
+
+                    // Format: grp-sync:{discordId}:{vrcUserId}
+                    const syncRolesButton = new ButtonBuilder()
+                        .setCustomId(`grp-sync:${user.discordId}:${vrcUserId}`)
+                        .setLabel("Sync Roles")
+                        .setStyle(ButtonStyle.Secondary)
+                        .setEmoji("🔄");
+
+                    components.push(
+                        new ActionRowBuilder().addComponents(joinGroupButton, syncRolesButton)
+                    );
+
+                    const currentDescription = embed.data.description || "";
+                    const additionalText = `\n\n**SHIELD VRChat Group**\n• Click **Join Group** to receive an invite\n• Click **Sync Roles** to update your VRChat group roles based on your Discord roles`;
+                    const newDescription = currentDescription + additionalText;
+                    
+                    // Ensure we don't exceed Discord's 4096 character limit for embed descriptions
+                    if (newDescription.length <= 4096) {
+                        embed.setDescription(newDescription);
+                    }
                 }
             }
 

@@ -55,7 +55,22 @@ export class GroupSelfInviteCommand {
       const vrcAccount = mainAccount || user.vrchatAccounts[0];
 
       // Send group invite
-      await inviteUserToGroup(guildSettings.vrcGroupId, vrcAccount.vrcUserId);
+      const result = await inviteUserToGroup(guildSettings.vrcGroupId, vrcAccount.vrcUserId);
+
+      // Check if user is already a member
+      if (result?.alreadyMember) {
+        const embed = new EmbedBuilder()
+          .setTitle("ℹ️ Already a Member")
+          .setDescription(
+            `You are already a member of the VRChat group!\n\n**Account:** ${vrcAccount.vrchatUsername || vrcAccount.vrcUserId}`,
+          )
+          .setColor(Colors.Blue)
+          .setFooter({ text: "S.H.I.E.L.D. Bot - Group Management" })
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+        return;
+      }
 
       const embed = new EmbedBuilder()
         .setTitle("✅ Group Invite Sent!")

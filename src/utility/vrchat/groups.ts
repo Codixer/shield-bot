@@ -21,9 +21,40 @@ export async function inviteUserToGroup(
     });
   } catch (error: any) {
     if (error instanceof RequestError) {
+      // Handle case where user is already a member (400 error)
+      if (error.statusCode === 400) {
+        const errorMessage = (error.message || String(error)).toLowerCase();
+        // Check if the error indicates the user is already a member
+        // Handle various error message formats
+        if (
+          errorMessage.includes("already a member") ||
+          errorMessage.includes("already a member of this group") ||
+          errorMessage.includes("is already a member")
+        ) {
+          // User is already in the group, this is not an error
+          console.log(
+            `[Group Invite] User ${userId} is already a member of group ${groupId}`,
+          );
+          return { success: true, alreadyMember: true };
+        }
+      }
       throw new Error(
         `Failed to invite user to group: ${error.statusCode} ${error.message}`,
       );
+    }
+    // Also check for non-RequestError errors that might have the same structure
+    if (error?.statusCode === 400 || error?.status === 400) {
+      const errorMessage = (error.message || JSON.stringify(error) || String(error)).toLowerCase();
+      if (
+        errorMessage.includes("already a member") ||
+        errorMessage.includes("already a member of this group") ||
+        errorMessage.includes("is already a member")
+      ) {
+        console.log(
+          `[Group Invite] User ${userId} is already a member of group ${groupId}`,
+        );
+        return { success: true, alreadyMember: true };
+      }
     }
     throw error;
   }
