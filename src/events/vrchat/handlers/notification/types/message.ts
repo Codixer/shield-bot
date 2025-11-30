@@ -1,4 +1,6 @@
+import { loggers } from "../../../../../utility/logger.js";
+
 export function handleMessageNotification(content: any) {
-  console.log("[VRChat Notification][Message]", content);
+  loggers.vrchat.debug("Message notification", { content });
   // Add message specific logic here
 }

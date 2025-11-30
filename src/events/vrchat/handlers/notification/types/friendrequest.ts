@@ -1,22 +1,23 @@
 import { acceptFriendRequest } from "../../../../../utility/vrchat.js";
+import { loggers } from "../../../../../utility/logger.js";
 
 export async function handleFriendRequestNotification(content: any) {
-  console.log("[VRChat Notification][FriendRequest]", content);
+  loggers.vrchat.debug("FriendRequest notification", { content });
   // Accept the friend request notification automatically
   if (content.id) {
     try {
       const result = await acceptFriendRequest(content.id);
-      console.log("[VRChat Notification][FriendRequest][Accepted]", result);
+      loggers.vrchat.info("FriendRequest accepted", { result });
     } catch (error) {
-      console.error(
-        "[VRChat Notification][FriendRequest][Accept Error]",
+      loggers.vrchat.error(
+        "FriendRequest accept error",
         error,
       );
     }
   } else {
-    console.warn(
-      "[VRChat Notification][FriendRequest] Missing notification id or authToken",
-      content,
+    loggers.vrchat.warn(
+      "Missing notification id or authToken",
+      { content },
     );
   }
 }

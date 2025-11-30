@@ -3,6 +3,7 @@ import {
   listInviteMessages,
   getCurrentUser,
 } from "../../utility/vrchat.js";
+import { loggers } from "../../utility/logger.js";
 
 export enum InviteMessageType {
   Message = "message",
@@ -277,11 +278,11 @@ export async function syncInviteMessageIfDifferent({
   });
   const msg = current.find((m: InviteMessage) => m.slot === slot);
   if (msg && msg.message !== expected) {
-    console.log(
-      `[InviteMessageManager] Message mismatch for userId=${userId}, type=${type}, slot=${slot}.`,
+    loggers.vrchat.debug(
+      `Message mismatch for userId=${userId}, type=${type}, slot=${slot}`,
     );
-    console.log(
-      `[InviteMessageManager] Current: "${msg.message}" | Expected: "${expected}"`,
+    loggers.vrchat.debug(
+      `Current: "${msg.message}" | Expected: "${expected}"`,
     );
     await updateInviteMessage({
       userId,
@@ -289,8 +290,8 @@ export async function syncInviteMessageIfDifferent({
       slot,
       message: expected,
     });
-    console.log(
-      `[InviteMessageManager] Updated message for userId=${userId}, type=${type}, slot=${slot} to: "${expected}"`,
+    loggers.vrchat.debug(
+      `Updated message for userId=${userId}, type=${type}, slot=${slot} to: "${expected}"`,
     );
   }
 }
@@ -320,8 +321,8 @@ export async function syncAllInviteMessages(userId?: string) {
       });
     }
   }
-  console.log(
-    `[InviteMessageManager] All invite messages synced for userId=${actualUserId}`,
+  loggers.vrchat.info(
+    `All invite messages synced for userId=${actualUserId}`,
   );
 }
 

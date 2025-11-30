@@ -7,6 +7,7 @@ import {
 import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
 import { groupRoleSyncManager } from "../../../../managers/groupRoleSync/groupRoleSyncManager.js";
+import { loggers } from "../../../../utility/logger.js";
 
 @Discord()
 export class VRChatGroupRoleSyncButtonHandler {
@@ -77,7 +78,7 @@ export class VRChatGroupRoleSyncButtonHandler {
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error: any) {
-      console.error("[Group Role Sync] Error syncing roles:", error);
+      loggers.vrchat.error("Error syncing roles", error);
 
       let errorMessage = "Failed to sync roles. Please try again later.";
       if (error.message?.includes("not in group")) {

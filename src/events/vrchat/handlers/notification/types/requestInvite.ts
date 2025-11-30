@@ -1,4 +1,6 @@
+import { loggers } from "../../../../../utility/logger.js";
+
 export function handleRequestInviteNotification(content: any) {
-  console.log("[VRChat Notification][RequestInvite]", content);
+  loggers.vrchat.debug("RequestInvite notification", { content });
   // Add requestInvite specific logic here
 }

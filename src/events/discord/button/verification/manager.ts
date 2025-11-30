@@ -8,6 +8,7 @@ import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
 import { getUserById } from "../../../../utility/vrchat.js";
 import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
+import { loggers } from "../../../../utility/logger.js";
 
 @Discord()
 export class VRChatVerifyManagerButtonHandler {
@@ -71,7 +72,7 @@ export class VRChatVerifyManagerButtonHandler {
         components: [],
       });
     } catch (error) {
-      console.error("Error verifying account:", error);
+      loggers.bot.error("Error verifying account", error);
       await interaction.reply({
         content: "❌ An error occurred while verifying the account.",
         flags: MessageFlags.Ephemeral,
@@ -122,8 +123,8 @@ export class VRChatVerifyManagerButtonHandler {
       try {
         await whitelistManager.syncAndPublishAfterVerification(discordId);
       } catch (error) {
-        console.error(
-          `[Verification Manager] Failed to sync whitelist for ${discordId}:`,
+        loggers.bot.error(
+          `Failed to sync whitelist for ${discordId}`,
           error,
         );
       }
@@ -149,7 +150,7 @@ export class VRChatVerifyManagerButtonHandler {
         components: [],
       });
     } catch (error) {
-      console.error("Error setting main account:", error);
+      loggers.bot.error("Error setting main account", error);
       await interaction.reply({
         content: "❌ An error occurred while setting the main account.",
         flags: MessageFlags.Ephemeral,
@@ -191,8 +192,8 @@ export class VRChatVerifyManagerButtonHandler {
       try {
         await whitelistManager.syncAndPublishAfterVerification(discordId);
       } catch (error) {
-        console.error(
-          `[Verification Manager] Failed to sync whitelist for ${discordId}:`,
+        loggers.bot.error(
+          `Failed to sync whitelist for ${discordId}`,
           error,
         );
       }
@@ -218,7 +219,7 @@ export class VRChatVerifyManagerButtonHandler {
         components: [],
       });
     } catch (error) {
-      console.error("Error setting alt account:", error);
+      loggers.bot.error("Error setting alt account", error);
       await interaction.reply({
         content: "❌ An error occurred while setting the alt account.",
         flags: MessageFlags.Ephemeral,
@@ -277,7 +278,7 @@ export class VRChatVerifyManagerButtonHandler {
         components: [],
       });
     } catch (error) {
-      console.error("Error unverifying account:", error);
+      loggers.bot.error("Error unverifying account", error);
       await interaction.reply({
         content: "❌ An error occurred while unverifying the account.",
         flags: MessageFlags.Ephemeral,

@@ -8,6 +8,7 @@ import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
 import { getUserById } from "../../../../utility/vrchat/user.js";
 import { createInstance, inviteUser } from "../../../../utility/vrchat/index.js";
+import { loggers } from "../../../../utility/logger.js";
 
 @Discord()
 export class VRChatAvatarInviteButtonHandler {
@@ -111,7 +112,7 @@ export class VRChatAvatarInviteButtonHandler {
         embeds: [embed],
       });
     } catch (error) {
-      console.error("[Avatar Invite] Error creating instance:", error);
+      loggers.vrchat.error("Error creating instance", error);
       await interaction.editReply({
         content:
           "❌ An error occurred while creating the instance. Please try again later or contact staff.",

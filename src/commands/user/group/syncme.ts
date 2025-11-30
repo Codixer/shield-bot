@@ -7,6 +7,7 @@ import {
 } from "discord.js";
 import { prisma } from "../../../main.js";
 import { groupRoleSyncManager } from "../../../managers/groupRoleSync/groupRoleSyncManager.js";
+import { loggers } from "../../../utility/logger.js";
 
 @Discord()
 @SlashGroup({ name: "group", description: "VRChat group commands" })
@@ -82,7 +83,7 @@ export class GroupSelfRoleSyncCommand {
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error: any) {
-      console.error("[Self Role Sync] Error:", error);
+      loggers.vrchat.error("Self Role Sync error", error);
 
       let errorMessage = "Failed to sync roles. Please try again later.";
       if (error.message?.includes("not in group")) {

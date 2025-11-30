@@ -17,6 +17,7 @@ import { getUserById } from "../../../../utility/vrchat/user.js";
 import { unfriendUser } from "../../../../utility/vrchat/user.js";
 import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
 import { sendWhitelistLog, getUserWhitelistRoles } from "../../../../utility/vrchat/whitelistLogger.js";
+import { loggers } from "../../../../utility/logger.js";
 
 @Discord()
 export class VRCAccountManagerButtonHandler {
@@ -82,7 +83,7 @@ export class VRCAccountManagerButtonHandler {
           });
       }
     } catch (error) {
-      console.error("Error in account manager button handler:", error);
+      loggers.bot.error("Error in account manager button handler", error);
       await interaction.reply({
         content:
           "❌ An error occurred while processing your request. Please try again later.",
@@ -135,15 +136,15 @@ export class VRCAccountManagerButtonHandler {
             accountType: "MAIN",
           });
         } catch (logError) {
-          console.warn(
-            `[Account Manager] Failed to send whitelist log for ${discordId}:`,
+          loggers.bot.warn(
+            `Failed to send whitelist log for ${discordId}`,
             logError,
           );
         }
       }
     } catch (error) {
-      console.error(
-        `[Account Manager] Failed to sync whitelist for ${discordId}:`,
+      loggers.bot.error(
+        `Failed to sync whitelist for ${discordId}`,
         error,
       );
     }
@@ -181,15 +182,15 @@ export class VRCAccountManagerButtonHandler {
             accountType: "ALT",
           });
         } catch (logError) {
-          console.warn(
-            `[Account Manager] Failed to send whitelist log for ${discordId}:`,
+          loggers.bot.warn(
+            `Failed to send whitelist log for ${discordId}`,
             logError,
           );
         }
       }
     } catch (error) {
-      console.error(
-        `[Account Manager] Failed to sync whitelist for ${discordId}:`,
+      loggers.bot.error(
+        `Failed to sync whitelist for ${discordId}`,
         error,
       );
     }
@@ -207,8 +208,8 @@ export class VRCAccountManagerButtonHandler {
       try {
         await unfriendUser(vrcUserId);
       } catch (unfriendError) {
-        console.warn(
-          `Failed to unfriend VRChat user ${vrcUserId}:`,
+        loggers.vrchat.warn(
+          `Failed to unfriend VRChat user ${vrcUserId}`,
           unfriendError,
         );
         // Continue with deletion even if unfriending fails
@@ -262,15 +263,15 @@ export class VRCAccountManagerButtonHandler {
           }
         }
       } catch (whitelistError) {
-        console.error(
-          `[Account Manager] Failed to sync whitelist after deletion for ${discordId}:`,
+        loggers.bot.error(
+          `Failed to sync whitelist after deletion for ${discordId}`,
           whitelistError,
         );
       }
 
       await this.updateAccountManagerMessage(interaction);
     } catch (error) {
-      console.error("Error deleting VRChat account:", error);
+      loggers.bot.error("Error deleting VRChat account", error);
       await interaction.reply({
         content:
           "❌ An error occurred while deleting the account. The account may have been partially removed.",

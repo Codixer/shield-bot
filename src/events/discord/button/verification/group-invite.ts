@@ -7,6 +7,7 @@ import {
 import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
 import { inviteUserToGroup } from "../../../../utility/vrchat/groups.js";
+import { loggers } from "../../../../utility/logger.js";
 
 @Discord()
 export class VRChatGroupInviteButtonHandler {
@@ -88,7 +89,7 @@ export class VRChatGroupInviteButtonHandler {
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error: any) {
-      console.error("[Group Invite] Error sending group invite:", error);
+      loggers.vrchat.error("Error sending group invite", error);
 
       let errorMessage = "Failed to send group invite. Please try again later.";
       if (error.message?.includes("400")) {

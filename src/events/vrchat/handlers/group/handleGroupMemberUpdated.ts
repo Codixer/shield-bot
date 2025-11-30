@@ -1,24 +1,25 @@
 import { prisma, bot } from "../../../../main.js";
 import { EmbedBuilder, Colors, TextChannel } from "discord.js";
 import { getGroupMember, getGroupRoles } from "../../../../utility/vrchat/groups.js";
+import { loggers } from "../../../../utility/logger.js";
 
 export async function handleGroupMemberUpdated(content: any) {
-  console.log("[Group Member Updated] Event received:", content);
+  loggers.vrchat.debug("Group Member Updated event received", { content });
 
   // content should have userId (VRChat user ID) and groupId
   const vrcUserId = content.userId;
   const groupId = content.groupId;
 
   if (!vrcUserId) {
-    console.warn("[Group Member Updated] ❌ No userId in event content - skipping");
+    loggers.vrchat.warn("No userId in event content - skipping");
     return;
   }
 
-  console.log(`[Group Member Updated] Processing update for VRChat user: ${vrcUserId}`);
+  loggers.vrchat.debug(`Processing update for VRChat user: ${vrcUserId}`);
   if (groupId) {
-    console.log(`[Group Member Updated] Group ID: ${groupId}`);
+    loggers.vrchat.debug(`Group ID: ${groupId}`);
   } else {
-    console.log(`[Group Member Updated] ⚠️ No groupId in event content`);
+    loggers.vrchat.debug(`No groupId in event content`);
   }
 
   // Find the verified VRChat account in our database
@@ -31,14 +32,14 @@ export async function handleGroupMemberUpdated(content: any) {
   });
 
   if (!vrcAccount || !vrcAccount.user) {
-    console.log(
-      `[Group Member Updated] ❌ No verified account found for VRChat user ${vrcUserId} - user not verified in bot database`,
+    loggers.vrchat.debug(
+      `No verified account found for VRChat user ${vrcUserId} - user not verified in bot database`,
     );
     return;
   }
 
-  console.log(
-    `[Group Member Updated] ✅ Found verified account for ${vrcAccount.vrchatUsername || vrcUserId} (Discord: ${vrcAccount.user.discordId})`,
+  loggers.vrchat.debug(
+    `Found verified account for ${vrcAccount.vrchatUsername || vrcUserId} (Discord: ${vrcAccount.user.discordId})`,
   );
 
   // Find all guilds with this VRChat group ID configured
@@ -49,14 +50,14 @@ export async function handleGroupMemberUpdated(content: any) {
   });
 
   if (guildSettings.length === 0) {
-    console.log(
-      `[Group Member Updated] ❌ No guilds found with VRChat group ${groupId || "any"} configured - no promotion logs channels to send to`,
+    loggers.vrchat.debug(
+      `No guilds found with VRChat group ${groupId || "any"} configured - no promotion logs channels to send to`,
     );
     return;
   }
 
-  console.log(
-    `[Group Member Updated] Found ${guildSettings.length} guild(s) with this VRChat group configured`,
+  loggers.vrchat.debug(
+    `Found ${guildSettings.length} guild(s) with this VRChat group configured`,
   );
 
   // Fetch current group member info and roles
@@ -66,7 +67,7 @@ export async function handleGroupMemberUpdated(content: any) {
 
   if (groupId) {
     try {
-      console.log(`[Group Member Updated] Fetching group member and roles info...`);
+      loggers.vrchat.debug(`Fetching group member and roles info...`);
       groupMember = await getGroupMember(groupId, vrcUserId);
       allRoles = (await getGroupRoles(groupId)) as unknown[];
 
@@ -80,18 +81,18 @@ export async function handleGroupMemberUpdated(content: any) {
         .map((id) => roleMap.get(id))
         .filter((name) => name !== undefined);
       
-      console.log(
-        `[Group Member Updated] Member has ${currentRoleNames.length} role(s): ${currentRoleNames.join(", ") || "none"}`,
+      loggers.vrchat.debug(
+        `Member has ${currentRoleNames.length} role(s): ${currentRoleNames.join(", ") || "none"}`,
       );
     } catch (error) {
-      console.error(
-        "[Group Member Updated] ❌ Error fetching role information:",
+      loggers.vrchat.error(
+        "Error fetching role information",
         error,
       );
     }
   } else {
-    console.log(
-      "[Group Member Updated] ⚠️ Skipping role fetch - no groupId available",
+    loggers.vrchat.debug(
+      "Skipping role fetch - no groupId available",
     );
   }
 
@@ -101,21 +102,21 @@ export async function handleGroupMemberUpdated(content: any) {
   // Log to promotion logs channel for each configured guild
   for (const settings of guildSettings) {
     if (!settings.botPromotionLogsChannelId) {
-      console.log(
-        `[Group Member Updated] ⚠️ Guild ${settings.guildId} has no promotion logs channel configured - skipping`,
+      loggers.vrchat.debug(
+        `Guild ${settings.guildId} has no promotion logs channel configured - skipping`,
       );
       continue;
     }
 
     try {
-      console.log(
-        `[Group Member Updated] Processing log for guild ${settings.guildId}...`,
+      loggers.vrchat.debug(
+        `Processing log for guild ${settings.guildId}...`,
       );
       
       const guild = await bot.guilds.fetch(settings.guildId).catch(() => null);
       if (!guild) {
-        console.log(
-          `[Group Member Updated] ❌ Guild ${settings.guildId} not found or bot not in guild - skipping`,
+        loggers.vrchat.warn(
+          `Guild ${settings.guildId} not found or bot not in guild - skipping`,
         );
         continue;
       }
@@ -125,8 +126,8 @@ export async function handleGroupMemberUpdated(content: any) {
         .catch(() => null);
       
       if (!member) {
-        console.log(
-          `[Group Member Updated] ⚠️ Discord member ${vrcAccount.user.discordId} not found in guild ${settings.guildId}`,
+        loggers.vrchat.debug(
+          `Discord member ${vrcAccount.user.discordId} not found in guild ${settings.guildId}`,
         );
       }
 
@@ -134,8 +135,8 @@ export async function handleGroupMemberUpdated(content: any) {
         settings.botPromotionLogsChannelId,
       )) as TextChannel;
       if (!channel || !channel.isTextBased()) {
-        console.warn(
-          `[Group Member Updated] ❌ Invalid promotion logs channel ${settings.botPromotionLogsChannelId} in guild ${settings.guildId} - skipping`,
+        loggers.vrchat.warn(
+          `Invalid promotion logs channel ${settings.botPromotionLogsChannelId} in guild ${settings.guildId} - skipping`,
         );
         continue;
       }
@@ -175,18 +176,18 @@ export async function handleGroupMemberUpdated(content: any) {
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" });
 
       await channel.send({ embeds: [embed] });
-      console.log(
-        `[Group Member Updated] ✅ Successfully logged role update for ${vrcUsername} in guild ${settings.guildId}`,
+      loggers.vrchat.info(
+        `Successfully logged role update for ${vrcUsername} in guild ${settings.guildId}`,
       );
     } catch (error) {
-      console.error(
-        `[Group Member Updated] ❌ Error logging for guild ${settings.guildId}:`,
+      loggers.vrchat.error(
+        `Error logging for guild ${settings.guildId}`,
         error,
       );
     }
   }
   
-  console.log(
-    `[Group Member Updated] ✅ Completed processing for ${vrcUsername}`,
+  loggers.vrchat.debug(
+    `Completed processing for ${vrcUsername}`,
   );
 }

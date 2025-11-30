@@ -7,6 +7,7 @@ import {
 } from "discord.js";
 import { prisma } from "../../../main.js";
 import { inviteUserToGroup } from "../../../utility/vrchat/groups.js";
+import { loggers } from "../../../utility/logger.js";
 
 @Discord()
 @SlashGroup({ name: "group", description: "VRChat group commands" })
@@ -83,7 +84,7 @@ export class GroupSelfInviteCommand {
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error: any) {
-      console.error("[Self Group Invite] Error:", error);
+      loggers.bot.error("[Self Group Invite] Error", error);
 
       let errorMessage = "Failed to send group invite. Please try again later.";
       if (error.message?.includes("400")) {

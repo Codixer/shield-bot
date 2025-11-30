@@ -1,5 +1,6 @@
 import { TextDisplayBuilder, MessageFlags, Client, ContainerBuilder } from "discord.js";
 import { prisma } from "../../main.js";
+import { loggers } from "../logger.js";
 
 export interface WhitelistLogData {
   discordId: string;
@@ -27,8 +28,8 @@ export async function sendWhitelistLog(
     });
 
     if (!guildSettings?.whitelistLogChannelId) {
-      console.log(
-        `[WhitelistLogger] No whitelist log channel configured for guild ${guildId}`,
+      loggers.bot.debug(
+        `No whitelist log channel configured for guild ${guildId}`,
       );
       return;
     }
@@ -42,8 +43,8 @@ export async function sendWhitelistLog(
       !channel.isTextBased() ||
       !("send" in channel)
     ) {
-      console.warn(
-        `[WhitelistLogger] Invalid log channel ${guildSettings.whitelistLogChannelId} for guild ${guildId}`,
+      loggers.bot.warn(
+        `Invalid log channel ${guildSettings.whitelistLogChannelId} for guild ${guildId}`,
       );
       return;
     }
@@ -67,12 +68,12 @@ export async function sendWhitelistLog(
       allowedMentions: { users: [] },
     });
 
-    console.log(
-      `[WhitelistLogger] Logged ${data.action} action for ${data.displayName} in guild ${guildId}`,
+    loggers.bot.info(
+      `Logged ${data.action} action for ${data.displayName} in guild ${guildId}`,
     );
   } catch (error) {
-    console.error(
-      `[WhitelistLogger] Failed to send whitelist log for guild ${guildId}:`,
+    loggers.bot.error(
+      `Failed to send whitelist log for guild ${guildId}`,
       error,
     );
   }
@@ -176,8 +177,8 @@ export async function getUserWhitelistRoles(
     }
     return Array.from(roles).sort();
   } catch (error) {
-    console.error(
-      `[WhitelistLogger] Failed to get whitelist roles for ${discordId}:`,
+    loggers.bot.error(
+      `Failed to get whitelist roles for ${discordId}`,
       error,
     );
     return [];
@@ -217,8 +218,8 @@ export async function getVRChatAccountInfo(discordId: string): Promise<{
       vrcUserId: account.vrcUserId,
     };
   } catch (error) {
-    console.error(
-      `[WhitelistLogger] Failed to get VRChat account info for ${discordId}:`,
+    loggers.bot.error(
+      `Failed to get VRChat account info for ${discordId}`,
       error,
     );
     return null;

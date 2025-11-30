@@ -9,6 +9,7 @@ import {
     ApplicationIntegrationType,
 } from "discord.js";
 import { Discord, Slash, SlashGroup } from "discordx";
+import { loggers } from "../../../utility/logger.js";
 
 interface StatusIncident {
     id: string;
@@ -154,7 +155,7 @@ export class VRChatStatusCommand {
                 components: [row],
             });
         } catch (error) {
-            console.error("Error fetching VRChat status:", error);
+            loggers.vrchat.error("Error fetching VRChat status", error);
             const errorEmbed = new EmbedBuilder()
                 .setTitle("❌ Error")
                 .setDescription("Failed to fetch VRChat status information.")
@@ -233,7 +234,7 @@ export class VRChatStatusCommand {
 
             await interaction.editReply({ embeds });
         } catch (error) {
-            console.error("Error fetching incident history:", error);
+            loggers.vrchat.error("Error fetching incident history", error);
             const errorEmbed = new EmbedBuilder()
                 .setTitle("❌ Error")
                 .setDescription("Failed to fetch incident history.")

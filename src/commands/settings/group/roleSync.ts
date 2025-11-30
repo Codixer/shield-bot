@@ -9,6 +9,7 @@ import {
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
 import { groupRoleSyncManager } from "../../../managers/groupRoleSync/groupRoleSyncManager.js";
+import { loggers } from "../../../utility/logger.js";
 
 @Discord()
 @SlashGroup({ name: "group", description: "VRChat group management" })
@@ -155,7 +156,7 @@ export class GroupRoleSyncCommand {
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error: any) {
-      console.error("[GroupRoleSync] Error syncing roles:", error);
+      loggers.vrchat.error("Error syncing roles", error);
       await interaction.editReply({
         content: `❌ Failed to sync roles: ${error.message}`,
       });

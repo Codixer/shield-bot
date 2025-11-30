@@ -8,6 +8,7 @@ import {
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
 import { getGroupRoles } from "../../../utility/vrchat/groups.js";
+import { loggers } from "../../../utility/logger.js";
 
 @Discord()
 @SlashGroup({ name: "group", description: "VRChat group management" })
@@ -109,7 +110,7 @@ export class GroupRoleMappingCommand {
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error: any) {
-      console.error("[GroupRoleMapping] Error mapping role:", error);
+      loggers.bot.error("Error mapping role", error);
       await interaction.reply({
         content: `❌ Failed to map role: ${error.message}`,
         ephemeral: true,
@@ -180,7 +181,7 @@ export class GroupRoleMappingCommand {
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error: any) {
-      console.error("[GroupRoleMapping] Error unmapping role:", error);
+      loggers.bot.error("Error unmapping role", error);
       await interaction.reply({
         content: `❌ Failed to unmap role: ${error.message}`,
         ephemeral: true,
@@ -246,7 +247,7 @@ export class GroupRoleMappingCommand {
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error: any) {
-      console.error("[GroupRoleMapping] Error listing mappings:", error);
+      loggers.bot.error("Error listing mappings", error);
       await interaction.reply({
         content: `❌ Failed to list mappings: ${error.message}`,
         ephemeral: true,
@@ -315,7 +316,7 @@ export class GroupRoleMappingCommand {
 
       await interaction.editReply({ embeds: [embed] });
     } catch (error: any) {
-      console.error("[GroupRoleMapping] Error fetching roles:", error);
+      loggers.bot.error("Error fetching roles", error);
       await interaction.editReply({
         content: `❌ Failed to fetch roles: ${error.message}`,
       });

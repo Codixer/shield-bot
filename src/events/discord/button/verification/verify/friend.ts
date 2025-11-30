@@ -13,6 +13,7 @@ import {
 } from "../../../../../utility/vrchat.js";
 import { prisma } from "../../../../../main.js";
 import { VerificationInteractionManager } from "../../../../../managers/verification/verificationInteractionManager.js";
+import { loggers } from "../../../../../utility/logger.js";
 
 @Discord()
 export class VRChatFriendVerifyButtonHandler {
@@ -126,7 +127,7 @@ export class VRChatFriendVerifyButtonHandler {
           });
         }
       } catch (e) {
-        console.warn(`Failed to fetch username for ${vrcUserId}:`, e);
+        loggers.vrchat.warn(`Failed to fetch username for ${vrcUserId}`, e);
       }
 
       const embed = new EmbedBuilder()
@@ -151,7 +152,7 @@ export class VRChatFriendVerifyButtonHandler {
           });
         }
       } catch (error) {
-        console.warn(`[Friend Verify] Failed to update original message:`, error);
+        loggers.vrchat.warn(`Failed to update original message`, error);
       }
     } else {
       const embed = new EmbedBuilder()

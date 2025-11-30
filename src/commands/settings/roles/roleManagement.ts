@@ -13,6 +13,7 @@ import {
   MessageFlags,
   EmbedBuilder,
 } from "discord.js";
+import { loggers } from "../../../utility/logger.js";
 import { prisma } from "../../../main.js";
 import { StaffGuard } from "../../../utility/guards.js";
 
@@ -86,7 +87,7 @@ export class SettingsRolesManagementSubGroup {
         flags: MessageFlags.Ephemeral,
       });
     } catch (error) {
-      console.error(`Error adding ${type} role:`, error);
+      loggers.bot.error(`Error adding ${type} role`, error);
       await interaction.reply({
         content: "Failed to add role. Please try again.",
         flags: MessageFlags.Ephemeral,
@@ -163,7 +164,7 @@ export class SettingsRolesManagementSubGroup {
         flags: MessageFlags.Ephemeral,
       });
     } catch (error) {
-      console.error(`Error removing ${type} role:`, error);
+      loggers.bot.error(`Error removing ${type} role`, error);
       await interaction.reply({
         content: "Failed to remove role. Please try again.",
         flags: MessageFlags.Ephemeral,
@@ -241,7 +242,7 @@ export class SettingsRolesManagementSubGroup {
         flags: MessageFlags.Ephemeral,
       });
     } catch (error) {
-      console.error("Error fetching role settings:", error);
+      loggers.bot.error("Error fetching role settings", error);
       await interaction.reply({
         content: "❌ Failed to fetch role settings. Please try again.",
         flags: MessageFlags.Ephemeral,

@@ -7,6 +7,7 @@ import {
 } from "discord.js";
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
+import { loggers } from "../../../utility/logger.js";
 
 @Discord()
 @SlashGroup({
@@ -70,7 +71,7 @@ export class GroupSettingsCommand {
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error: any) {
-      console.error("[GroupSettings] Error setting group ID:", error);
+      loggers.bot.error("Error setting group ID", error);
       await interaction.reply({
         content: `❌ Failed to set group ID: ${error.message}`,
         ephemeral: true,
@@ -113,7 +114,7 @@ export class GroupSettingsCommand {
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error: any) {
-      console.error("[GroupSettings] Error viewing group ID:", error);
+      loggers.bot.error("Error viewing group ID", error);
       await interaction.reply({
         content: `❌ Failed to view group ID: ${error.message}`,
         ephemeral: true,
@@ -163,7 +164,7 @@ export class GroupSettingsCommand {
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error: any) {
-      console.error("[GroupSettings] Error clearing group ID:", error);
+      loggers.bot.error("Error clearing group ID", error);
       await interaction.reply({
         content: `❌ Failed to clear group ID: ${error.message}`,
         ephemeral: true,
@@ -215,7 +216,7 @@ export class GroupSettingsCommand {
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error: any) {
-      console.error("[GroupSettings] Error setting promotion logs:", error);
+      loggers.bot.error("Error setting promotion logs", error);
       await interaction.reply({
         content: `❌ Failed to set promotion logs channel: ${error.message}`,
         ephemeral: true,
@@ -251,7 +252,7 @@ export class GroupSettingsCommand {
 
       await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error: any) {
-      console.error("[GroupSettings] Error clearing promotion logs:", error);
+      loggers.bot.error("Error clearing promotion logs", error);
       await interaction.reply({
         content: `❌ Failed to clear promotion logs: ${error.message}`,
         ephemeral: true,

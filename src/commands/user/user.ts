@@ -10,6 +10,7 @@ import {
   getUserPermissionLevelFromRoles,
   PermissionLevel,
 } from "../../utility/permissionUtils.js";
+import { loggers } from "../../utility/logger.js";
 
 @Discord()
 @SlashGroup({
@@ -60,7 +61,7 @@ export class UserCommands {
         flags: MessageFlags.Ephemeral,
       });
     } catch (error) {
-      console.error("Error getting user permission:", error);
+      loggers.bot.error("Error getting user permission", error);
       await interaction.reply({
         content: "❌ Failed to get user permission. Please try again.",
         flags: MessageFlags.Ephemeral,

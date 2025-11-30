@@ -9,6 +9,7 @@ import { Discord, Slash, SlashGroup, SlashOption, Guard } from "discordx";
 import { whitelistManager } from "../../managers/whitelist/whitelistManager.js";
 import { searchUsers } from "../../utility/vrchat/user.js";
 import { StaffGuard } from "../../utility/guards.js";
+import { loggers } from "../../utility/logger.js";
 
 @Discord()
 @SlashGroup({
@@ -107,8 +108,8 @@ export class WhitelistCommands {
           member.roles.cache.has(discordRole.id),
         );
 
-        console.log(
-          `[Whitelist] Triggering resync for ${membersWithRole.size} members with role ${discordRole.name}`,
+        loggers.bot.info(
+          `Triggering resync for ${membersWithRole.size} members with role ${discordRole.name}`,
         );
 
         for (const [, member] of membersWithRole) {
@@ -122,8 +123,8 @@ export class WhitelistCommands {
               );
             }
           } catch (error) {
-            console.error(
-              `[Whitelist] Error resyncing ${member.displayName}:`,
+            loggers.bot.error(
+              `Error resyncing ${member.displayName}`,
               error,
             );
           }
@@ -182,8 +183,8 @@ export class WhitelistCommands {
             member.roles.cache.has(discordRole.id),
           );
 
-          console.log(
-            `[Whitelist] Revalidating access for ${membersWithRole.size} members after removing role mapping for ${discordRole.name}`,
+          loggers.bot.info(
+            `Revalidating access for ${membersWithRole.size} members after removing role mapping for ${discordRole.name}`,
           );
 
           let accessUpdated = 0;
@@ -216,16 +217,16 @@ export class WhitelistCommands {
                 accessUpdated++;
               }
             } catch (error) {
-              console.error(
-                `[Whitelist] Error revalidating access for ${member.displayName}:`,
+              loggers.bot.error(
+                `Error revalidating access for ${member.displayName}`,
                 error,
               );
               errors++;
             }
           }
 
-          console.log(
-            `[Whitelist] Role removal revalidation complete: ${accessUpdated} access changed, ${errors} errors`,
+          loggers.bot.info(
+            `Role removal revalidation complete: ${accessUpdated} access changed, ${errors} errors`,
           );
           
           // Queue a single batched update after processing all members
@@ -714,7 +715,7 @@ export class WhitelistCommands {
         repoUpdateSuccess = true;
       } catch (repoError: any) {
         repoUpdateError = repoError.message;
-        console.warn("Failed to update GitHub repository:", repoError);
+        loggers.bot.warn("Failed to update GitHub repository", repoError);
       }
 
       const embed = new EmbedBuilder()
@@ -1034,8 +1035,8 @@ export class WhitelistCommands {
               }
             }
           } catch (error) {
-            console.error(
-              `[Whitelist] Error validating access for ${member.displayName}:`,
+            loggers.bot.error(
+              `Error validating access for ${member.displayName}`,
               error,
             );
             errors++;
@@ -1061,14 +1062,14 @@ export class WhitelistCommands {
               );
               usersNotInGuild++;
               accessRevoked++;
-              console.log(
-                `[Whitelist] Removed ${entry.vrchatUsername || entry.discordId} - no longer in guild`,
+              loggers.bot.info(
+                `Removed ${entry.vrchatUsername || entry.discordId} - no longer in guild`,
               );
             }
           } catch (error) {
             const entry = whitelistEntry as { discordId?: string; vrchatUsername?: string };
-            console.error(
-              `[Whitelist] Error checking guild membership for ${entry.vrchatUsername || entry.discordId}:`,
+            loggers.bot.error(
+              `Error checking guild membership for ${entry.vrchatUsername || entry.discordId}`,
               error,
             );
             errors++;
@@ -1113,12 +1114,12 @@ export class WhitelistCommands {
           try {
             const msg = `Bulk validation: ${accessGranted} granted, ${accessRevoked} revoked`;
             whitelistManager.queueBatchedUpdate('bulk-validation', msg);
-            console.log(
-              `[Whitelist] Queued GitHub repository update after bulk validation`,
+            loggers.bot.info(
+              `Queued GitHub repository update after bulk validation`,
             );
           } catch (gistError) {
-            console.warn(
-              `[Whitelist] Failed to queue GitHub repository update after bulk validation:`,
+            loggers.bot.warn(
+              `Failed to queue GitHub repository update after bulk validation`,
               gistError,
             );
           }

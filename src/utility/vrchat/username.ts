@@ -1,6 +1,7 @@
 import { prisma } from "../../main.js";
 import { getUserById } from "./user.js";
 import { forceUpdateUsernameCache } from "./usernameCache.js";
+import { loggers } from "../logger.js";
 
 /**
  * Get VRChat username, preferring cached version but updating if needed
@@ -44,8 +45,8 @@ export async function getVRChatUsername(
 
     return username || null;
   } catch (error) {
-    console.warn(
-      `[getVRChatUsername] Failed to get username for ${vrcUserId}:`,
+    loggers.vrchat.warn(
+      `Failed to get username for ${vrcUserId}`,
       error,
     );
     return null;
@@ -67,8 +68,8 @@ export async function getVRChatUsernameFresh(
 
     return vrcAccount?.vrchatUsername || null;
   } catch (error) {
-    console.warn(
-      `[getVRChatUsernameFresh] Failed to get fresh username for ${vrcUserId}:`,
+    loggers.vrchat.warn(
+      `Failed to get fresh username for ${vrcUserId}`,
       error,
     );
     return null;

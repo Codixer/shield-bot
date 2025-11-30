@@ -1,6 +1,8 @@
 // responseNotificationHandler.ts
 
+import { loggers } from "../../../../../utility/logger.js";
+
 export async function handleResponseNotification(content: any) {
   // TODO: Implement response-notification event handling
-  console.log("[Response Notification]", content);
+  loggers.vrchat.debug("Response Notification", { content });
 }

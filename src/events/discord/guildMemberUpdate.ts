@@ -1,6 +1,7 @@
 import { ArgsOf, Discord, On } from "discordx";
 import { prisma } from "../../main.js";
 import { groupRoleSyncManager } from "../../managers/groupRoleSync/groupRoleSyncManager.js";
+import { loggers } from "../../utility/logger.js";
 
 @Discord()
 export class GuildMemberUpdateEvent {
@@ -16,8 +17,8 @@ export class GuildMemberUpdateEvent {
         return;
       }
 
-      console.log(
-        `[GuildMemberUpdate] Roles changed for ${newMember.user.tag} in ${newMember.guild.name}`,
+      loggers.bot.debug(
+        `Roles changed for ${newMember.user.tag} in ${newMember.guild.name}`,
       );
 
       // Check if this guild has VRChat group sync configured
@@ -47,8 +48,8 @@ export class GuildMemberUpdateEvent {
         return;
       }
 
-      console.log(
-        `[GuildMemberUpdate] Found ${user.vrchatAccounts.length} verified VRChat account(s) for ${newMember.user.tag}`,
+      loggers.bot.debug(
+        `Found ${user.vrchatAccounts.length} verified VRChat account(s) for ${newMember.user.tag}`,
       );
 
       // Sync VRChat roles for each verified account
@@ -60,14 +61,14 @@ export class GuildMemberUpdateEvent {
             vrcAccount.vrcUserId,
           );
         } catch (error) {
-          console.error(
-            `[GuildMemberUpdate] Error syncing VRChat roles for ${vrcAccount.vrcUserId}:`,
+          loggers.vrchat.error(
+            `Error syncing VRChat roles for ${vrcAccount.vrcUserId}`,
             error,
           );
         }
       }
     } catch (error) {
-      console.error("[GuildMemberUpdate] Error handling member update:", error);
+      loggers.bot.error("Error handling member update", error);
     }
   }
 }

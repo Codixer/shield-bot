@@ -1,4 +1,6 @@
+import { loggers } from "../../../../utility/logger.js";
+
 export async function handleUserUpdate(content: any) {
   // TODO: Implement user-update event handling
-  console.log("[User Update]", content);
+  loggers.vrchat.debug("User Update", { content });
 }

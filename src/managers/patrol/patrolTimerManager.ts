@@ -7,6 +7,7 @@ import {
   VoiceState,
 } from "discord.js";
 import { prisma } from "../../main.js";
+import { loggers } from "../../utility/logger.js";
 
 type TrackedUser = {
   userId: string;
@@ -54,8 +55,8 @@ export class PatrolTimerManager {
       try {
         await this.resumeActiveForGuild(guild);
       } catch (err) {
-        console.error(
-          `[PatrolTimer] Failed to resume active sessions for guild ${guild.id}:`,
+        loggers.patrol.error(
+          `Failed to resume active sessions for guild ${guild.id}`,
           err,
         );
       }
@@ -164,7 +165,7 @@ export class PatrolTimerManager {
         this.startTracking(guildId, member, joinedChannelId!);
       }
     } catch (err) {
-      console.error("[PatrolTimer] voiceStateUpdate error:", err);
+      loggers.patrol.error("voiceStateUpdate error", err);
     }
   }
 
@@ -188,7 +189,7 @@ export class PatrolTimerManager {
         create: { guildId, userId: member.id, channelId, startedAt },
       })
       .catch((err: any) =>
-        console.error("[PatrolTimer] Failed to persist session:", err),
+        loggers.patrol.error("Failed to persist session", err),
       );
     // console.log(`[PatrolTimer] Start ${member.user.tag} in ${channelId}`);
   }
@@ -209,7 +210,7 @@ export class PatrolTimerManager {
           where: { guildId, userId: member.id },
         })
         .catch((err: any) =>
-          console.error("[PatrolTimer] Failed to delete session:", err),
+          loggers.patrol.error("Failed to delete session", err),
         );
       return;
     }
@@ -224,7 +225,7 @@ export class PatrolTimerManager {
         where: { guildId, userId: member.id },
       })
       .catch((err: any) =>
-        console.error("[PatrolTimer] Failed to delete session:", err),
+        loggers.patrol.error("Failed to delete session", err),
       );
     // Ensure a corresponding User row exists for this Discord ID
     await this.ensureUser(member.id);
@@ -289,7 +290,7 @@ export class PatrolTimerManager {
                 where: { guildId: guild.id, userId },
               })
               .catch((err: any) =>
-                console.error("[PatrolTimer] Failed to delete session:", err),
+                loggers.patrol.error("Failed to delete session", err),
               );
           }
         }
@@ -796,7 +797,7 @@ export class PatrolTimerManager {
         update: {},
       });
     } catch (e) {
-      console.error("[PatrolTimer] ensureUser failed", e);
+      loggers.patrol.error("ensureUser failed", e);
     }
   }
 
@@ -837,7 +838,7 @@ export class PatrolTimerManager {
         // Get promotion channel
         const channel = await member.guild.channels.fetch(settings.promotionChannelId);
         if (!channel || !channel.isTextBased()) {
-          console.error(`[PatrolTimer] Promotion channel ${settings.promotionChannelId} not found or not a text channel`);
+          loggers.patrol.error(`Promotion channel ${settings.promotionChannelId} not found or not a text channel`);
           return;
         }
 
@@ -858,10 +859,10 @@ export class PatrolTimerManager {
           },
         });
         
-        console.log(`[PatrolTimer] Promotion notification sent for ${member.user.tag} (${totalHours.toFixed(2)}h)`);
+        loggers.patrol.info(`Promotion notification sent for ${member.user.tag} (${totalHours.toFixed(2)}h)`);
       }
     } catch (err) {
-      console.error("[PatrolTimer] checkPromotion error:", err);
+      loggers.patrol.error("checkPromotion error", err);
     }
   }
 

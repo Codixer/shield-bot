@@ -10,6 +10,7 @@ import {
 } from "discord.js";
 import { prisma, patrolTimer } from "../../../main.js";
 import { StaffGuard } from "../../../utility/guards.js";
+import { loggers } from "../../../utility/logger.js";
 
 @Discord()
 @SlashGroup({
@@ -323,9 +324,9 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
         content: `✅ Promotion notification sent for <@${user.id}> in <#${settings.promotionChannelId}> (${totalHours.toFixed(2)} hours).`,
       });
 
-      console.log(`[PatrolTimer] Manual promotion check for ${user.tag} by ${interaction.user.tag} (${totalHours.toFixed(2)}h)`);
+      loggers.patrol.info(`Manual promotion check for ${user.tag} by ${interaction.user.tag} (${totalHours.toFixed(2)}h)`);
     } catch (err) {
-      console.error("[PatrolTimer] Manual promotion check error:", err);
+      loggers.patrol.error("Manual promotion check error", err);
       await interaction.editReply({
         content: "❌ An error occurred while checking for promotion. Please check the logs.",
       });
@@ -434,9 +435,9 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
 
       await interaction.editReply({ content: summary });
 
-      console.log(`[PatrolTimer] Bulk promotion check by ${interaction.user.tag}: ${eligible.length} eligible, ${ineligible.length} not eligible, ${alreadyPromoted.length} already promoted`);
+      loggers.patrol.info(`Bulk promotion check by ${interaction.user.tag}: ${eligible.length} eligible, ${ineligible.length} not eligible, ${alreadyPromoted.length} already promoted`);
     } catch (err) {
-      console.error("[PatrolTimer] Bulk promotion check error:", err);
+      loggers.patrol.error("Bulk promotion check error", err);
       await interaction.editReply({
         content: "❌ An error occurred while checking promotions. Please check the logs.",
       });

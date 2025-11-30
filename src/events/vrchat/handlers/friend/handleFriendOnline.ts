@@ -1,6 +1,7 @@
 import { prisma } from "../../../../main.js";
 import { hasFriendLocationConsent } from "../../../../utility/vrchat.js";
 import { updateUsernameCache } from "../../../../utility/vrchat/usernameCache.js";
+import { loggers } from "../../../../utility/logger.js";
 
 export async function handleFriendOnline(content: any) {
   // Ignore if the location is "travelling"
@@ -11,8 +12,8 @@ export async function handleFriendOnline(content: any) {
   // Update username cache for this user (if it's been a week or more)
   if (content.userId) {
     updateUsernameCache(content.userId).catch((e) =>
-      console.warn(
-        `[Friend Online] Username cache update failed for ${content.userId}:`,
+      loggers.vrchat.warn(
+        `Username cache update failed for ${content.userId}`,
         e,
       ),
     );
@@ -51,10 +52,7 @@ export async function handleFriendOnline(content: any) {
       senderUserId: null,
     },
   });
-  console.log(
-    "[VRChat Friend Online] Upserted:",
-    content.userId,
-    instanceId,
-    worldId,
+  loggers.vrchat.debug(
+    `Upserted friend online: ${content.userId}, ${instanceId}, ${worldId}`,
   );
 }

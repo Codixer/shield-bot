@@ -3,6 +3,7 @@
 import { RequestError, InstanceRegionType, InstanceAccessNormalType, WorldIdType, InstanceIdType } from "vrc-ts";
 import { vrchatApi } from "./index.js";
 import { getCurrentUser } from "./user.js";
+import { loggers } from "../logger.js";
 
 /**
  * Create a VRChat instance
@@ -101,7 +102,7 @@ export async function getInstanceInfoByShortName(
   shortName: string,
 ): Promise<any | null> {
   if (!shortName) {
-    console.log("[VRChat Instance Lookup] No shortName provided");
+    loggers.vrchat.debug("No shortName provided for instance lookup");
     return null;
   }
 
@@ -111,8 +112,8 @@ export async function getInstanceInfoByShortName(
     });
   } catch (error: any) {
     if (error instanceof RequestError && error.statusCode === 404) {
-      console.log(
-        `[VRChat Instance Lookup] Instance not found for shortName ${shortName}`,
+      loggers.vrchat.debug(
+        `Instance not found for shortName ${shortName}`,
       );
       return null;
     }

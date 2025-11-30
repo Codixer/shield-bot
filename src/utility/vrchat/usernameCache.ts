@@ -1,5 +1,6 @@
 import { prisma } from "../../main.js";
 import { getUserById } from "./user.js";
+import { loggers } from "../logger.js";
 
 /**
  * Update VRChat username cache for a user if needed
@@ -33,8 +34,8 @@ export async function updateUsernameCache(vrcUserId: string): Promise<void> {
     const currentUsername = userInfo?.displayName || userInfo?.username;
 
     if (!currentUsername) {
-      console.warn(
-        `[Username Cache] Could not fetch username for ${vrcUserId}`,
+      loggers.vrchat.warn(
+        `Could not fetch username for ${vrcUserId}`,
       );
       return;
     }
@@ -49,13 +50,13 @@ export async function updateUsernameCache(vrcUserId: string): Promise<void> {
         },
       });
 
-      console.log(
-        `[Username Cache] Updated username for ${vrcUserId}: ${currentUsername}`,
+      loggers.vrchat.debug(
+        `Updated username for ${vrcUserId}: ${currentUsername}`,
       );
     }
   } catch (error) {
-    console.warn(
-      `[Username Cache] Failed to update username for ${vrcUserId}:`,
+    loggers.vrchat.warn(
+      `Failed to update username for ${vrcUserId}`,
       error,
     );
   }
@@ -88,13 +89,13 @@ export async function forceUpdateUsernameCache(
         },
       });
 
-      console.log(
-        `[Username Cache] Force updated username for ${vrcUserId}: ${currentUsername}`,
+      loggers.vrchat.debug(
+        `Force updated username for ${vrcUserId}: ${currentUsername}`,
       );
     }
   } catch (error) {
-    console.warn(
-      `[Username Cache] Failed to force update username for ${vrcUserId}:`,
+    loggers.vrchat.warn(
+      `Failed to force update username for ${vrcUserId}`,
       error,
     );
   }

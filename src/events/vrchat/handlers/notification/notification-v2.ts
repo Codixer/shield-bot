@@ -1,4 +1,6 @@
+import { loggers } from "../../../../utility/logger.js";
+
 export async function handleNotificationV2(content: any) {
   // TODO: Implement notification-v2 event handling
-  console.log("[Notification V2]", content);
+  loggers.vrchat.debug("Notification V2", { content });
 }

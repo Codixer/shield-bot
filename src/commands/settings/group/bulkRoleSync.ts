@@ -8,6 +8,7 @@ import {
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
 import { groupRoleSyncManager } from "../../../managers/groupRoleSync/groupRoleSyncManager.js";
+import { loggers } from "../../../utility/logger.js";
 
 @Discord()
 @SlashGroup({ name: "group", description: "VRChat group management" })
@@ -167,8 +168,8 @@ export class GroupBulkRoleSyncCommand {
             // Only store first 5 errors
             results.errors.push(errorMsg);
           }
-          console.error(
-            `[BulkRoleSync] Error syncing ${vrcAccount.vrcUserId}:`,
+          loggers.vrchat.error(
+            `Error syncing ${vrcAccount.vrcUserId}`,
             error,
           );
         }
@@ -213,7 +214,7 @@ export class GroupBulkRoleSyncCommand {
 
       await interaction.editReply({ embeds: [finalEmbed] });
     } catch (error: any) {
-      console.error("[BulkRoleSync] Error:", error);
+      loggers.vrchat.error("BulkRoleSync error", error);
       await interaction.editReply({
         content: `❌ Failed to perform bulk sync: ${error.message}`,
       });

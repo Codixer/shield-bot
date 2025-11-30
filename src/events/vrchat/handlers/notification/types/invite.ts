@@ -1,7 +1,8 @@
 import { prisma } from "../../../../../main.js";
+import { loggers } from "../../../../../utility/logger.js";
 
 export async function handleInviteNotification(content: any) {
-  console.log("[VRChat Notification][Invite]", content);
+  loggers.vrchat.debug("Invite notification", { content });
   // Extract worldId from details if present
   const worldId =
     content.details?.worldId || content.worldId || "[WORLD ID NOT FOUND]";
@@ -30,16 +31,16 @@ export async function handleInviteNotification(content: any) {
         senderUserId,
       },
     });
-    console.log(
-      `[Invite Handler] Stored invite for user ${receiverUserId} in worldId ${worldId} as private.`,
+    loggers.vrchat.info(
+      `Stored invite for user ${receiverUserId} in worldId ${worldId} as private.`,
     );
   } catch (err) {
-    console.error("[Invite Handler] Failed to store invite in database:", err);
+    loggers.vrchat.error("Failed to store invite in database", err);
   }
   // Message for users
   const worldName = content.details?.worldName || "[WORLD NAME NOT FOUND]";
   const sender = senderUsername || senderUserId || "[SENDER NOT FOUND]";
-  console.log(
-    `[Invite Handler] You have been invited to: ${worldName} (World ID: ${worldId}). This is a private instance. Please request an invite from ${sender} instead of joining directly.`,
+  loggers.vrchat.debug(
+    `User has been invited to: ${worldName} (World ID: ${worldId}). This is a private instance.`,
   );
 }

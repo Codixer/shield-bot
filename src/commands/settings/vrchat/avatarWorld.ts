@@ -5,6 +5,7 @@ import {
 } from "discord.js";
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
+import { loggers } from "../../../utility/logger.js";
 
 @Discord()
 @SlashGroup({ name: "vrchat", description: "VRChat settings", root: "settings" })
@@ -81,7 +82,7 @@ export class VRChatSettingsCommand {
         ephemeral: true,
       });
     } catch (error: any) {
-      console.error("[VRChatSettings] Error setting avatar world:", error);
+      loggers.bot.error("Error setting avatar world", error);
       await interaction.reply({
         content: `❌ Failed to set avatar world: ${error.message}`,
         ephemeral: true,
@@ -127,8 +128,8 @@ export class VRChatSettingsCommand {
         ephemeral: true,
       });
     } catch (error: any) {
-      console.error(
-        "[VRChatSettings] Error clearing avatar world:",
+      loggers.bot.error(
+        "Error clearing avatar world",
         error,
       );
       await interaction.reply({

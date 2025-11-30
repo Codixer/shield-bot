@@ -4,6 +4,7 @@ import { prisma } from "../../main.js";
 import { RequestError, InstanceIdType, WorldIdType } from "vrc-ts";
 import { vrchatApi } from "./index.js";
 import { getInstanceInfoByShortName } from "./instance.js";
+import { loggers } from "../logger.js";
 
 /**
  * Find friend instance or world from database
@@ -13,7 +14,7 @@ export async function findFriendInstanceOrWorld(userId: string) {
     where: { vrcUserId: userId },
   });
   if (!record) {
-    console.log(`[VRChat Friend Lookup] User not tracked: ${userId}`);
+    loggers.vrchat.debug(`User not tracked: ${userId}`);
     return null;
   }
   return record;
@@ -34,8 +35,8 @@ export async function getFriendInstanceInfo(userId: string): Promise<any | null>
     record.location === "travelling" ||
     record.location === "traveling"
   ) {
-    console.log(
-      `[VRChat Instance Lookup] User ${userId} is not in a public instance (location: ${record.location})`,
+    loggers.vrchat.debug(
+      `User ${userId} is not in a public instance (location: ${record.location})`,
     );
     return null;
   }
@@ -50,8 +51,8 @@ export async function getFriendInstanceInfo(userId: string): Promise<any | null>
       });
     } catch (error: any) {
       if (error instanceof RequestError && error.statusCode === 404) {
-        console.log(
-          `[VRChat Instance Lookup] Private instance not found for user ${userId}`,
+        loggers.vrchat.debug(
+          `Private instance not found for user ${userId}`,
         );
         return null;
       }
@@ -71,8 +72,8 @@ export async function getFriendInstanceInfo(userId: string): Promise<any | null>
   }
 
   if (!worldId || !instanceId) {
-    console.log(
-      `[VRChat Instance Lookup] Could not parse worldId/instanceId for user ${userId}`,
+    loggers.vrchat.debug(
+      `Could not parse worldId/instanceId for user ${userId}`,
     );
     return null;
   }
@@ -85,8 +86,8 @@ export async function getFriendInstanceInfo(userId: string): Promise<any | null>
     });
   } catch (error: any) {
     if (error instanceof RequestError && error.statusCode === 404) {
-      console.log(
-        `[VRChat Instance Lookup] Instance not found for user ${userId}`,
+      loggers.vrchat.debug(
+        `Instance not found for user ${userId}`,
       );
       return null;
     }

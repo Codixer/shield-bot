@@ -8,6 +8,7 @@ import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
 import { ButtonBuilder } from "discord.js";
 import { getUserById } from "../../../../utility/vrchat.js";
+import { loggers } from "../../../../utility/logger.js";
 @Discord()
 export class VRChatVerifyButtonHandler {
   @ButtonComponent({
@@ -193,7 +194,7 @@ export class VRChatVerifyButtonHandler {
       const userInfo = await getUserById(vrcUserId);
       return userInfo?.displayName || userInfo?.username || null;
     } catch (error) {
-      console.warn(`Failed to fetch username for ${vrcUserId}:`, error);
+      loggers.vrchat.warn(`Failed to fetch username for ${vrcUserId}`, error);
       return null;
     }
   }

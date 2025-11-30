@@ -56,8 +56,8 @@ export async function inviteUserToGroup(
         errorMessage.includes("already a member of this group") ||
         errorMessage.includes("is already a member")
       ) {
-        console.log(
-          `[Group Invite] User ${userId} is already a member of group ${groupId}`,
+        loggers.vrchat.debug(
+          `User ${userId} is already a member of group ${groupId}`,
         );
         return { success: true, alreadyMember: true };
       }

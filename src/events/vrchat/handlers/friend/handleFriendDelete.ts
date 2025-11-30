@@ -1,4 +1,5 @@
 import { prisma } from "../../../../main.js";
+import { loggers } from "../../../../utility/logger.js";
 
 /**
  * Handles the friend-delete event by deleting the friend location data for the given user ID.
@@ -6,7 +7,7 @@ import { prisma } from "../../../../main.js";
  */
 export async function handleFriendDelete(content: any) {
   if (!content.userId) {
-    console.warn("[VRChat Friend Delete] Missing userId in content", content);
+    loggers.vrchat.warn("Missing userId in content", { content });
     return;
   }
   try {
@@ -15,12 +16,12 @@ export async function handleFriendDelete(content: any) {
       await prisma.friendLocationConsent.deleteMany({
         where: { ownerVrcUserId: content.userId },
       });
-      console.log(
-        `[VRChat Friend Delete] Revoked consent for userId: ${content.userId}`,
+      loggers.vrchat.info(
+        `Revoked consent for userId: ${content.userId}`,
       );
     } catch (consentError) {
-      console.error(
-        `[VRChat Friend Delete] Error revoking consent for userId: ${content.userId}`,
+      loggers.vrchat.error(
+        `Error revoking consent for userId: ${content.userId}`,
         consentError,
       );
     }
@@ -29,18 +30,18 @@ export async function handleFriendDelete(content: any) {
       await prisma.friendLocation.deleteMany({
         where: { vrcUserId: content.userId },
       });
-      console.log(
-        `[VRChat Friend Delete] Deleted friend location(s) for userId: ${content.userId}`,
+      loggers.vrchat.info(
+        `Deleted friend location(s) for userId: ${content.userId}`,
       );
     } catch (locationError) {
-      console.error(
-        `[VRChat Friend Delete] Error deleting friend location(s) for userId: ${content.userId}`,
+      loggers.vrchat.error(
+        `Error deleting friend location(s) for userId: ${content.userId}`,
         locationError,
       );
     }
   } catch (error) {
-    console.error(
-      `[VRChat Friend Delete] Unexpected error for userId: ${content.userId}`,
+    loggers.vrchat.error(
+      `Unexpected error for userId: ${content.userId}`,
       error,
     );
   }

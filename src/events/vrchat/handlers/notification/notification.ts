@@ -1,16 +1,17 @@
 import { handleFriendRequestNotification } from "./types/friendrequest.js";
 import { handleInviteNotification } from "./types/invite.js";
+import { loggers } from "../../../../utility/logger.js";
 
 export async function handleNotification(content: any) {
   switch (content.type) {
     case "friendRequest":
       await handleFriendRequestNotification(content).catch((err) => {
-        console.error("[Notification] Error handling friendRequest:", err);
+        loggers.vrchat.error("Error handling friendRequest", err);
       });
       break;
     case "invite":
       await handleInviteNotification(content).catch((err) => {
-        console.error("[Notification] Error handling invite:", err);
+        loggers.vrchat.error("Error handling invite", err);
       });
       break;
     // case "inviteResponse":
@@ -21,6 +22,6 @@ export async function handleNotification(content: any) {
     //     handleResponseNotification(content); // Placeholder, update to specific handler if needed
     //     break;
     default:
-      console.debug("[VRChat Notification][Unknown]", content);
+      loggers.vrchat.debug("Unknown notification type", { content });
   }
 }

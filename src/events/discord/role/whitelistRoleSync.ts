@@ -2,6 +2,7 @@ import { Discord, On, ArgsOf } from "discordx";
 import { WhitelistManager } from "../../../managers/whitelist/whitelistManager.js";
 import { prisma } from "../../../main.js";
 import { sendWhitelistLog } from "../../../utility/vrchat/whitelistLogger.js";
+import { loggers } from "../../../utility/logger.js";
 
 const whitelistManager = new WhitelistManager();
 
@@ -50,8 +51,8 @@ export class WhitelistRoleSync {
     newMember,
   ]: ArgsOf<"guildMemberUpdate">): Promise<void> {
     try {
-      console.log(
-        `[Whitelist] Syncing roles for ${newMember.displayName} (${newMember.id})`,
+      loggers.bot.info(
+        `Syncing roles for ${newMember.displayName} (${newMember.id})`,
       );
 
       // Fetch full member data if oldMember is partial
@@ -60,8 +61,8 @@ export class WhitelistRoleSync {
         try {
           fullOldMember = await oldMember.fetch();
         } catch (error) {
-          console.warn(
-            `[Whitelist] Could not fetch full member data for ${oldMember.id}, using available data`,
+          loggers.bot.warn(
+            `Could not fetch full member data for ${oldMember.id}, using available data`,
           );
           fullOldMember = oldMember;
         }
@@ -73,15 +74,15 @@ export class WhitelistRoleSync {
       const newRoleIds =
         newMember.roles?.cache?.map((role: any) => role.id) || [];
 
-      console.log(
-        `[Whitelist] Role comparison for ${newMember.displayName}: old=${oldRoleIds.length}, new=${newRoleIds.length}`,
+      loggers.bot.debug(
+        `Role comparison for ${newMember.displayName}: old=${oldRoleIds.length}, new=${newRoleIds.length}`,
       );
 
       if (
         JSON.stringify(oldRoleIds.sort()) === JSON.stringify(newRoleIds.sort())
       ) {
-        console.log(
-          `[Whitelist] No role changes detected for ${newMember.displayName}`,
+        loggers.bot.debug(
+          `No role changes detected for ${newMember.displayName}`,
         );
         return; // No role changes
       }
@@ -89,8 +90,8 @@ export class WhitelistRoleSync {
       // Check if user has any VRChat accounts (verified or unverified)
       const userHasVRChatAccount = await this.hasVRChatAccount(newMember.id);
       if (!userHasVRChatAccount) {
-        console.log(
-          `[Whitelist] User ${newMember.displayName} has no VRChat account, skipping whitelist sync`,
+        loggers.bot.debug(
+          `User ${newMember.displayName} has no VRChat account, skipping whitelist sync`,
         );
         return;
       }
@@ -117,14 +118,14 @@ export class WhitelistRoleSync {
         JSON.stringify(currentRolesSorted) ===
         JSON.stringify(expectedRolesSorted)
       ) {
-        console.log(
-          `[Whitelist] No whitelist role changes needed for ${newMember.displayName} - Current: [${currentRolesSorted.join(", ")}], Expected: [${expectedRolesSorted.join(", ")}]`,
+        loggers.bot.debug(
+          `No whitelist role changes needed for ${newMember.displayName} - Current: [${currentRolesSorted.join(", ")}], Expected: [${expectedRolesSorted.join(", ")}]`,
         );
         return; // No whitelist changes needed
       }
 
-      console.log(
-        `[Whitelist] Whitelist role changes detected for ${newMember.displayName} - Current: [${currentRolesSorted.join(", ")}], Expected: [${expectedRolesSorted.join(", ")}]`,
+      loggers.bot.info(
+        `Whitelist role changes detected for ${newMember.displayName} - Current: [${currentRolesSorted.join(", ")}], Expected: [${expectedRolesSorted.join(", ")}]`,
       );
 
       // Sync user roles (this handles both granting and removing access based on current roles)
@@ -138,8 +139,8 @@ export class WhitelistRoleSync {
       const updatedWhitelistRoles =
         await this.getUserWhitelistRoles(newMember.id);
 
-      console.log(
-        `[Whitelist] Successfully updated whitelist for ${newMember.displayName}`,
+      loggers.bot.info(
+        `Successfully updated whitelist for ${newMember.displayName}`,
       );
 
       // Send whitelist log message
@@ -158,8 +159,8 @@ export class WhitelistRoleSync {
           accountType: primaryAccount?.accountType,
         });
       } catch (logError) {
-        console.warn(
-          `[Whitelist] Failed to send modification log for ${newMember.displayName}:`,
+        loggers.bot.warn(
+          `Failed to send modification log for ${newMember.displayName}`,
           logError,
         );
       }
@@ -181,18 +182,18 @@ export class WhitelistRoleSync {
         // Queue for batched update instead of immediate publish
         const msg = this.buildCommitMessage(username, action, permsForMsg);
         whitelistManager.queueBatchedUpdate(newMember.id, msg);
-        console.log(
-          `[Whitelist] Queued GitHub repository update after role change for ${newMember.displayName}`,
+        loggers.bot.info(
+          `Queued GitHub repository update after role change for ${newMember.displayName}`,
         );
       } catch (repoError) {
-        console.warn(
-          `[Whitelist] Failed to queue GitHub repository update after role change for ${newMember.displayName}:`,
+        loggers.bot.warn(
+          `Failed to queue GitHub repository update after role change for ${newMember.displayName}`,
           repoError,
         );
       }
     } catch (error) {
-      console.error(
-        `[Whitelist] Error syncing roles for ${newMember.displayName}:`,
+      loggers.bot.error(
+        `Error syncing roles for ${newMember.displayName}`,
         error,
       );
     }
@@ -203,15 +204,15 @@ export class WhitelistRoleSync {
     try {
       const roleIds = member.roles.cache.map((role: any) => role.id);
 
-      console.log(
-        `[Whitelist] New member ${member.displayName} joined with ${roleIds.length} roles`,
+      loggers.bot.info(
+        `New member ${member.displayName} joined with ${roleIds.length} roles`,
       );
 
       // Check if user has any VRChat accounts (verified or unverified)
       const userHasVRChatAccount = await this.hasVRChatAccount(member.id);
       if (!userHasVRChatAccount) {
-        console.log(
-          `[Whitelist] New member ${member.displayName} has no VRChat account, skipping whitelist sync`,
+        loggers.bot.debug(
+          `New member ${member.displayName} has no VRChat account, skipping whitelist sync`,
         );
         return;
       }
@@ -226,8 +227,8 @@ export class WhitelistRoleSync {
       // Get updated whitelist roles after sync
       const updatedWhitelistRoles = await this.getUserWhitelistRoles(member.id);
 
-      console.log(
-        `[Whitelist] Successfully processed new member ${member.displayName}`,
+      loggers.bot.info(
+        `Successfully processed new member ${member.displayName}`,
       );
 
       // Send whitelist log message if they got whitelist access
@@ -247,8 +248,8 @@ export class WhitelistRoleSync {
             accountType: primaryAccount?.accountType,
           });
         } catch (logError) {
-          console.warn(
-            `[Whitelist] Failed to send verification log for new member ${member.displayName}:`,
+          loggers.bot.warn(
+            `Failed to send verification log for new member ${member.displayName}`,
             logError,
           );
         }
@@ -264,18 +265,18 @@ export class WhitelistRoleSync {
         // Queue for batched update instead of immediate publish
         const msg = this.buildCommitMessage(username, "added", permissions);
         whitelistManager.queueBatchedUpdate(member.id, msg);
-        console.log(
-          `[Whitelist] Queued GitHub repository update after new member ${member.displayName} joined`,
+        loggers.bot.info(
+          `Queued GitHub repository update after new member ${member.displayName} joined`,
         );
       } catch (repoError) {
-        console.warn(
-          `[Whitelist] Failed to queue GitHub repository update after new member ${member.displayName} joined:`,
+        loggers.bot.warn(
+          `Failed to queue GitHub repository update after new member ${member.displayName} joined`,
           repoError,
         );
       }
     } catch (error) {
-      console.error(
-        `[Whitelist] Error processing new member ${member.displayName}:`,
+      loggers.bot.error(
+        `Error processing new member ${member.displayName}`,
         error,
       );
     }
@@ -291,8 +292,8 @@ export class WhitelistRoleSync {
         member.user?.displayName ||
         member.user?.username ||
         member.id;
-      console.log(
-        `[Whitelist] Member ${memberName} left/kicked/banned - removing from whitelist`,
+      loggers.bot.info(
+        `Member ${memberName} left/kicked/banned - removing from whitelist`,
       );
 
       // Get their whitelist roles before removal for logging
@@ -318,8 +319,8 @@ export class WhitelistRoleSync {
             accountType: primaryAccount?.accountType,
           });
         } catch (logError) {
-          console.warn(
-            `[Whitelist] Failed to send removal log for ${memberName}:`,
+          loggers.bot.warn(
+            `Failed to send removal log for ${memberName}`,
             logError,
           );
         }
@@ -332,12 +333,12 @@ export class WhitelistRoleSync {
           // Queue for batched update instead of immediate publish
           const msg = `${username} was removed with the roles none`;
           whitelistManager.queueBatchedUpdate(member.id, msg);
-          console.log(
-            `[Whitelist] Queued GitHub repository update after ${memberName} left server`,
+          loggers.bot.info(
+            `Queued GitHub repository update after ${memberName} left server`,
           );
         } catch (repoError) {
-          console.warn(
-            `[Whitelist] Failed to queue GitHub repository update after ${memberName} left server:`,
+          loggers.bot.warn(
+            `Failed to queue GitHub repository update after ${memberName} left server`,
             repoError,
           );
         }
@@ -348,8 +349,8 @@ export class WhitelistRoleSync {
         member.user?.displayName ||
         member.user?.username ||
         member.id;
-      console.error(
-        `[Whitelist] Error removing member ${memberName} from whitelist:`,
+      loggers.bot.error(
+        `Error removing member ${memberName} from whitelist`,
         error,
       );
     }
@@ -360,8 +361,8 @@ export class WhitelistRoleSync {
     try {
       const user = ban.user;
       const userName = user.displayName || user.username || user.id;
-      console.log(
-        `[Whitelist] User ${userName} was banned - ensuring removal from whitelist`,
+      loggers.bot.info(
+        `User ${userName} was banned - ensuring removal from whitelist`,
       );
 
       // Get their whitelist roles before removal for logging
@@ -385,8 +386,8 @@ export class WhitelistRoleSync {
             accountType: primaryAccount?.accountType,
           });
         } catch (logError) {
-          console.warn(
-            `[Whitelist] Failed to send removal log for banned user ${userName}:`,
+          loggers.bot.warn(
+            `Failed to send removal log for banned user ${userName}`,
             logError,
           );
         }
@@ -399,12 +400,12 @@ export class WhitelistRoleSync {
         // Queue for batched update instead of immediate publish
         const msg = `${username} was removed with the roles none`;
         whitelistManager.queueBatchedUpdate(user.id, msg);
-        console.log(
-          `[Whitelist] Queued GitHub repository update after ${userName} was banned`,
+        loggers.bot.info(
+          `Queued GitHub repository update after ${userName} was banned`,
         );
       } catch (repoError) {
-        console.warn(
-          `[Whitelist] Failed to queue GitHub repository update after ${userName} was banned:`,
+        loggers.bot.warn(
+          `Failed to queue GitHub repository update after ${userName} was banned`,
           repoError,
         );
       }
@@ -414,8 +415,8 @@ export class WhitelistRoleSync {
         ban.user?.username ||
         ban.user?.id ||
         "Unknown";
-      console.error(
-        `[Whitelist] Error removing banned user ${userName} from whitelist:`,
+      loggers.bot.error(
+        `Error removing banned user ${userName} from whitelist`,
         error,
       );
     }
@@ -469,8 +470,8 @@ export class WhitelistRoleSync {
       }
       return Array.from(roles).sort();
     } catch (error) {
-      console.error(
-        `[WhitelistRoleSync] Failed to get whitelist roles for ${discordId}:`,
+      loggers.bot.error(
+        `Failed to get whitelist roles for ${discordId}`,
         error,
       );
       return [];

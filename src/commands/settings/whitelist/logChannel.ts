@@ -6,6 +6,7 @@ import {
 } from "discord.js";
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
+import { loggers } from "../../../utility/logger.js";
 
 @Discord()
 @SlashGroup({ name: "whitelist", description: "Whitelist settings", root: "settings" })
@@ -74,7 +75,7 @@ export class WhitelistSettingsCommand {
         ephemeral: true,
       });
     } catch (error: any) {
-      console.error("[WhitelistSettings] Error setting log channel:", error);
+      loggers.bot.error("Error setting log channel", error);
       await interaction.reply({
         content: `❌ Failed to set log channel: ${error.message}`,
         ephemeral: true,
@@ -120,8 +121,8 @@ export class WhitelistSettingsCommand {
         ephemeral: true,
       });
     } catch (error: any) {
-      console.error(
-        "[WhitelistSettings] Error clearing log channel:",
+      loggers.bot.error(
+        "Error clearing log channel",
         error,
       );
       await interaction.reply({

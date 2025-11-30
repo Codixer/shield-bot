@@ -1,13 +1,14 @@
 import { prisma } from "../../../../main.js";
 import { groupRoleSyncManager } from "../../../../managers/groupRoleSync/groupRoleSyncManager.js";
+import { loggers } from "../../../../utility/logger.js";
 
 export async function handleGroupJoined(content: any) {
-  console.log("[Group Joined]", content);
+  loggers.vrchat.debug("Group Joined", { content });
 
   // content should have userId (VRChat user ID)
   const vrcUserId = content.userId;
   if (!vrcUserId) {
-    console.warn("[Group Joined] No userId in event content");
+    loggers.vrchat.warn("No userId in event content");
     return;
   }
 
@@ -21,8 +22,8 @@ export async function handleGroupJoined(content: any) {
   });
 
   if (!vrcAccount || !vrcAccount.user) {
-    console.log(
-      `[Group Joined] No verified account found for VRChat user ${vrcUserId}`,
+    loggers.vrchat.debug(
+      `No verified account found for VRChat user ${vrcUserId}`,
     );
     return;
   }
@@ -45,8 +46,8 @@ export async function handleGroupJoined(content: any) {
         vrcUserId,
       );
     } catch (error) {
-      console.error(
-        `[Group Joined] Error syncing roles for guild ${settings.guildId}:`,
+      loggers.vrchat.error(
+        `Error syncing roles for guild ${settings.guildId}`,
         error,
       );
     }

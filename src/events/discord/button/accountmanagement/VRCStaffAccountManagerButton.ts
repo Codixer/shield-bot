@@ -17,6 +17,7 @@ import { unfriendUser } from "../../../../utility/vrchat/user.js";
 import { StaffGuard } from "../../../../utility/guards.js";
 import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
 import { sendWhitelistLog, getUserWhitelistRoles } from "../../../../utility/vrchat/whitelistLogger.js";
+import { loggers } from "../../../../utility/logger.js";
 
 @Discord()
 export class VRCStaffAccountManagerButtonHandler {
@@ -99,7 +100,7 @@ export class VRCStaffAccountManagerButtonHandler {
           });
       }
     } catch (error) {
-      console.error("Error in staff account manager button handler:", error);
+      loggers.bot.error("Error in staff account manager button handler", error);
       await interaction.reply({
         content:
           "❌ An error occurred while processing your request. Please try again later.",
@@ -153,15 +154,15 @@ export class VRCStaffAccountManagerButtonHandler {
             accountType: "MAIN",
           });
         } catch (logError) {
-          console.warn(
-            `[Staff Account Manager] Failed to send whitelist log for ${targetDiscordId}:`,
+          loggers.bot.warn(
+            `Failed to send whitelist log for ${targetDiscordId}`,
             logError,
           );
         }
       }
     } catch (error) {
-      console.error(
-        `[Staff Account Manager] Failed to sync whitelist for ${targetDiscordId}:`,
+      loggers.bot.error(
+        `Failed to sync whitelist for ${targetDiscordId}`,
         error,
       );
     }
@@ -200,15 +201,15 @@ export class VRCStaffAccountManagerButtonHandler {
             accountType: "ALT",
           });
         } catch (logError) {
-          console.warn(
-            `[Staff Account Manager] Failed to send whitelist log for ${targetDiscordId}:`,
+          loggers.bot.warn(
+            `Failed to send whitelist log for ${targetDiscordId}`,
             logError,
           );
         }
       }
     } catch (error) {
-      console.error(
-        `[Staff Account Manager] Failed to sync whitelist for ${targetDiscordId}:`,
+      loggers.bot.error(
+        `Failed to sync whitelist for ${targetDiscordId}`,
         error,
       );
     }
@@ -227,8 +228,8 @@ export class VRCStaffAccountManagerButtonHandler {
       try {
         await unfriendUser(vrcUserId);
       } catch (unfriendError) {
-        console.warn(
-          `Failed to unfriend VRChat user ${vrcUserId}:`,
+        loggers.vrchat.warn(
+          `Failed to unfriend VRChat user ${vrcUserId}`,
           unfriendError,
         );
         // Continue with deletion even if unfriending fails
@@ -282,15 +283,15 @@ export class VRCStaffAccountManagerButtonHandler {
           }
         }
       } catch (whitelistError) {
-        console.error(
-          `[Staff Account Manager] Failed to sync whitelist after deletion for ${targetDiscordId}:`,
+        loggers.bot.error(
+          `Failed to sync whitelist after deletion for ${targetDiscordId}`,
           whitelistError,
         );
       }
 
       await this.updateStaffAccountManagerMessage(interaction, targetDiscordId);
     } catch (error) {
-      console.error("Error deleting VRChat account:", error);
+      loggers.bot.error("Error deleting VRChat account", error);
       await interaction.reply({
         content:
           "❌ An error occurred while deleting the account. The account may have been partially removed.",

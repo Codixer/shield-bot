@@ -1,4 +1,6 @@
+import { loggers } from "../../../../utility/logger.js";
+
 export async function handleUserBadgeUnassigned(content: any) {
   // TODO: Implement user-badge-unassigned event handling
-  console.log("[User Badge Unassigned]", content);
+  loggers.vrchat.debug("User Badge Unassigned", { content });
 }

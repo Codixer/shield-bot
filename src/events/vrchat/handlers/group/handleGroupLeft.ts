@@ -1,13 +1,14 @@
 import { prisma } from "../../../../main.js";
 import { groupRoleSyncManager } from "../../../../managers/groupRoleSync/groupRoleSyncManager.js";
+import { loggers } from "../../../../utility/logger.js";
 
 export async function handleGroupLeft(content: any) {
-  console.log("[Group Left]", content);
+  loggers.vrchat.debug("Group Left", { content });
 
   // content should have userId (VRChat user ID)
   const vrcUserId = content.userId;
   if (!vrcUserId) {
-    console.warn("[Group Left] No userId in event content");
+    loggers.vrchat.warn("No userId in event content");
     return;
   }
 
@@ -21,8 +22,8 @@ export async function handleGroupLeft(content: any) {
   });
 
   if (!vrcAccount || !vrcAccount.user) {
-    console.log(
-      `[Group Left] No verified account found for VRChat user ${vrcUserId}`,
+    loggers.vrchat.debug(
+      `No verified account found for VRChat user ${vrcUserId}`,
     );
     return;
   }
@@ -45,8 +46,8 @@ export async function handleGroupLeft(content: any) {
         vrcUserId,
       );
     } catch (error) {
-      console.error(
-        `[Group Left] Error logging group leave for guild ${settings.guildId}:`,
+      loggers.vrchat.error(
+        `Error logging group leave for guild ${settings.guildId}`,
         error,
       );
     }
