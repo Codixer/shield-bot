@@ -34,7 +34,7 @@ let env;
 try {
   env = validateEnv();
 } catch (error) {
-  console.error("Failed to validate environment variables:", error);
+  loggers.startup.error("Failed to validate environment variables", error);
   process.exit(1);
 }
 

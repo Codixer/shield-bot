@@ -1,5 +1,6 @@
 import { prisma } from "../../main.js";
 import { bot } from "../../main.js";
+import { loggers } from "../../utility/logger.js";
 
 /**
  * Discord role synchronization operations
@@ -23,8 +24,8 @@ export class DiscordSync {
     });
     
     if (!user) {
-      console.log(
-        `[Whitelist] User ${discordId} not found in database, skipping sync`,
+      loggers.bot.debug(
+        `User ${discordId} not found in database, skipping sync`,
       );
       return;
     }
@@ -39,8 +40,8 @@ export class DiscordSync {
       if (removeUserFromWhitelistIfNoRoles) {
         await removeUserFromWhitelistIfNoRoles(discordId);
       }
-      console.log(
-        `[Whitelist] User ${discordId} has no verified VRChat accounts - removed from whitelist`,
+      loggers.bot.info(
+        `User ${discordId} has no verified VRChat accounts - removed from whitelist`,
       );
       return;
     }
@@ -61,8 +62,8 @@ export class DiscordSync {
       
       if (validMappedRoles.length < mappedRoles.length) {
         const invalidCount = mappedRoles.length - validMappedRoles.length;
-        console.log(
-          `[Whitelist] User ${discordId} has ${invalidCount} role(s) from other guilds - filtering them out`,
+        loggers.bot.debug(
+          `User ${discordId} has ${invalidCount} role(s) from other guilds - filtering them out`,
         );
       }
     }
@@ -72,8 +73,8 @@ export class DiscordSync {
       if (removeUserFromWhitelistIfNoRoles) {
         await removeUserFromWhitelistIfNoRoles(discordId);
       }
-      console.log(
-        `[Whitelist] User ${discordId} has no qualifying Discord roles - removed from whitelist`,
+      loggers.bot.info(
+        `User ${discordId} has no qualifying Discord roles - removed from whitelist`,
       );
       return;
     }
@@ -131,8 +132,8 @@ export class DiscordSync {
       }
     }
 
-    console.log(
-      `[Whitelist] User ${discordId} synced with ${validMappedRoles.length} role(s) and permissions: [${Array.from(allPermissions).join(", ")}]`,
+    loggers.bot.info(
+      `User ${discordId} synced with ${validMappedRoles.length} role(s) and permissions: [${Array.from(allPermissions).join(", ")}]`,
     );
   }
 
@@ -180,8 +181,8 @@ export class DiscordSync {
       create: { userId: user.id },
     });
 
-    console.log(
-      `[Whitelist] Granted basic access to unverified account for user ${discordId}`,
+    loggers.bot.info(
+      `Granted basic access to unverified account for user ${discordId}`,
     );
 
     // Now check if user has eligible Discord roles for full sync and publish
@@ -224,16 +225,16 @@ export class DiscordSync {
       }
 
       if (!member) {
-        console.log(
-          `[Whitelist] Discord user ${discordId} not found in any guild; skipping full sync`,
+        loggers.bot.debug(
+          `Discord user ${discordId} not found in any guild; skipping full sync`,
         );
         return;
       }
 
       const roleIds: string[] = (member as { roles: { cache: { map: (fn: (role: unknown) => string) => string[] } } }).roles.cache.map((role: unknown) => (role as { id: string }).id);
       if (!roleIds.length) {
-        console.log(
-          `[Whitelist] Discord user ${discordId} has no roles; skipping full sync`,
+        loggers.bot.debug(
+          `Discord user ${discordId} has no roles; skipping full sync`,
         );
         return;
       }
@@ -244,8 +245,8 @@ export class DiscordSync {
         (m: unknown) => (m as { discordRoleId?: string }).discordRoleId && roleIds.includes((m as { discordRoleId: string }).discordRoleId),
       );
       if (eligible.length === 0) {
-        console.log(
-          `[Whitelist] Discord user ${discordId} has no eligible mapped roles; skipping full sync`,
+        loggers.bot.debug(
+          `Discord user ${discordId} has no eligible mapped roles; skipping full sync`,
         );
         return;
       }
@@ -253,8 +254,8 @@ export class DiscordSync {
       // Perform full sync and publish
       await syncAndPublishAfterVerification(discordId);
     } catch (e) {
-      console.warn(
-        `[Whitelist] Failed to perform full sync for unverified user ${discordId}:`,
+      loggers.bot.warn(
+        `Failed to perform full sync for unverified user ${discordId}`,
         e,
       );
     }
@@ -275,8 +276,8 @@ export class DiscordSync {
     const activeBot = (botOverride ?? bot) as { guilds?: { cache?: { values: () => IterableIterator<unknown> }; fetch: (guildId: string) => Promise<unknown> } };
     const guildManager = activeBot?.guilds;
     if (!guildManager) {
-      console.warn(
-        `[Whitelist] Discord client unavailable; skipping whitelist sync for ${discordId}`,
+      loggers.bot.warn(
+        `Discord client unavailable; skipping whitelist sync for ${discordId}`,
       );
       return;
     }
@@ -307,24 +308,24 @@ export class DiscordSync {
             }
           }
         } catch (fetchError) {
-          console.warn(
-            `[Whitelist] Failed to fetch fallback guild ${fallbackGuildId}:`,
+          loggers.bot.warn(
+            `Failed to fetch fallback guild ${fallbackGuildId}`,
             fetchError,
           );
         }
       }
 
       if (!member) {
-        console.log(
-          `[Whitelist] Discord user ${discordId} not found in any guild; skipping whitelist sync`,
+        loggers.bot.debug(
+          `Discord user ${discordId} not found in any guild; skipping whitelist sync`,
         );
         return;
       }
 
       const roleIds: string[] = (member as { roles: { cache: { map: (fn: (role: unknown) => string) => string[] } } }).roles.cache.map((role: unknown) => (role as { id: string }).id);
       if (!roleIds.length) {
-        console.log(
-          `[Whitelist] Discord user ${discordId} has no roles; skipping whitelist sync`,
+        loggers.bot.debug(
+          `Discord user ${discordId} has no roles; skipping whitelist sync`,
         );
         return;
       }
@@ -335,8 +336,8 @@ export class DiscordSync {
         (m: unknown) => (m as { discordRoleId?: string }).discordRoleId && roleIds.includes((m as { discordRoleId: string }).discordRoleId),
       );
       if (eligible.length === 0) {
-        console.log(
-          `[Whitelist] Discord user ${discordId} has no eligible mapped roles; skipping whitelist sync`,
+        loggers.bot.debug(
+          `Discord user ${discordId} has no eligible mapped roles; skipping whitelist sync`,
         );
         return;
       }
@@ -370,12 +371,12 @@ export class DiscordSync {
 
       // Queue batched update instead of immediate publish
       queueBatchedUpdate(discordId, msg);
-      console.log(
-        `[Whitelist] Queued repository update after verification for ${who}`,
+      loggers.bot.info(
+        `Queued repository update after verification for ${who}`,
       );
     } catch (e) {
-      console.warn(
-        `[Whitelist] Failed to sync/publish whitelist for verified user ${discordId}:`,
+      loggers.bot.warn(
+        `Failed to sync/publish whitelist for verified user ${discordId}`,
         e,
       );
     }

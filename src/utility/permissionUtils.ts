@@ -2,6 +2,7 @@ import { PermissionLevel } from "../generated/prisma/client.js";
 import { GuildMember } from "discord.js";
 import { prisma } from "../main.js";
 import { getEnv } from "../config/env.js";
+import { loggers } from "./logger.js";
 
 export { PermissionLevel };
 
@@ -245,7 +246,7 @@ export async function getUserPermissionLevelFromRoles(
   const botOwnerId = getEnv().BOT_OWNER_ID;
 
   if (!botOwnerId) {
-    console.error("BOT_OWNER_ID environment variable is not set!");
+    loggers.bot.error("BOT_OWNER_ID environment variable is not set!");
     return PermissionLevel.USER;
   }
 

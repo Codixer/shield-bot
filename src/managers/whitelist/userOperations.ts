@@ -1,5 +1,6 @@
 import { prisma } from "../../main.js";
 import { searchUsers } from "../../utility/vrchat/user.js";
+import { loggers } from "../../utility/logger.js";
 
 /**
  * User operations for whitelist management
@@ -171,8 +172,8 @@ export class WhitelistUserOperations {
   async removeUserFromWhitelistIfNoRoles(discordId: string): Promise<void> {
     const user = await this.getUserByDiscordId(discordId);
     if (!user || !user.whitelistEntry) {
-      console.log(
-        `[Whitelist] User ${discordId} not found or has no whitelist entry - nothing to remove`,
+      loggers.bot.debug(
+        `User ${discordId} not found or has no whitelist entry - nothing to remove`,
       );
       return;
     }
@@ -188,8 +189,8 @@ export class WhitelistUserOperations {
       where: { userId: user.id },
     });
 
-    console.log(
-      `[Whitelist] Removed user ${discordId} from whitelist - had roles: [${roleIds.join(", ")}]`,
+    loggers.bot.info(
+      `Removed user ${discordId} from whitelist - had roles: [${roleIds.join(", ")}]`,
     );
   }
 
@@ -227,8 +228,8 @@ export class WhitelistUserOperations {
       }
       return Array.from(roles).sort();
     } catch (error) {
-      console.error(
-        `[Whitelist] Failed to get whitelist roles for ${discordId}:`,
+      loggers.bot.error(
+        `Failed to get whitelist roles for ${discordId}`,
         error,
       );
       return [];

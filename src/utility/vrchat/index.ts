@@ -3,6 +3,7 @@
 import { VRChatAPI } from "vrc-ts";
 import path from "path";
 import { fileURLToPath } from "url";
+import { loggers } from "../logger.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -27,12 +28,12 @@ export const vrchatApi = new VRChatAPI({
 // These are kept for any code that might still reference them, but they're no longer used
 export function saveCookie(_cookie: string) {
   // vrc-ts handles cookies internally, this is a no-op for backward compatibility
-  console.warn("[VRChat] saveCookie() is deprecated. vrc-ts handles cookies automatically.");
+  loggers.vrchat.warn("saveCookie() is deprecated. vrc-ts handles cookies automatically.");
 }
 
 export function loadCookie(): string | null {
   // vrc-ts handles cookies internally, this is a no-op for backward compatibility
-  console.warn("[VRChat] loadCookie() is deprecated. vrc-ts handles cookies automatically.");
+  loggers.vrchat.warn("loadCookie() is deprecated. vrc-ts handles cookies automatically.");
   return null;
 }
 

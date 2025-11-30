@@ -1,5 +1,6 @@
 import { prisma } from "../../../../main.js";
 import { WhitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
+import { loggers } from "../../../../utility/logger.js";
 
 const whitelistManager = new WhitelistManager();
 
@@ -11,7 +12,7 @@ export async function handleFriendUpdate(content: any) {
     // console.log("[Friend Update] ", { userId, user });
 
     if (!userId || !user) {
-      console.warn("[Friend Update] Missing userId or user data");
+      loggers.vrchat.warn("Missing userId or user data");
       return;
     }
 
@@ -38,8 +39,8 @@ export async function handleFriendUpdate(content: any) {
             },
           });
 
-          console.log(
-            `[Friend Update] Updated username for ${userId}: ${currentUsername}`,
+          loggers.vrchat.debug(
+            `Updated username for ${userId}: ${currentUsername}`,
           );
 
           // If username changed, update whitelist repository
@@ -48,25 +49,25 @@ export async function handleFriendUpdate(content: any) {
               const oldUsername = vrcAccount.vrchatUsername || 'unknown';
               const msg = `Username updated: ${oldUsername} → ${currentUsername}`;
               whitelistManager.queueBatchedUpdate(userId, msg);
-              console.log(
-                `[Friend Update] Queued whitelist repository update due to username change for ${userId}`,
+              loggers.vrchat.info(
+                `Queued whitelist repository update due to username change for ${userId}`,
               );
             } catch (repoError) {
-              console.warn(
-                `[Friend Update] Failed to queue whitelist repository update for ${userId}:`,
+              loggers.vrchat.warn(
+                `Failed to queue whitelist repository update for ${userId}`,
                 repoError,
               );
             }
           }
         }
       } catch (error) {
-        console.error(
-          `[Friend Update] Error updating username cache for ${userId}:`,
+        loggers.vrchat.error(
+          `Error updating username cache for ${userId}`,
           error,
         );
       }
     }
   } catch (error) {
-    console.error("[Friend Update] Error processing friend update:", error);
+    loggers.vrchat.error("Error processing friend update", error);
   }
 }

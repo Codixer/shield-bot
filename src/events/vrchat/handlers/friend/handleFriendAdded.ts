@@ -5,12 +5,13 @@ import { prisma, bot } from '../../../../main.js';
 import { EmbedBuilder, Colors, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
 import { sendWhitelistLog, getUserWhitelistRoles } from '../../../../utility/vrchat/whitelistLogger.js';
 import { VerificationInteractionManager } from '../../../../managers/verification/verificationInteractionManager.js';
+import { loggers } from '../../../../utility/logger.js';
 
 export async function handleFriendAdd(content: any) {
     // content should include the VRChat user ID of the new friend
     const vrcUserId = content.userId || content.id;
     if (!vrcUserId) {
-        console.log('[Friend Add] No VRChat user ID found in event:', content);
+        loggers.vrchat.warn('No VRChat user ID found in event', { content });
         return;
     }
     // Find the VRChatAccount in the database (pending verification)
@@ -18,7 +19,7 @@ export async function handleFriendAdd(content: any) {
         where: { vrcUserId, accountType: { in: ["IN_VERIFICATION"] } },
     });
     if (!vrcAccount) {
-        console.log('[Friend Add] No VRChatAccount found for VRChat user:', vrcUserId);
+        loggers.vrchat.debug('No VRChatAccount found for VRChat user', { vrcUserId });
         return;
     }
     // Try to update the verified field and set verification status to VERIFIED
@@ -29,7 +30,7 @@ export async function handleFriendAdd(content: any) {
             const userInfo = await getUserById(vrcUserId);
             vrchatUsername = userInfo?.displayName || userInfo?.username;
         } catch (e) {
-            console.warn(`Failed to fetch username for ${vrcUserId}:`, e);
+            loggers.vrchat.warn(`Failed to fetch username for ${vrcUserId}`, e);
         }
 
         // Determine account type based on whether user has a MAIN account
@@ -48,7 +49,7 @@ export async function handleFriendAdd(content: any) {
             }
         });
 
-        console.log(`[Friend Add] Account ${vrcUserId} successfully verified and marked as VERIFIED`);
+        loggers.vrchat.info(`Account ${vrcUserId} successfully verified and marked as VERIFIED`);
 
         // Get user's Discord ID for interaction lookup
         const user = await prisma.user.findUnique({ where: { id: vrcAccount.userId } });
@@ -67,12 +68,12 @@ export async function handleFriendAdd(content: any) {
             await sendDMConfirmation(vrcAccount.userId, vrcUserId, vrchatUsername);
         }
     } catch (e) {
-        console.log('[Friend Add] Could not update verification status:', e);
+        loggers.vrchat.error('Could not update verification status', e);
     }
     // Fetch the Discord user by userId and update whitelist
     const user = await prisma.user.findUnique({ where: { id: vrcAccount.userId, } });
     if (user && user.discordId) {
-        console.log(`[Friend Add] VRChat account for Discord user: ${user.discordId}`);
+        loggers.vrchat.debug(`VRChat account for Discord user: ${user.discordId}`);
         try {
             // For verified accounts, sync and publish with roles
             if (vrchatUsername) { // If username was fetched, it was verified
@@ -106,7 +107,7 @@ export async function handleFriendAdd(content: any) {
                             }
                         }
                     } catch (logError) {
-                        console.warn(`[Friend Add] Failed to send whitelist log for ${user.discordId}:`, logError);
+                        loggers.vrchat.warn(`Failed to send whitelist log for ${user.discordId}`, logError);
                     }
                 }
             } else {
@@ -114,7 +115,7 @@ export async function handleFriendAdd(content: any) {
                 await whitelistManager.ensureUnverifiedAccountAccess(user.discordId);
             }
         } catch (e) {
-            console.warn(`[Friend Add] Failed to update whitelist for user ${user.discordId}:`, e);
+            loggers.vrchat.warn(`Failed to update whitelist for user ${user.discordId}`, e);
         }
         // Optionally, send a Discord notification here
     }
@@ -161,7 +162,7 @@ async function buildVerificationSuccessEmbed(
                     hasOnlyDefaultRole = totalRoles <= 1;
                 }
             } catch (error) {
-                console.debug(`[Update Verification Message] Could not check group membership for ${vrcUserId}:`, error);
+                loggers.vrchat.debug(`Could not check group membership for ${vrcUserId}`, error);
             }
 
             if (isInGroup) {
@@ -248,10 +249,10 @@ async function updateVerificationMessage(
             // Remove the interaction since we've used it
             VerificationInteractionManager.removeInteraction(discordId, vrcUserId);
 
-            console.log(`[Update Verification Message] Successfully updated via stored interaction for ${vrcUserId}`);
+            loggers.vrchat.info(`Successfully updated via stored interaction for ${vrcUserId}`);
             return true;
         } catch (error) {
-            console.warn(`[Update Verification Message] Failed to update via stored interaction:`, error);
+            loggers.vrchat.warn(`Failed to update via stored interaction`, error);
             return false;
         }
     }
@@ -268,7 +269,7 @@ async function sendDMConfirmation(userId: number, vrcUserId: string, vrchatUsern
         // Get the user from database to get their Discord ID
         const user = await prisma.user.findUnique({ where: { id: userId } });
         if (!user?.discordId) {
-            console.warn('[DM Confirmation] No Discord ID found for user:', userId);
+            loggers.vrchat.warn('No Discord ID found for user', { userId });
             return;
         }
 
@@ -308,7 +309,7 @@ async function sendDMConfirmation(userId: number, vrcUserId: string, vrchatUsern
                     }
                 } catch (error) {
                     // User is not in group or error checking - treat as not in group
-                    console.debug(`[DM Confirmation] Could not check group membership for ${vrcUserId}:`, error);
+                    loggers.vrchat.debug(`Could not check group membership for ${vrcUserId}`, error);
                 }
 
                 if (isInGroup) {
@@ -385,12 +386,12 @@ async function sendDMConfirmation(userId: number, vrcUserId: string, vrchatUsern
                 embeds: [embed],
                 components: components.length > 0 ? components : undefined,
             });
-            console.log(`[DM Confirmation] Successfully sent verification confirmation DM to ${user.discordId}`);
+            loggers.vrchat.info(`Successfully sent verification confirmation DM to ${user.discordId}`);
         } catch (dmError: any) {
             // If DM fails (user has DMs disabled, etc.), log but don't throw
-            console.warn(`[DM Confirmation] Failed to send DM to ${user.discordId}:`, dmError.message || dmError);
+            loggers.vrchat.warn(`Failed to send DM to ${user.discordId}`, dmError);
         }
     } catch (error) {
-        console.error('[DM Confirmation] Error in sendDMConfirmation:', error);
+        loggers.vrchat.error('Error in sendDMConfirmation', error);
     }
 }

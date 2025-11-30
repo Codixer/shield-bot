@@ -6,6 +6,7 @@ import { WhitelistRoleOperations } from "./roleOperations.js";
 import { WhitelistGeneration } from "./whitelistGeneration.js";
 import { GitHubPublisher } from "./githubPublisher.js";
 import { DiscordSync } from "./discordSync.js";
+import { loggers } from "../../utility/logger.js";
 
 /**
  * Main whitelist manager that orchestrates all whitelist operations
@@ -172,7 +173,7 @@ export class WhitelistManager {
 
     // Skip update if content hasn't changed (unless forced)
     if (!force && this.lastPublishedContent !== null && currentContent === this.lastPublishedContent) {
-      console.log('[Whitelist] Content unchanged, skipping GitHub update');
+      loggers.bot.debug('Content unchanged, skipping GitHub update');
       return { updated: false, reason: 'Content unchanged' };
     }
 
@@ -205,13 +206,13 @@ export class WhitelistManager {
               `https://api.vrcshield.com/api/vrchat/whitelist/encoded`
             ];
             await purgeCloudflareCache(zoneId, apiToken, urls);
-            console.log(`[Whitelist] Purged Cloudflare cache for guild ${gid}`);
+            loggers.bot.info(`Purged Cloudflare cache for guild ${gid}`);
           }
         } catch (err) {
-          console.warn(`[Whitelist] Cloudflare purge failed:`, err);
+          loggers.bot.warn(`Cloudflare purge failed`, err);
         }
       } else {
-        console.log(`[Whitelist] Cloudflare cache purge skipped - missing zone ID or API token`);
+        loggers.bot.debug(`Cloudflare cache purge skipped - missing zone ID or API token`);
       }
     }
     return result;
@@ -247,7 +248,7 @@ export class WhitelistManager {
     this.pendingUpdates.clear();
     this.updateTimer = null;
 
-    console.log(`[Whitelist] Processing batched update for ${count} users`);
+    loggers.bot.info(`Processing batched update for ${count} users`);
 
     try {
       // Generate a meaningful commit message if not provided
@@ -270,7 +271,7 @@ export class WhitelistManager {
       // Publish with content change check
       await this.publishWhitelist(message, false);
     } catch (error) {
-      console.error('[Whitelist] Error processing batched updates:', error);
+      loggers.bot.error('Error processing batched updates', error);
     }
   }
 
@@ -385,7 +386,7 @@ export class WhitelistManager {
             try {
               // Note: This needs to be updated to use roleId instead of roleName
               // TODO: Look up role by Discord role ID or other identifier
-              console.warn(`[Bulk Import] Role assignment by name is deprecated: ${roleName}`);
+              loggers.bot.warn(`Role assignment by name is deprecated: ${roleName}`);
             } catch (error) {
               // Ignore role assignment errors for now
             }
@@ -413,9 +414,9 @@ export class WhitelistManager {
     }
     // Process any pending updates before shutdown
     if (this.pendingUpdates.size > 0) {
-      console.log(`[WhitelistManager] Processing ${this.pendingUpdates.size} pending updates before shutdown`);
+      loggers.bot.info(`Processing ${this.pendingUpdates.size} pending updates before shutdown`);
       this.processBatchedUpdates("Shutdown cleanup").catch((err) => {
-        console.error("[WhitelistManager] Error processing final updates:", err);
+        loggers.bot.error("Error processing final updates", err);
       });
     }
   }

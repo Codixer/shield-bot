@@ -1,5 +1,6 @@
 import { VRCWebSocket, EventType } from "vrc-ts";
 import { vrchatApi } from "../../utility/vrchat/index.js";
+import { loggers } from "../../utility/logger.js";
 import {
   handleFriendActive,
   handleFriendDelete,
@@ -38,11 +39,11 @@ export function stopVRChatWebSocketListener() {
         (ws as any).disconnect();
       }
     } catch (error) {
-      console.error("[WS] Error disconnecting WebSocket:", error);
+      loggers.vrchat.error("Error disconnecting WebSocket", error);
     }
     ws = null;
   }
-  console.log("[WS] VRChat WebSocket listener stopped");
+  loggers.vrchat.info("VRChat WebSocket listener stopped");
 }
 
 /**
@@ -51,13 +52,13 @@ export function stopVRChatWebSocketListener() {
 export function startVRChatWebSocketListener() {
   // Check if already connected
   if (ws) {
-    console.warn("[WS] WebSocket already connected");
+    loggers.vrchat.warn("WebSocket already connected");
     return;
   }
 
   // Check if API is logged in
   if (!vrchatApi.currentUser) {
-    console.error("[WS] Not logged in to VRChat. Please log in first.");
+    loggers.vrchat.error("Not logged in to VRChat. Please log in first.");
     return;
   }
 
@@ -89,7 +90,7 @@ export function startVRChatWebSocketListener() {
           user: data.user,
         });
       } catch (err) {
-        console.error("[WS] Error handling friend-add:", err);
+        loggers.vrchat.error("Error handling friend-add", err);
       }
     });
 
@@ -100,7 +101,7 @@ export function startVRChatWebSocketListener() {
           user: data.user,
         });
       } catch (err) {
-        console.error("[WS] Error handling friend-delete:", err);
+        loggers.vrchat.error("Error handling friend-delete", err);
       }
     });
 
@@ -115,7 +116,7 @@ export function startVRChatWebSocketListener() {
           user: data.user,
         });
       } catch (err) {
-        console.error("[WS] Error handling friend-online:", err);
+        loggers.vrchat.error("Error handling friend-online", err);
       }
     });
 
@@ -128,7 +129,7 @@ export function startVRChatWebSocketListener() {
           user: data.user,
         });
       } catch (err) {
-        console.error("[WS] Error handling friend-active:", err);
+        loggers.vrchat.error("Error handling friend-active", err);
       }
     });
 
@@ -139,7 +140,7 @@ export function startVRChatWebSocketListener() {
           user: data.user,
         });
       } catch (err) {
-        console.error("[WS] Error handling friend-offline:", err);
+        loggers.vrchat.error("Error handling friend-offline", err);
       }
     });
 
@@ -150,7 +151,7 @@ export function startVRChatWebSocketListener() {
           user: data.user,
         });
       } catch (err) {
-        console.error("[WS] Error handling friend-update:", err);
+        loggers.vrchat.error("Error handling friend-update", err);
       }
     });
 
@@ -164,7 +165,7 @@ export function startVRChatWebSocketListener() {
           user: data.user,
         });
       } catch (err) {
-        console.error("[WS] Error handling friend-location:", err);
+        loggers.vrchat.error("Error handling friend-location", err);
       }
     });
 
@@ -174,7 +175,7 @@ export function startVRChatWebSocketListener() {
         // vrc-ts notification format may differ, adapt as needed
         await handleNotification(data);
       } catch (err) {
-        console.error("[WS] Error handling notification:", err);
+        loggers.vrchat.error("Error handling notification", err);
       }
     });
 
@@ -183,13 +184,13 @@ export function startVRChatWebSocketListener() {
         // Handle v2 notifications
         await handleNotification(data);
       } catch (err) {
-        console.error("[WS] Error handling notification-v2:", err);
+        loggers.vrchat.error("Error handling notification-v2", err);
       }
     });
 
     // Error handling
     ws.on(EventType.Error, (error: any) => {
-      console.error("[WS] VRChat WebSocket error:", error);
+      loggers.vrchat.error("VRChat WebSocket error", error);
     });
 
     // Connection events - vrc-ts WebSocket may use different event names
@@ -198,22 +199,22 @@ export function startVRChatWebSocketListener() {
     if (typeof (ws as any).on === "function") {
       try {
         (ws as any).on("open", () => {
-          console.log("[WS] Connected to VRChat WebSocket");
+          loggers.vrchat.info("Connected to VRChat WebSocket");
         });
 
         (ws as any).on("close", () => {
-          console.warn("[WS] VRChat WebSocket disconnected");
+          loggers.vrchat.warn("VRChat WebSocket disconnected");
           ws = null;
         });
       } catch (error) {
         // Event listeners may not be available in this format
-        console.debug("[WS] Could not set up connection event listeners");
+        loggers.vrchat.debug("Could not set up connection event listeners");
       }
     }
 
-    console.log("[WS] VRChat WebSocket listener started");
+    loggers.vrchat.info("VRChat WebSocket listener started");
   } catch (error) {
-    console.error("[WS] Failed to start VRChat WebSocket listener:", error);
+    loggers.vrchat.error("Failed to start VRChat WebSocket listener", error);
     ws = null;
   }
 }

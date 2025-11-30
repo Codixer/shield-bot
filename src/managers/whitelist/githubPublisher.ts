@@ -1,3 +1,5 @@
+import { loggers } from "../../utility/logger.js";
+
 /**
  * GitHub publishing operations for whitelist
  */
@@ -179,8 +181,8 @@ export class GitHubPublisher {
         });
         signature = typeof signed === "string" ? signed : String(signed);
       } catch (e) {
-        console.warn(
-          "[Whitelist] Failed to sign commit, falling back to unsigned commit:",
+        loggers.bot.warn(
+          "Failed to sign commit, falling back to unsigned commit",
           e,
         );
       }

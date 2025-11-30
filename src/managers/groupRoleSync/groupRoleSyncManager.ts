@@ -6,6 +6,7 @@ import {
   getGroupRoles,
 } from "../../utility/vrchat/groups.js";
 import { GuildMember, EmbedBuilder, Colors, TextChannel } from "discord.js";
+import { loggers } from "../../utility/logger.js";
 
 /**
  * Manager for syncing VRChat group roles to Discord roles
@@ -82,8 +83,8 @@ export class GroupRoleSyncManager {
 
       return highestRankOrder;
     } catch (error) {
-      console.error(
-        `[GroupRoleSync] Error getting role order for ${userId}:`,
+      loggers.vrchat.error(
+        `Error getting role order for ${userId}`,
         error,
       );
       return Infinity;
@@ -154,8 +155,8 @@ export class GroupRoleSyncManager {
       // Example: Bot order 3, Member order 2 → Bot CANNOT manage (3 > 2)
       return botHighestRankOrder < memberHighestRankOrder;
     } catch (error) {
-      console.error(
-        `[GroupRoleSync] Error checking if bot can manage ${userId}:`,
+      loggers.vrchat.error(
+        `Error checking if bot can manage ${userId}`,
         error,
       );
       return false;
@@ -263,9 +264,9 @@ export class GroupRoleSyncManager {
           try {
             await addRoleToGroupMember(groupId, vrcUserId, roleId);
           } catch (error: any) {
-            console.error(
-              `[GroupRoleSync] Failed to add VRChat role ${roleId}:`,
-              error.message,
+            loggers.vrchat.error(
+              `Failed to add VRChat role ${roleId}`,
+              error,
             );
           }
         }
@@ -276,9 +277,9 @@ export class GroupRoleSyncManager {
           try {
             await removeRoleFromGroupMember(groupId, vrcUserId, roleId);
           } catch (error: any) {
-            console.error(
-              `[GroupRoleSync] Failed to remove VRChat role ${roleId}:`,
-              error.message,
+            loggers.vrchat.error(
+              `Failed to remove VRChat role ${roleId}`,
+              error,
             );
           }
         }
@@ -295,8 +296,8 @@ export class GroupRoleSyncManager {
         );
       }
     } catch (error) {
-      console.error(
-        `[GroupRoleSync] Error syncing roles for ${discordId}:`,
+      loggers.vrchat.error(
+        `Error syncing roles for ${discordId}`,
         error,
       );
       throw error;
@@ -380,7 +381,7 @@ export class GroupRoleSyncManager {
 
       await channel.send({ embeds: [embed] });
     } catch (error) {
-      console.error("[GroupRoleSync] Error logging role sync:", error);
+      loggers.vrchat.error("Error logging role sync", error);
     }
   }
 
@@ -455,7 +456,7 @@ export class GroupRoleSyncManager {
 
       await channel.send({ embeds: [embed] });
     } catch (error) {
-      console.error("[GroupRoleSync] Error handling group left:", error);
+      loggers.vrchat.error("Error handling group left", error);
     }
   }
 }

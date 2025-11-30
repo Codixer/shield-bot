@@ -1,9 +1,10 @@
 import { Client } from "discord.js";
+import { loggers } from "../utility/logger.js";
 
 export function initializeSchedules(_client: Client) {
-  console.log("[SCHEDULES] No scheduled tasks to initialize.");
+  loggers.schedules.info("No scheduled tasks to initialize.");
 }
 
 export function stopSchedules() {
-  console.log("[SCHEDULES] No scheduled tasks to stop.");
+  loggers.schedules.info("No scheduled tasks to stop.");
 }

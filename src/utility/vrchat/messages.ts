@@ -2,6 +2,8 @@
 // NOTE: This functionality has been disabled as it's not currently in use
 // The functions are stubbed out to prevent errors if they're still referenced
 
+import { loggers } from "../logger.js";
+
 // import type { InviteMessage } from "../../managers/messages/InviteMessageManager.js"; // Not used in disabled functions
 
 /**
@@ -14,7 +16,7 @@ export async function updateInviteMessage(_params: {
   slot?: number;
   message: string;
 }): Promise<never> {
-  console.warn("[VRChat Messages] updateInviteMessage is disabled - functionality not in use");
+  loggers.vrchat.warn("updateInviteMessage is disabled - functionality not in use");
   throw new Error("Invite message functionality has been disabled");
 }
 
@@ -26,6 +28,6 @@ export async function listInviteMessages(_params: {
   userId: string;
   messageType?: "message" | "response" | "request" | "requestResponse";
 }): Promise<never> {
-  console.warn("[VRChat Messages] listInviteMessages is disabled - functionality not in use");
+  loggers.vrchat.warn("listInviteMessages is disabled - functionality not in use");
   throw new Error("Invite message functionality has been disabled");
 }
