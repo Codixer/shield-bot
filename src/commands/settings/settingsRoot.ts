@@ -1,7 +1,5 @@
-import { Discord, Slash, SlashGroup } from "discordx";
+import { Discord, SlashGroup } from "discordx";
 import {
-  CommandInteraction,
-  MessageFlags,
   InteractionContextType,
   ApplicationIntegrationType,
 } from "discord.js";

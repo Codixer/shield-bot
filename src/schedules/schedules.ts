@@ -1,6 +1,6 @@
 import { Client } from "discord.js";
 
-export function initializeSchedules(client: Client) {
+export function initializeSchedules(_client: Client) {
   console.log("[SCHEDULES] No scheduled tasks to initialize.");
 }
 

@@ -59,13 +59,14 @@ export class VRChatAvatarInviteButtonHandler {
 
       // Check if user's status is "ask me" (orange/invite me)
       if (vrcUser.status !== "ask me") {
-        const statusEmoji = {
+        const statusEmojiMap: Record<string, string> = {
           "active": "🟢",
           "join me": "🟢", 
           "ask me": "🟠",
           "busy": "🔴",
           "offline": "⚫"
-        }[vrcUser.status] || "❓";
+        };
+        const statusEmoji = statusEmojiMap[vrcUser.status as string] || "❓";
 
         await interaction.editReply({
           content:
@@ -84,7 +85,8 @@ export class VRChatAvatarInviteButtonHandler {
         canRequestInvite: true,
       });
 
-      if (!instance || !instance.instanceId) {
+      const instanceTyped = instance as { instanceId?: string; location?: string; world?: { name?: string }; shortName?: string } | null;
+      if (!instanceTyped || !instanceTyped.instanceId) {
         await interaction.editReply({
           content: "❌ Failed to create instance. Please try again later.",
         });
@@ -92,14 +94,14 @@ export class VRChatAvatarInviteButtonHandler {
       }
 
       // Invite user to the instance
-      await inviteUser(vrcAccount.vrcUserId, instance.location);
+      await inviteUser(vrcAccount.vrcUserId, instanceTyped.location || "");
 
       const embed = new EmbedBuilder()
         .setTitle("✅ Instance Created & Invite Sent")
         .setDescription(
           `An instance has been created and an invite has been sent to your VRChat account.\n\n` +
-          `**World:** ${instance.world?.name || worldId}\n` +
-          `**Instance ID:** ${instance.shortName || instance.instanceId}\n\n` +
+          `**World:** ${instanceTyped.world?.name || worldId}\n` +
+          `**Instance ID:** ${instanceTyped.shortName || instanceTyped.instanceId || ""}\n\n` +
           `Check your VRChat notifications for the invite!`
         )
         .setColor(Colors.Green)

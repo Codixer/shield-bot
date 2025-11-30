@@ -6,11 +6,9 @@ import {
 } from "discord.js";
 import { Pagination } from "@discordx/pagination";
 import { Discord, Slash, SlashGroup, SlashOption, Guard } from "discordx";
-import { WhitelistManager } from "../../managers/whitelist/whitelistManager.js";
+import { whitelistManager } from "../../managers/whitelist/whitelistManager.js";
 import { searchUsers } from "../../utility/vrchat/user.js";
 import { StaffGuard } from "../../utility/guards.js";
-
-const whitelistManager = new WhitelistManager();
 
 @Discord()
 @SlashGroup({
@@ -1050,25 +1048,27 @@ export class WhitelistCommands {
 
         for (const whitelistEntry of whitelistedUsers) {
           try {
-            if (!whitelistEntry.discordId) continue;
+            const entry = whitelistEntry as { discordId?: string; vrchatUsername?: string };
+            if (!entry.discordId) continue;
 
             // Check if user is in the current guild members
-            const isInGuild = members.has(whitelistEntry.discordId);
+            const isInGuild = members.has(entry.discordId);
 
             if (!isInGuild) {
               // User has whitelist access but is not in the guild - remove them
               await whitelistManager.removeUserFromWhitelistIfNoRoles(
-                whitelistEntry.discordId,
+                entry.discordId,
               );
               usersNotInGuild++;
               accessRevoked++;
               console.log(
-                `[Whitelist] Removed ${whitelistEntry.vrchatUsername || whitelistEntry.discordId} - no longer in guild`,
+                `[Whitelist] Removed ${entry.vrchatUsername || entry.discordId} - no longer in guild`,
               );
             }
           } catch (error) {
+            const entry = whitelistEntry as { discordId?: string; vrchatUsername?: string };
             console.error(
-              `[Whitelist] Error checking guild membership for ${whitelistEntry.vrchatUsername || whitelistEntry.discordId}:`,
+              `[Whitelist] Error checking guild membership for ${entry.vrchatUsername || entry.discordId}:`,
               error,
             );
             errors++;

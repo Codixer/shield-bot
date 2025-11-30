@@ -58,7 +58,7 @@ export class GroupSelfInviteCommand {
       const result = await inviteUserToGroup(guildSettings.vrcGroupId, vrcAccount.vrcUserId);
 
       // Check if user is already a member
-      if (result?.alreadyMember) {
+      if (result && typeof result === "object" && "alreadyMember" in result && result.alreadyMember) {
         const embed = new EmbedBuilder()
           .setTitle("ℹ️ Already a Member")
           .setDescription(

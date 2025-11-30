@@ -10,7 +10,7 @@ export class PatrolButtonHandlers {
   @Guard(StaffGuard)
   async handleWipeConfirm(interaction: ButtonInteraction) {
     if (!interaction.guildId) return;    
-    const [_, userId, ephemeralStr] = interaction.customId.split(":");
+    const [_, userId, _ephemeralStr] = interaction.customId.split(":");
     
     // Check permissions again
     const member = interaction.member as GuildMember;

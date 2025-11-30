@@ -25,14 +25,14 @@ export class GroupRoleSyncManager {
     }
 
     const roles = await getGroupRoles(groupId);
-    this.roleCache.set(groupId, roles);
+    this.roleCache.set(groupId, roles as unknown[]);
 
     // Clear cache after 5 minutes
     setTimeout(() => {
       this.roleCache.delete(groupId);
     }, 5 * 60 * 1000);
 
-    return roles;
+    return roles as unknown[];
   }
 
   /**
@@ -56,9 +56,10 @@ export class GroupRoleSyncManager {
       }
 
       // Get the role IDs to check
+      const memberTyped = member as { mRoleIds?: string[]; roleIds?: string[] };
       const roleIdsToCheck = managementOnly
-        ? member.mRoleIds || []
-        : [...(member.roleIds || []), ...(member.mRoleIds || [])];
+        ? memberTyped.mRoleIds || []
+        : [...(memberTyped.roleIds || []), ...(memberTyped.mRoleIds || [])];
 
       if (roleIdsToCheck.length === 0) {
         return Infinity; // No roles = lowest possible rank
@@ -95,7 +96,8 @@ export class GroupRoleSyncManager {
    * @param userId VRChat user ID
    * @returns The order of the highest management role, or -1 if none
    */
-  private async getHighestManagementRoleOrder(
+  // @ts-expect-error - Method kept for future use
+  private async _getHighestManagementRoleOrder(
     groupId: string,
     userId: string,
   ): Promise<number> {
@@ -222,9 +224,10 @@ export class GroupRoleSyncManager {
       // Get the VRChat role IDs the member currently has (non-management only)
       // VRChat has two role arrays: roleIds (regular) and mRoleIds (management/permissions)
       // We need to check both to see if the user has the role
+      const groupMemberTyped = groupMember as { roleIds?: string[]; mRoleIds?: string[] };
       const currentVrcRoleIds = new Set([
-        ...(groupMember.roleIds || []),
-        ...(groupMember.mRoleIds || []),
+        ...(groupMemberTyped.roleIds || []),
+        ...(groupMemberTyped.mRoleIds || []),
       ]);
 
       // Group mappings by VRChat role (since multiple Discord roles can map to one VRChat role)
@@ -411,7 +414,7 @@ export class GroupRoleSyncManager {
   async handleGroupLeft(
     guildId: string,
     discordId: string,
-    vrcUserId: string,
+    _vrcUserId: string,
   ): Promise<void> {
     try {
       const settings = await prisma.guildSettings.findUnique({

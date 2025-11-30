@@ -9,7 +9,6 @@ import {
 import {
   ApplicationCommandOptionType,
   CommandInteraction,
-  PermissionFlagsBits,
   Role,
   MessageFlags,
   EmbedBuilder,

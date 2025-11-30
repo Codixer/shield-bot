@@ -12,14 +12,14 @@ export async function createInstance({
   type = "friends",
   region = "us",
   ownerId,
-  canRequestInvite = false,
+  canRequestInvite: _canRequestInvite = false,
 }: {
   worldId: string;
   type?: "public" | "hidden" | "friends" | "private" | "group";
   region?: "us" | "use" | "eu" | "jp";
   ownerId?: string;
   canRequestInvite?: boolean;
-}): Promise<any> {
+}): Promise<unknown> {
   // For non-public instances, ownerId is required
   let finalOwnerId = ownerId;
   if (type !== "public" && !finalOwnerId) {
@@ -44,13 +44,24 @@ export async function createInstance({
                             region === "eu" ? "eu" :
                             region === "jp" ? "jp" : "us") as InstanceRegionType;
 
-    return await vrchatApi.instanceApi.generateNormalInstance({
+    // Build request - ownerId only needed for invite types
+    const request: {
+      worldId: WorldIdType;
+      instanceType: InstanceAccessNormalType;
+      region: InstanceRegionType;
+      ownerId?: string;
+    } = {
       worldId: worldId as WorldIdType,
       instanceType: instanceType as unknown as InstanceAccessNormalType,
       region: instanceRegion,
-      ownerId: finalOwnerId,
-      // canRequestInvite is not a parameter in generateNormalInstance
-    });
+    };
+
+    // Add ownerId for private instances (needed for non-public instances)
+    if (finalOwnerId && type === "private") {
+      request.ownerId = finalOwnerId;
+    }
+
+    return await vrchatApi.instanceApi.generateNormalInstance(request as Parameters<typeof vrchatApi.instanceApi.generateNormalInstance>[0]);
   } catch (error: any) {
     if (error instanceof RequestError) {
       throw new Error(

@@ -5,8 +5,6 @@ import {
   MessageFlags,
 } from "discord.js";
 import {
-  VRChatLoginGuard,
-  AttendanceHostGuard,
   StaffGuard,
 } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";

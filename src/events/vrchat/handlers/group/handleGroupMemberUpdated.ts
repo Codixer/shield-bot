@@ -68,7 +68,7 @@ export async function handleGroupMemberUpdated(content: any) {
     try {
       console.log(`[Group Member Updated] Fetching group member and roles info...`);
       groupMember = await getGroupMember(groupId, vrcUserId);
-      allRoles = await getGroupRoles(groupId);
+      allRoles = (await getGroupRoles(groupId)) as unknown[];
 
       // Map role IDs to names
       const roleMap = new Map(allRoles.map((r: any) => [r.id, r.name]));

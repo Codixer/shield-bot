@@ -9,15 +9,16 @@ import {
   handleFriendUpdate,
 } from "./handlers/friend/index.js";
 import { handleFriendAdd } from "./handlers/friend/handleFriendAdded.js";
-import { handleUserUpdate } from "./handlers/user/handleUserUpdate.js";
-import { handleUserLocation } from "./handlers/user/handleUserLocation.js";
-import { handleUserBadgeAssigned } from "./handlers/user/handleUserBadgeAssigned.js";
-import { handleUserBadgeUnassigned } from "./handlers/user/handleUserBadgeUnassigned.js";
-import { handleContentRefresh } from "./handlers/user/handleContentRefresh.js";
-import { handleInstanceQueueJoined } from "./handlers/user/handleInstanceQueueJoined.js";
-import { handleGroupJoined } from "./handlers/group/handleGroupJoined.js";
-import { handleGroupLeft } from "./handlers/group/handleGroupLeft.js";
-import { handleGroupRoleUpdated } from "./handlers/group/handleGroupRoleUpdated.js";
+// TODO: Implement these handlers when needed
+// import { handleUserUpdate } from "./handlers/user/handleUserUpdate.js";
+// import { handleUserLocation } from "./handlers/user/handleUserLocation.js";
+// import { handleUserBadgeAssigned } from "./handlers/user/handleUserBadgeAssigned.js";
+// import { handleUserBadgeUnassigned } from "./handlers/user/handleUserBadgeUnassigned.js";
+// import { handleContentRefresh } from "./handlers/user/handleContentRefresh.js";
+// import { handleInstanceQueueJoined } from "./handlers/user/handleInstanceQueueJoined.js";
+// import { handleGroupJoined } from "./handlers/group/handleGroupJoined.js";
+// import { handleGroupLeft } from "./handlers/group/handleGroupLeft.js";
+// import { handleGroupRoleUpdated } from "./handlers/group/handleGroupRoleUpdated.js";
 import { handleNotification } from "./handlers/notification/notification.js";
 
 // WebSocket instance

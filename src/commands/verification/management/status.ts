@@ -8,8 +8,6 @@ import {
   AutocompleteInteraction,
   InteractionContextType,
   ApplicationIntegrationType,
-  ButtonBuilder,
-  ButtonStyle,
 } from "discord.js";
 import { VRChatLoginGuard } from "../../../utility/guards.js";
 import { getUserById, searchUsers } from "../../../utility/vrchat.js";

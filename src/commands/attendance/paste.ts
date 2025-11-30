@@ -47,7 +47,8 @@ export class VRChatAttendancePasteCommand {
       const autoInteraction = interaction as AutocompleteInteraction;
       const focused = autoInteraction.options.getFocused(true);
       if (focused.name === "event_id") {
-        const user = await attendanceManager.findOrCreateUserByDiscordId(
+        // User lookup needed for event filtering
+        void await attendanceManager.findOrCreateUserByDiscordId(
           autoInteraction.user.id,
         );
         const events = await attendanceManager.getAllEvents();

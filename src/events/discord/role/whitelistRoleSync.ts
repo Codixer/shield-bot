@@ -27,11 +27,12 @@ export class WhitelistRoleSync {
     const permissions = new Set<string>();
     const roleMappings = await whitelistManager.getDiscordRoleMappings();
     for (const mapping of roleMappings) {
-      if (!mapping.discordRoleId) continue;
-      if (discordRoleIds.includes(mapping.discordRoleId)) {
+      const mappingTyped = mapping as { discordRoleId?: string; permissions?: string };
+      if (!mappingTyped.discordRoleId) continue;
+      if (discordRoleIds.includes(mappingTyped.discordRoleId)) {
         // Note: name field was removed, using discordRoleId as identifier
-        roles.push(mapping.discordRoleId);
-        const perms = mapping.permissions as string | null | undefined;
+        roles.push(mappingTyped.discordRoleId);
+        const perms = mappingTyped.permissions;
         if (perms)
           for (const p of perms
             .split(",")

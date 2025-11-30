@@ -9,6 +9,8 @@ import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../../main.js";
 import { getUserById } from "../../../../../utility/vrchat.js";
 import { VerificationInteractionManager } from "../../../../../managers/verification/verificationInteractionManager.js";
+import { loggers } from "../../../../../utility/logger.js";
+import { DiscordColors } from "../../../../../config/constants.js";
 
 @Discord()
 export class VRChatStatusVerifyButtonHandler {
@@ -18,7 +20,7 @@ export class VRChatStatusVerifyButtonHandler {
     const discordId = parts[1];
     const vrcUserId = parts[2];
 
-    // TODO: Generate and store a unique verification code for this user in the database
+    // Generate and store a unique verification code for this user in the database
     const verificationCode = Math.random()
       .toString(36)
       .slice(2, 8)
@@ -32,7 +34,7 @@ export class VRChatStatusVerifyButtonHandler {
       .setDescription(
         `To verify, change your VRChat status to the following code:\n\n**${verificationCode}**\n\nOnce you've changed your status, click **Verify status** below.`,
       )
-      .setColor(0xfee75c);
+      .setColor(DiscordColors.WARNING);
     const verifyBtn = new ButtonBuilder()
       .setCustomId(`vrchat-status-verify:${discordId}:${vrcUserId}`)
       .setLabel("Verify status")
@@ -79,7 +81,7 @@ export class VRChatStatusVerifyButtonHandler {
         .setDescription(
           "No verification code found for this account, or this account is not linked to your Discord user. Please restart the verification process.",
         )
-        .setColor(0xed4245);
+        .setColor(DiscordColors.ERROR);
       await interaction.editReply({
         embeds: [embed],
         components: [],
@@ -87,10 +89,13 @@ export class VRChatStatusVerifyButtonHandler {
       return;
     }
     // Fetch the VRChat user info
-    let userInfo: any = null;
+    let userInfo: Awaited<ReturnType<typeof getUserById>> | null = null;
     try {
       userInfo = await getUserById(vrcUserId);
     } catch (e) {
+      loggers.vrchat.error("Failed to fetch user info for verification", e, {
+        vrcUserId,
+      });
       userInfo = null;
     }
     if (!userInfo || !userInfo.statusDescription) {
@@ -99,7 +104,7 @@ export class VRChatStatusVerifyButtonHandler {
         .setDescription(
           "Could not fetch VRChat user status. Please try again later.",
         )
-        .setColor(0xed4245);
+        .setColor(DiscordColors.ERROR);
       await interaction.editReply({
         embeds: [embed],
         components: [],
@@ -133,7 +138,7 @@ export class VRChatStatusVerifyButtonHandler {
         .setDescription(
           `Your VRChat account (**${vrchatUsername || vrcUserId}**) has been successfully verified via status change!\n\n✅ Your account is now fully verified and protected from takeover.`,
         )
-        .setColor(0x57f287);
+        .setColor(DiscordColors.SUCCESS);
 
       // Update the ephemeral reply
       await interaction.editReply({
@@ -154,7 +159,7 @@ export class VRChatStatusVerifyButtonHandler {
           });
           VerificationInteractionManager.removeInteraction(discordId, vrcUserId);
         } catch (error) {
-          console.warn(`[Status Verify] Failed to update via stored interaction:`, error);
+          loggers.vrchat.warn("Failed to update via stored interaction", error);
           // Fall through to message editing
         }
       }
@@ -168,7 +173,7 @@ export class VRChatStatusVerifyButtonHandler {
           });
         }
       } catch (error) {
-        console.warn(`[Status Verify] Failed to update original message:`, error);
+        loggers.vrchat.warn("Failed to update original message", error);
       }
     } else {
       const embed = new EmbedBuilder()
@@ -176,7 +181,7 @@ export class VRChatStatusVerifyButtonHandler {
         .setDescription(
           "Verification failed. The code was not found in your VRChat status. Please make sure you have set your status correctly and try again.",
         )
-        .setColor(0xed4245);
+        .setColor(DiscordColors.ERROR);
       const verifyBtn = new ButtonBuilder()
         .setCustomId(`vrchat-status-verify:${discordId}:${vrcUserId}`)
         .setLabel("Verify status")

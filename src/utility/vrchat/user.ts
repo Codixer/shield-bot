@@ -1,6 +1,6 @@
 // User-related VRChat API methods using vrc-ts
 
-import { RequestError, GroupIdType, NotificationIdType } from "vrc-ts";
+import { RequestError, NotificationIdType } from "vrc-ts";
 import { vrchatApi } from "./index.js";
 import { prisma } from "../../main.js";
 
@@ -75,7 +75,7 @@ export async function searchUsers({
   search,
   n = 60,
   offset = 0,
-  developerType,
+  developerType: _developerType,
 }: {
   search: string;
   n?: number;

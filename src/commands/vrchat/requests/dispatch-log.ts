@@ -25,7 +25,6 @@ import { VRChatLoginGuard } from "../../../utility/guards.js";
 import { ShieldMemberGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
 import {
-  extractInstanceNumber,
   resolveWorldDisplay,
 } from "../../../utility/vrchat/tracking.js";
 

@@ -9,13 +9,10 @@ import {
 import {
   ApplicationCommandOptionType,
   ApplicationIntegrationType,
-  ChannelType,
   CommandInteraction,
   GuildMember,
   InteractionContextType,
   MessageFlags,
-  PermissionFlagsBits,
-  Role,
   User,
   AutocompleteInteraction,
   ActionRowBuilder,
@@ -210,7 +207,8 @@ export class PatrolTimerCommands {
     interaction: CommandInteraction,
   ) {
     if (!interaction.guildId) return;
-    const member = interaction.member as GuildMember;
+    // Member check ensures interaction is in a guild
+    void (interaction.member as GuildMember);
 
     // Create confirmation buttons
     const confirmButton = new ButtonBuilder()
@@ -446,7 +444,8 @@ export class PatrolTimerCommands {
     }
 
     // Get the focused option and the year if provided
-    const focusedOption = interaction.options.getFocused(true);
+    // Get focused option to determine which field is being autocompleted
+    void interaction.options.getFocused(true);
     const yearOption = interaction.options.get("year");
     const year = yearOption?.value ? parseInt(yearOption.value as string) : undefined;
 

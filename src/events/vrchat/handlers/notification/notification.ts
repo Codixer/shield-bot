@@ -1,6 +1,5 @@
 import { handleFriendRequestNotification } from "./types/friendrequest.js";
 import { handleInviteNotification } from "./types/invite.js";
-import { handleResponseNotification } from "./types/response.js";
 
 export async function handleNotification(content: any) {
   switch (content.type) {

@@ -1,15 +1,12 @@
-import { Discord, Slash, SlashGroup, SlashOption, SlashChoice } from "discordx";
+import { Discord, Slash, SlashGroup, SlashOption } from "discordx";
 import {
   ApplicationCommandOptionType,
   CommandInteraction,
-  GuildMember,
   MessageFlags,
   InteractionContextType,
   ApplicationIntegrationType,
 } from "discord.js";
-import { prisma } from "../../main.js";
 import {
-  userHasPermissionFromRoles,
   getUserPermissionLevelFromRoles,
   PermissionLevel,
 } from "../../utility/permissionUtils.js";

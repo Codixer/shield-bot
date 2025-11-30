@@ -1,4 +1,4 @@
-import { Discord, Slash, SlashOption, Guard, SlashGroup } from "discordx";
+import { Discord, Slash, SlashOption, SlashGroup } from "discordx";
 import {
   CommandInteraction,
   ApplicationCommandOptionType,
@@ -45,7 +45,8 @@ export class VRChatAttendanceSelectCommand {
       const focused = autoInteraction.options.getFocused(true);
 
       if (focused.name === "event") {
-        const user = await attendanceManager.findOrCreateUserByDiscordId(
+        // User lookup needed for event filtering
+        void await attendanceManager.findOrCreateUserByDiscordId(
           autoInteraction.user.id,
         );
         const events = await attendanceManager.getAllEvents();

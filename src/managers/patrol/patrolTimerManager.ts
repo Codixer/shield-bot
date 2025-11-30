@@ -138,7 +138,8 @@ export class PatrolTimerManager {
 
       // Ensure map
       if (!this.tracked.has(guildId)) this.tracked.set(guildId, new Map());
-      const guildMap = this.tracked.get(guildId)!;
+      // Map is created above, using it for channel checks
+      // const _guildMap = this.tracked.get(guildId)!;
 
       // Helper to check if a channel is in tracked category
       const isInTrackedCategory = (cid: string | null | undefined) => {
@@ -274,7 +275,7 @@ export class PatrolTimerManager {
     // Stop tracking for users who have persisted sessions but are no longer in a tracked channel
     const guildMap = this.tracked.get(guild.id);
     if (guildMap) {
-      for (const [userId, tracked] of guildMap.entries()) {
+      for (const [userId, _tracked] of guildMap.entries()) {
         if (!trackedUsers.has(userId)) {
           // User left while bot was down, stop and persist
           const member = guild.members.cache.get(userId);

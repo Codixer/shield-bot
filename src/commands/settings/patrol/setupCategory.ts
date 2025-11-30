@@ -1,10 +1,9 @@
 import { Discord, Guard, Slash, SlashGroup } from "discordx";
 import {
   CommandInteraction,
-  PermissionFlagsBits,
   MessageFlags,
 } from "discord.js";
-import { prisma, bot } from "../../../main.js";
+import { bot } from "../../../main.js";
 import { PatrolTimerManager } from "../../../managers/patrol/patrolTimerManager.js";
 import { StaffGuard } from "../../../utility/guards.js";
 

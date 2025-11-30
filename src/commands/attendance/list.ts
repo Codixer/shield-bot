@@ -1,4 +1,4 @@
-import { Discord, Slash, Guard, SlashGroup } from "discordx";
+import { Discord, Slash, SlashGroup } from "discordx";
 import {
   CommandInteraction,
   MessageFlags,

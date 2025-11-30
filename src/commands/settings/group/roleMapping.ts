@@ -285,7 +285,7 @@ export class GroupRoleMappingCommand {
       // Fetch roles from VRChat API
       const roles = await getGroupRoles(settings.vrcGroupId);
 
-      if (!roles || roles.length === 0) {
+      if (!roles || !Array.isArray(roles) || roles.length === 0) {
         await interaction.editReply({
           content: "ℹ️ No roles found in the VRChat group.",
         });
@@ -294,7 +294,7 @@ export class GroupRoleMappingCommand {
 
       // Format roles for display
       const roleList = roles
-        .map((role: any) => {
+        .map((role: { name?: string; id?: string; isSelfAssignable?: boolean; requiresTwoFactor?: boolean; order?: number }) => {
           const type = role.isSelfAssignable
             ? "Self-Assignable"
             : role.requiresTwoFactor
@@ -307,7 +307,7 @@ export class GroupRoleMappingCommand {
         .join("\n\n");
 
       const embed = new EmbedBuilder()
-        .setTitle(`VRChat Group Roles (${roles.length})`)
+        .setTitle(`VRChat Group Roles (${Array.isArray(roles) ? roles.length : 0})`)
         .setDescription(roleList)
         .setColor(Colors.Blue)
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" })

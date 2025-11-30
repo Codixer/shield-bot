@@ -13,7 +13,6 @@ import {
 } from "discord.js";
 import { Discord, ButtonComponent, Guard } from "discordx";
 import { prisma } from "../../../../main.js";
-import { getUserById } from "../../../../utility/vrchat/user.js";
 import { unfriendUser } from "../../../../utility/vrchat/user.js";
 import { StaffGuard } from "../../../../utility/guards.js";
 import { whitelistManager } from "../../../../managers/whitelist/whitelistManager.js";

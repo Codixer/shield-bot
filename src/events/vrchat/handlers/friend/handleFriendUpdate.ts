@@ -1,5 +1,4 @@
 import { prisma } from "../../../../main.js";
-import { updateUsernameCache } from "../../../../utility/vrchat/usernameCache.js";
 import { WhitelistManager } from "../../../../managers/whitelist/whitelistManager.js";
 
 const whitelistManager = new WhitelistManager();

@@ -3,8 +3,6 @@ import { dirname, importx } from "@discordx/importer";
 import { Koa } from "@discordx/koa";
 import multer from "@koa/multer";
 import {
-  ActivityType,
-  IntentsBitField,
   Interaction,
   Message,
 } from "discord.js";
@@ -25,85 +23,96 @@ import { startVRChatWebSocketListener, stopVRChatWebSocketListener } from "./eve
 import { initializeSchedules } from "./schedules/schedules.js";
 import { PrismaMariaDb } from '@prisma/adapter-mariadb'
 import { whitelistManager } from "./managers/whitelist/whitelistManager.js";
+import { validateEnv, getEnv, hasVRChatCredentials } from "./config/env.js";
+import { loggers, logger } from "./utility/logger.js";
+import { ConfigError } from "./utility/errors.js";
+import { ExceptionConstants } from "./config/constants.js";
+import { BOT_INTENTS, BOT_CONFIG } from "./config/discord.js";
 
-const databaseUrl = process.env.DATABASE_URL!;
+// Validate environment variables at startup
+let env;
+try {
+  env = validateEnv();
+} catch (error) {
+  console.error("Failed to validate environment variables:", error);
+  process.exit(1);
+}
 
+const databaseUrl = env.DATABASE_URL;
 const adapter = new PrismaMariaDb(databaseUrl);
-
 export const prisma = new PrismaClient({ adapter });
 
 export const bot = new Client({
-  intents: [
-    IntentsBitField.Flags.Guilds,
-    IntentsBitField.Flags.GuildMembers,
-    IntentsBitField.Flags.GuildVoiceStates,
-  ],
-  silent: false,
+  intents: BOT_INTENTS,
+  silent: BOT_CONFIG.silent,
 });
 
 // Global patrol timer manager singleton
 export const patrolTimer = new PatrolTimerManager(bot);
 
 bot.rest.on("rateLimited", (info) => {
-  console.log("Rate limit hit!");
-  console.log(`Endpoint: ${info.route}`);
-  console.log(`Timeout: ${info.timeToReset}ms`);
-  console.log(`Limit: ${info.limit}`);
+  loggers.bot.warn("Rate limit hit!", {
+    endpoint: info.route,
+    timeout: info.timeToReset,
+    limit: info.limit,
+  });
 });
 
 bot.once("clientReady", async () => {
   try {
     await bot.initApplicationCommands();
-    console.log("###################################################");
-    console.log("|                      |                          |");
-    console.log("|                      |     S.H.I.E.L.D. Bot     |");
-    console.log("|                      |                          |");
-    console.log("|                      |                          |");
-    console.log("|                      | stefano@stefanocoding.me |");
-    console.log("|                      |         Codixer          |");
-    console.log("|                      |                          |");
-    console.log("###################################################");
+    loggers.bot.info("###################################################");
+    loggers.bot.info("|                      |                          |");
+    loggers.bot.info("|                      |     S.H.I.E.L.D. Bot     |");
+    loggers.bot.info("|                      |                          |");
+    loggers.bot.info("|                      |                          |");
+    loggers.bot.info("|                      | stefano@stefanocoding.me |");
+    loggers.bot.info("|                      |         Codixer          |");
+    loggers.bot.info("|                      |                          |");
+    loggers.bot.info("###################################################");
 
     // VRChat login on startup
-    const vrcUsername = process.env.VRCHAT_USERNAME;
-    const vrcPassword = process.env.VRCHAT_PASSWORD;
-    if (!vrcUsername || !vrcPassword) {
-      console.warn(
-        "[VRChat] VRChat credentials not set in environment variables. Skipping VRChat login.",
+    if (!hasVRChatCredentials()) {
+      loggers.vrchat.warn(
+        "VRChat credentials not set in environment variables. Skipping VRChat login.",
       );
     } else {
       try {
-        const user = await loginAndGetCurrentUser(vrcUsername, vrcPassword);
-        console.log(
-          `[VRChat] VRChat login successful:  ${user.displayName} | ${user.username} | ${user.id}`,
+        const env = getEnv();
+        const user = await loginAndGetCurrentUser(
+          env.VRCHAT_USERNAME!,
+          env.VRCHAT_PASSWORD!,
+        );
+        loggers.vrchat.info(
+          `VRChat login successful: ${user.displayName} | ${user.username} | ${user.id}`,
         );
       } catch (err) {
-        console.error("[VRChat] VRChat login failed:", err);
+        loggers.vrchat.error("VRChat login failed", err);
       }
     }
   } catch (error) {
-    console.error("[VRChat] Failed to initialize application commands:", error);
+    loggers.bot.error("Failed to initialize application commands", error);
   }
 
-  console.log("[Schedules] Initializing schedules...");
+  loggers.schedules.info("Initializing schedules...");
   initializeSchedules(bot);
-  console.log("[Schedules] Schedules initialized.");
+  loggers.schedules.info("Schedules initialized.");
 
   // Initialize Patrol Timer after bot is ready
-  console.log("[PatrolTimer] Initializing patrol timer...");
+  loggers.patrol.info("Initializing patrol timer...");
   await patrolTimer.init();
-  console.log("[PatrolTimer] Patrol timer initialized.");
+  loggers.patrol.info("Patrol timer initialized.");
 
   const vrchatIsRunning = await isLoggedInAndVerified();
   if (vrchatIsRunning) {
-    console.log("[VRChat] VRChat is running");
+    loggers.vrchat.info("VRChat is running");
     startVRChatWebSocketListener();
     // Invite message sync removed - not in use
     // syncAllInviteMessages().catch((err) => {
-    //   console.error("[VRChat] Failed to sync invite messages:", err);
+    //   loggers.vrchat.error("Failed to sync invite messages", err);
     // });
   } else {
-    console.log("[VRChat] VRChat is not running");
+    loggers.vrchat.info("VRChat is not running");
   }
 });
 
@@ -111,7 +120,10 @@ bot.on("interactionCreate", async (interaction: Interaction) => {
   try {
     await bot.executeInteraction(interaction);
   } catch (error) {
-    console.error("[Bot] Error handling interaction:", error);
+    loggers.bot.error("Error handling interaction", error, {
+      interactionId: interaction.id,
+      type: interaction.type,
+    });
     // Try to respond if interaction hasn't been responded to
     if (interaction.isRepliable() && !interaction.replied && !interaction.deferred) {
       try {
@@ -121,7 +133,7 @@ bot.on("interactionCreate", async (interaction: Interaction) => {
         });
       } catch (replyError) {
         // Ignore errors from trying to reply (might be too late)
-        console.error("[Bot] Failed to send error reply:", replyError);
+        loggers.bot.error("Failed to send error reply", replyError);
       }
     }
   }
@@ -131,7 +143,10 @@ bot.on("messageCreate", async (message: Message) => {
   try {
     await bot.executeCommand(message);
   } catch (error) {
-    console.error("[Bot] Error handling message:", error);
+    loggers.bot.error("Error handling message", error, {
+      messageId: message.id,
+      channelId: message.channelId,
+    });
   }
 });
 
@@ -140,22 +155,23 @@ async function run() {
     `${dirname(import.meta.url)}/{events,commands,api}/**/*.{ts,js}`,
   );
 
-  if (!process.env.BOT_TOKEN) {
-    throw Error(
+  const env = getEnv();
+  if (!env.BOT_TOKEN) {
+    throw new ConfigError(
       "Bot token missing. Please check you have included it in the .env file. Required field: BOT_TOKEN=xxx",
     );
   }
 
-  await bot.login(process.env.BOT_TOKEN);
+  await bot.login(env.BOT_TOKEN);
 
   const server = new Koa();
   server.use(multer().single("file"));
   server.use(bodyParser());
   await server.build();
 
-  const port = process.env.PORT ?? 3000;
+  const port = env.PORT;
   server.listen(port, () => {
-    console.log(`Running On Port: ${port}`);
+    loggers.bot.info(`Running On Port: ${port}`);
   });
 }
 
@@ -168,31 +184,31 @@ async function gracefulShutdown(signal: string) {
   }
   isShuttingDown = true;
 
-  console.log(`\n[Shutdown] Received ${signal}, shutting down gracefully...`);
+  loggers.shutdown.info(`Received ${signal}, shutting down gracefully...`);
 
   try {
     // Stop WebSocket listener
     stopVRChatWebSocketListener();
-    console.log("[Shutdown] WebSocket listener stopped");
+    loggers.shutdown.info("WebSocket listener stopped");
 
     // Cleanup managers
     whitelistManager.cleanup();
-    console.log("[Shutdown] Managers cleaned up");
+    loggers.shutdown.info("Managers cleaned up");
 
     // Disconnect bot
     if (bot.isReady()) {
       bot.destroy();
-      console.log("[Shutdown] Discord bot disconnected");
+      loggers.shutdown.info("Discord bot disconnected");
     }
 
     // Close database connection
     await prisma.$disconnect();
-    console.log("[Shutdown] Database connection closed");
+    loggers.shutdown.info("Database connection closed");
 
-    console.log("[Shutdown] Graceful shutdown complete");
+    loggers.shutdown.info("Graceful shutdown complete");
     process.exit(0);
   } catch (error) {
-    console.error("[Shutdown] Error during shutdown:", error);
+    loggers.shutdown.error("Error during shutdown", error);
     process.exit(1);
   }
 }
@@ -200,39 +216,47 @@ async function gracefulShutdown(signal: string) {
 // Track uncaught exceptions to prevent infinite loops
 let uncaughtExceptionCount = 0;
 let lastUncaughtExceptionTime = 0;
-const MAX_UNCAUGHT_EXCEPTIONS = 5;
-const EXCEPTION_RESET_TIME = 60000; // 1 minute
 
 process.on("unhandledRejection", (reason, promise) => {
-  console.error("Unhandled Rejection at:", promise, "reason:", reason);
+  logger.error(
+    "Unhandled Rejection",
+    "Unhandled promise rejection",
+    reason instanceof Error ? reason : new Error(String(reason)),
+    { promise: String(promise) },
+  );
   // Log but don't crash - let the bot continue running
 });
 
 process.on("uncaughtException", (error) => {
   const now = Date.now();
-  
+
   // Reset counter if enough time has passed
-  if (now - lastUncaughtExceptionTime > EXCEPTION_RESET_TIME) {
+  if (now - lastUncaughtExceptionTime > ExceptionConstants.EXCEPTION_RESET_TIME) {
     uncaughtExceptionCount = 0;
   }
-  
+
   uncaughtExceptionCount++;
   lastUncaughtExceptionTime = now;
-  
-  console.error(`[Uncaught Exception #${uncaughtExceptionCount}]`, error);
-  console.error("Stack trace:", error.stack);
-  
+
+  logger.error(
+    "Uncaught Exception",
+    `Uncaught exception #${uncaughtExceptionCount}`,
+    error,
+  );
+
   // Only shutdown if we're getting too many exceptions in a short time (likely infinite loop)
-  if (uncaughtExceptionCount >= MAX_UNCAUGHT_EXCEPTIONS) {
-    console.error(
-      `[Fatal] Too many uncaught exceptions (${uncaughtExceptionCount}) in a short period. Shutting down to prevent infinite loop.`
+  if (uncaughtExceptionCount >= ExceptionConstants.MAX_UNCAUGHT_EXCEPTIONS) {
+    logger.error(
+      "Fatal",
+      `Too many uncaught exceptions (${uncaughtExceptionCount}) in a short period. Shutting down to prevent infinite loop.`,
     );
     gracefulShutdown("uncaughtException").catch(() => {
       process.exit(1);
     });
   } else {
-    console.warn(
-      `[Warning] Bot will continue running despite uncaught exception. This may lead to unstable behavior.`
+    logger.warn(
+      "Warning",
+      "Bot will continue running despite uncaught exception. This may lead to unstable behavior.",
     );
     // Bot continues running - don't exit
   }
@@ -243,6 +267,6 @@ process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 run().catch((error) => {
-  console.error("[Startup] Fatal error during startup:", error);
+  loggers.startup.error("Fatal error during startup", error);
   process.exit(1);
 });

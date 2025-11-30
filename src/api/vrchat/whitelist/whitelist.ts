@@ -1,7 +1,6 @@
-import { Get, Post, Delete, Router } from "@discordx/koa";
+import { Get, Router } from "@discordx/koa";
 import { Context } from "koa";
 import { WhitelistManager } from "../../../managers/whitelist/whitelistManager.js";
-import { prisma } from "../../../main.js";
 import crypto from "crypto";
 
 const whitelistManager = new WhitelistManager();

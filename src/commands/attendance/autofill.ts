@@ -13,7 +13,6 @@ import { AttendanceManager } from "../../managers/attendance/attendanceManager.j
 import { AttendanceHostGuard } from "../../utility/guards.js";
 import { prisma } from "../../main.js";
 import {
-  getUserPermissionLevelFromRoles,
   PermissionLevel,
   userHasSpecificRole,
 } from "../../utility/permissionUtils.js";
@@ -177,7 +176,7 @@ export class VRChatAttendanceAutofillCommand {
 
     // First pass: Process all category channels for staff detection
     const staffMembersInCategories = new Set<string>();
-    for (const [channelId, channel] of allCategoryVoiceChannels) {
+    for (const [_channelId, channel] of allCategoryVoiceChannels) {
       if (channel.type !== ChannelType.GuildVoice) continue;
 
       const members = channel.members;
@@ -195,7 +194,7 @@ export class VRChatAttendanceAutofillCommand {
 
       const members = channel.members;
 
-      for (const [memberId, member] of members) {
+      for (const [memberId, _member] of members) {
         processedUsers.add(memberId);
         newMemberSquads.set(memberId, channelId);
 
@@ -278,7 +277,7 @@ export class VRChatAttendanceAutofillCommand {
     if (event.host?.discordId) exemptUserIds.add(event.host.discordId);
     if (event.cohost?.discordId) exemptUserIds.add(event.cohost.discordId);
     
-    for (const [discordId, squadName] of currentMemberSquads) {
+    for (const [discordId, _squadName] of currentMemberSquads) {
       // Skip marking as left if user is manually added (host/cohost)
       if (!processedUsers.has(discordId) && !exemptUserIds.has(discordId)) {
         const dbUser = await attendanceManager.findOrCreateUserByDiscordId(

@@ -1,5 +1,5 @@
 import { getUserById } from '../../../../utility/vrchat.js';
-import { inviteUserToGroup, getGroupMember } from '../../../../utility/vrchat/groups.js';
+import { getGroupMember } from '../../../../utility/vrchat/groups.js';
 import { whitelistManager } from '../../../../managers/whitelist/whitelistManager.js';
 import { prisma, bot } from '../../../../main.js';
 import { EmbedBuilder, Colors, ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
@@ -155,8 +155,8 @@ async function buildVerificationSuccessEmbed(
                 if (groupMember) {
                     isInGroup = true;
                     const totalRoles = [
-                        ...(groupMember.roleIds || []),
-                        ...(groupMember.mRoleIds || []),
+                        ...((groupMember as { roleIds?: string[] }).roleIds || []),
+                        ...((groupMember as { mRoleIds?: string[] }).mRoleIds || []),
                     ].length;
                     hasOnlyDefaultRole = totalRoles <= 1;
                 }
@@ -222,7 +222,7 @@ async function updateVerificationMessage(
     discordId: string | null | undefined,
     vrcUserId: string,
     vrchatUsername: string | null,
-    userId: number
+    _userId: number
 ): Promise<boolean> {
     if (!discordId) {
         // Can't use interaction without Discord ID
@@ -300,8 +300,8 @@ async function sendDMConfirmation(userId: number, vrcUserId: string, vrchatUsern
                         isInGroup = true;
                         // Check if they only have the default/everyone role (0 or 1 role total)
                         const totalRoles = [
-                            ...(groupMember.roleIds || []),
-                            ...(groupMember.mRoleIds || []),
+                            ...((groupMember as { roleIds?: string[] }).roleIds || []),
+                            ...((groupMember as { mRoleIds?: string[] }).mRoleIds || []),
                         ].length;
                         // If they have 1 or fewer roles, they likely only have the default role
                         hasOnlyDefaultRole = totalRoles <= 1;

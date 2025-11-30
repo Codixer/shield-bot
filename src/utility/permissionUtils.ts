@@ -1,6 +1,7 @@
 import { PermissionLevel } from "../generated/prisma/client.js";
 import { GuildMember } from "discord.js";
-import { prisma, bot } from "../main.js";
+import { prisma } from "../main.js";
+import { getEnv } from "../config/env.js";
 
 export { PermissionLevel };
 
@@ -92,7 +93,7 @@ export async function userHasPermission(
 export async function getAllPermissionsFromRoles(
   member: GuildMember,
 ): Promise<number> {
-  const botOwnerId = process.env.BOT_OWNER_ID;
+  const botOwnerId = getEnv().BOT_OWNER_ID;
 
   // Bot owner has all permissions
   if (botOwnerId && member.id === botOwnerId) {
@@ -169,7 +170,7 @@ export async function userHasSpecificRole(
   member: GuildMember,
   roleType: PermissionLevel,
 ): Promise<boolean> {
-  const botOwnerId = process.env.BOT_OWNER_ID;
+  const botOwnerId = getEnv().BOT_OWNER_ID;
 
   // Check bot owner
   if (roleType === PermissionLevel.BOT_OWNER) {
@@ -241,7 +242,7 @@ export async function userHasSpecificRole(
 export async function getUserPermissionLevelFromRoles(
   member: GuildMember,
 ): Promise<PermissionLevel> {
-  const botOwnerId = process.env.BOT_OWNER_ID;
+  const botOwnerId = getEnv().BOT_OWNER_ID;
 
   if (!botOwnerId) {
     console.error("BOT_OWNER_ID environment variable is not set!");

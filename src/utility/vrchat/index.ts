@@ -25,7 +25,7 @@ export const vrchatApi = new VRChatAPI({
 
 // Legacy cookie functions for backward compatibility (deprecated, use vrchatApi directly)
 // These are kept for any code that might still reference them, but they're no longer used
-export function saveCookie(cookie: string) {
+export function saveCookie(_cookie: string) {
   // vrc-ts handles cookies internally, this is a no-op for backward compatibility
   console.warn("[VRChat] saveCookie() is deprecated. vrc-ts handles cookies automatically.");
 }
