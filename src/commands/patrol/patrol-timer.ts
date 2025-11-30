@@ -168,7 +168,7 @@ export class PatrolTimerCommands {
       const y = year ? parseInt(year) : now.getUTCFullYear();
       const m = month ? parseInt(month) : now.getUTCMonth() + 1;
       rows = await (patrolTimer as { getTopByMonth: (guildId: string, year: number, month: number, limit?: number) => Promise<Array<{ userId: string; totalMs: bigint | number }>> }).getTopByMonth(
-        interaction.guildId!,
+        interaction.guildId,
         y,
         m,
         limit ? parseInt(limit) : undefined,
