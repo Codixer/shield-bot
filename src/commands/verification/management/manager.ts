@@ -12,10 +12,14 @@ import {
   SeparatorBuilder,
   SeparatorSpacingSize,
   type MessageActionRowComponentBuilder,
+  ApplicationCommandOptionType,
+  User,
+  GuildMember,
 } from "discord.js";
-import { Discord, Guard, Slash, SlashGroup } from "discordx";
+import { Discord, Guard, Slash, SlashGroup, SlashOption } from "discordx";
 import { prisma } from "../../../main.js";
 import { VRChatLoginGuard } from "../../../utility/guards.js";
+import { userHasPermissionFromRoles, PermissionLevel } from "../../../utility/permissionUtils.js";
 
 @Discord()
 @SlashGroup({
@@ -33,10 +37,47 @@ import { VRChatLoginGuard } from "../../../utility/guards.js";
 export class VRChatVerifyManagerCommand {
   @Slash({
     name: "manage",
-    description: "Manage MAIN/ALT status for your verified VRChat accounts.",
+    description: "Manage MAIN/ALT status for verified VRChat accounts. Staff can manage any user's accounts.",
   })
-  async manage(interaction: CommandInteraction) {
-    const discordId = interaction.user.id;
+  async manage(
+    @SlashOption({
+      name: "user",
+      description: "[Staff only] The Discord user whose accounts you want to manage (defaults to yourself)",
+      type: ApplicationCommandOptionType.User,
+      required: false,
+    })
+    targetUser: User | null,
+    interaction: CommandInteraction,
+  ) {
+    const member = interaction.member as GuildMember;
+    if (!member) {
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // Check if user is staff
+    const isStaff = await userHasPermissionFromRoles(member, PermissionLevel.STAFF);
+    
+    // Determine target user
+    let targetDiscordId: string;
+    let isManagingSelf = true;
+    
+    if (targetUser && isStaff) {
+      // Staff managing another user
+      targetDiscordId = targetUser.id;
+      isManagingSelf = false;
+    } else if (targetUser && !isStaff) {
+      // Non-staff trying to specify a user - ignore and use themselves
+      targetDiscordId = interaction.user.id;
+    } else {
+      // No user specified, use themselves
+      targetDiscordId = interaction.user.id;
+    }
+
+    const discordId = targetDiscordId;
 
     // Get all VRChat accounts for this user
     const user = await prisma.user.findUnique({
@@ -71,6 +112,12 @@ export class VRChatVerifyManagerCommand {
     // Build the container using the new structure
     const container = new ContainerBuilder();
 
+    const infoText = isManagingSelf
+      ? "**Account Manager**\n- Only **verified** accounts can be set as MAIN/ALT. Unverified accounts have basic whitelist access only.\n- One MAIN account allowed. Deleting an account will unfriend it.\n- Username updates require being friended with the bot."
+      : `**Staff Account Manager** - Managing accounts for <@${discordId}>\n- Only **verified** accounts can be set as MAIN/ALT. Unverified accounts have basic whitelist access only.\n- One MAIN account allowed. Deleting an account will unfriend it.\n- Username updates require being friended with the bot.`;
+
+    const buttonCustomId = isManagingSelf ? "accountmanager:info" : "staffaccountmanager:info";
+
     container.addSectionComponents(
       new SectionBuilder()
         .setButtonAccessory(
@@ -79,12 +126,10 @@ export class VRChatVerifyManagerCommand {
             .setLabel("Info")
             .setEmoji({ name: "ℹ️" })
             .setDisabled(true)
-            .setCustomId("accountmanager:info"),
+            .setCustomId(buttonCustomId),
         )
         .addTextDisplayComponents(
-          new TextDisplayBuilder().setContent(
-            "**Account Manager**\n- Only **verified** accounts can be set as MAIN/ALT. Unverified accounts have basic whitelist access only.\n- One MAIN account allowed. Deleting an account will unfriend it.\n- Username updates require being friended with the bot.",
-          ),
+          new TextDisplayBuilder().setContent(infoText),
         ),
     );
 
@@ -138,22 +183,32 @@ export class VRChatVerifyManagerCommand {
           altBtnDisabled = true;
         }
 
+        const mainCustomId = isManagingSelf
+          ? `accountmanager:main:${acc.vrcUserId}`
+          : `staffaccountmanager:main:${discordId}:${acc.vrcUserId}`;
+        const altCustomId = isManagingSelf
+          ? `accountmanager:alt:${acc.vrcUserId}`
+          : `staffaccountmanager:alt:${discordId}:${acc.vrcUserId}`;
+        const deleteCustomId = isManagingSelf
+          ? `accountmanager:delete:${acc.vrcUserId}`
+          : `staffaccountmanager:delete:${discordId}:${acc.vrcUserId}`;
+
         container.addActionRowComponents(
           new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
             new ButtonBuilder()
               .setStyle(mainBtnStyle)
               .setLabel("Main")
               .setDisabled(mainBtnDisabled)
-              .setCustomId(`accountmanager:main:${acc.vrcUserId}`),
+              .setCustomId(mainCustomId),
             new ButtonBuilder()
               .setStyle(altBtnStyle)
               .setLabel("Alt")
               .setDisabled(altBtnDisabled)
-              .setCustomId(`accountmanager:alt:${acc.vrcUserId}`),
+              .setCustomId(altCustomId),
             new ButtonBuilder()
               .setStyle(ButtonStyle.Danger)
               .setLabel("Unlink (Delete)")
-              .setCustomId(`accountmanager:delete:${acc.vrcUserId}`),
+              .setCustomId(deleteCustomId),
           ),
         );
       }
@@ -202,7 +257,11 @@ export class VRChatVerifyManagerCommand {
             new ButtonBuilder()
               .setStyle(ButtonStyle.Danger)
               .setLabel("Unlink (Delete)")
-              .setCustomId(`accountmanager:delete:${acc.vrcUserId}`),
+              .setCustomId(
+                isManagingSelf
+                  ? `accountmanager:delete:${acc.vrcUserId}`
+                  : `staffaccountmanager:delete:${discordId}:${acc.vrcUserId}`,
+              ),
           ),
         );
       }

@@ -7,7 +7,7 @@ import {
   User,
 } from "discord.js";
 import { Pagination } from "@discordx/pagination";
-import { Discord, Slash, SlashGroup, SlashOption, Guard } from "discordx";
+import { Discord, Slash, SlashGroup, SlashOption, Guard, SlashChoice } from "discordx";
 import { whitelistManager } from "../../managers/whitelist/whitelistManager.js";
 import { searchUsers } from "../../utility/vrchat/user.js";
 import { StaffGuard } from "../../utility/guards.js";
@@ -21,26 +21,197 @@ import { loggers } from "../../utility/logger.js";
 @SlashGroup("whitelist")
 @Guard(StaffGuard)
 export class WhitelistCommands {
-  @Slash({ description: "Setup Discord role mapping to whitelist permissions" })
-  async setuprole(
+  @Slash({ description: "Manage Discord role mappings to whitelist permissions" })
+  async role(
+    @SlashChoice({ name: "Setup", value: "setup" })
+    @SlashChoice({ name: "Remove", value: "remove" })
+    @SlashChoice({ name: "List", value: "list" })
     @SlashOption({
-      description: "Discord role to map",
-      name: "discord_role",
-      required: true,
-      type: ApplicationCommandOptionType.Role,
-    })
-    discordRole: Role,
-    @SlashOption({
-      description:
-        "Whitelist permissions (comma-separated): station, truavatar, trudoor, forceAvatar, forceDoor",
-      name: "permissions",
+      description: "Action to perform",
+      name: "action",
       required: true,
       type: ApplicationCommandOptionType.String,
     })
-    permissions: string,
+    action: string,
+    @SlashOption({
+      description: "Discord role to map (required for setup/remove)",
+      name: "discord_role",
+      required: false,
+      type: ApplicationCommandOptionType.Role,
+    })
+    discordRole: Role | null,
+    @SlashOption({
+      description:
+        "Whitelist permissions (comma-separated, required for setup): station, truavatar, trudoor, forceAvatar, forceDoor",
+      name: "permissions",
+      required: false,
+      type: ApplicationCommandOptionType.String,
+    })
+    permissions: string | null,
     interaction: CommandInteraction,
   ): Promise<void> {
     try {
+      // Handle list action
+      if (action === "list") {
+        const roleMappings = await whitelistManager.getDiscordRoleMappings();
+
+        if (roleMappings.length === 0) {
+          await interaction.reply({
+            content: "❌ No Discord role mappings found.",
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle("📋 Discord Role Mappings")
+          .setColor(0x0099ff);
+
+        const roleList = roleMappings
+          .map((role) => {
+            const roleTyped = role as { id: number; discordRoleId: string | null; permissions: string | null; guildId: string };
+            const discordRole = roleTyped.discordRoleId
+              ? `<@&${roleTyped.discordRoleId}>`
+              : "Not linked";
+            const permissions = roleTyped.permissions || "No permissions";
+            return `**Role ID: ${roleTyped.id}**\nDiscord: ${discordRole}\nPermissions: ${permissions}\nGuild: ${roleTyped.guildId}`;
+          })
+          .join("\n\n");
+
+        embed.setDescription(roleList);
+        await interaction.reply({ embeds: [embed] });
+        return;
+      }
+
+      // Handle remove action
+      if (action === "remove") {
+        if (!discordRole) {
+          await interaction.reply({
+            content: "❌ Discord role is required for remove action.",
+            ephemeral: true,
+          });
+          return;
+        }
+
+        if (!interaction.guild) {
+          await interaction.reply({
+            content: "❌ This command can only be used in a server.",
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const success = await whitelistManager.deleteRole(interaction.guild.id, discordRole.id);
+
+        if (success) {
+          const embed = new EmbedBuilder()
+            .setTitle("✅ Role Mapping Removed")
+            .setColor(0xff0000)
+            .addFields({ name: "Discord Role", value: `<@&${discordRole.id}>` })
+            .setTimestamp();
+
+          await interaction.reply({ embeds: [embed] });
+
+          // Trigger a resync for all members who had this role
+          const guild = interaction.guild;
+          if (guild) {
+            const allMembers = await guild.members.fetch();
+            const membersWithRole = allMembers.filter((member) =>
+              member.roles.cache.has(discordRole.id),
+            );
+
+            loggers.bot.info(
+              `Revalidating access for ${membersWithRole.size} members after removing role mapping for ${discordRole.name}`,
+            );
+
+            let accessUpdated = 0;
+            let errors = 0;
+
+            for (const [, member] of membersWithRole) {
+              try {
+                const roleIds = member.roles.cache.map((role) => role.id);
+
+                // Get their current whitelist status
+                const userBefore = await whitelistManager.getUserByDiscordId(
+                  member.id,
+                );
+                const hadAccessBefore = !!userBefore?.whitelistEntry;
+
+                // Sync their roles (this will remove access if they no longer qualify)
+                if (!interaction.guild) {
+                  await interaction.reply({
+                    content: "❌ This command can only be used in a server.",
+                    ephemeral: true,
+                  });
+                  return;
+                }
+                await whitelistManager.syncUserRolesFromDiscord(
+                  member.id,
+                  roleIds,
+                  interaction.guild.id,
+                );
+
+                // Check their status after sync
+                const userAfter = await whitelistManager.getUserByDiscordId(
+                  member.id,
+                );
+                const hasAccessAfter = !!userAfter?.whitelistEntry;
+
+                if (hadAccessBefore !== hasAccessAfter) {
+                  accessUpdated++;
+                }
+              } catch (error) {
+                loggers.bot.error(
+                  `Error revalidating access for ${member.displayName}`,
+                  error,
+                );
+                errors++;
+              }
+            }
+
+            loggers.bot.info(
+              `Role removal revalidation complete: ${accessUpdated} access changed, ${errors} errors`,
+            );
+            
+            // Queue a single batched update after processing all members
+            if (accessUpdated > 0) {
+              const msg = `Role mapping removed for ${discordRole.name}`;
+              whitelistManager.queueBatchedUpdate('bulk-role-removal', msg);
+            }
+          }
+        } else {
+          await interaction.reply({
+            content: `❌ Role mapping not found.`,
+            ephemeral: true,
+          });
+        }
+        return;
+      }
+
+      // Handle setup action
+      if (action !== "setup") {
+        await interaction.reply({
+          content: "❌ Invalid action. Use 'setup', 'remove', or 'list'.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      if (!discordRole) {
+        await interaction.reply({
+          content: "❌ Discord role is required for setup action.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      if (!permissions) {
+        await interaction.reply({
+          content: "❌ Permissions are required for setup action.",
+          ephemeral: true,
+        });
+        return;
+      }
       const permissionList = permissions
         .split(",")
         .map((p) => p.trim())
@@ -156,175 +327,218 @@ export class WhitelistCommands {
     }
   }
 
-  @Slash({ description: "Remove Discord role mapping" })
-  async removerole(
+
+  @Slash({ description: "Manage whitelist user operations" })
+  async user(
+    @SlashChoice({ name: "Info", value: "info" })
+    @SlashChoice({ name: "Sync", value: "sync" })
+    @SlashChoice({ name: "Browse", value: "browse" })
     @SlashOption({
-      description: "Discord role to remove from whitelist",
-      name: "discord_role",
+      description: "Action to perform",
+      name: "action",
       required: true,
-      type: ApplicationCommandOptionType.Role,
+      type: ApplicationCommandOptionType.String,
     })
-    discordRole: Role,
-    interaction: CommandInteraction,
-  ): Promise<void> {
-    try {
-      if (!interaction.guild) {
-        await interaction.reply({
-          content: "❌ This command can only be used in a server.",
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const success = await whitelistManager.deleteRole(interaction.guild.id, discordRole.id);
-
-      if (success) {
-        const embed = new EmbedBuilder()
-          .setTitle("✅ Role Mapping Removed")
-          .setColor(0xff0000)
-          .addFields({ name: "Discord Role", value: `<@&${discordRole.id}>` })
-          .setTimestamp();
-
-        await interaction.reply({ embeds: [embed] });
-
-        // Trigger a resync for all members who had this role
-        const guild = interaction.guild;
-        if (guild) {
-          const allMembers = await guild.members.fetch();
-          const membersWithRole = allMembers.filter((member) =>
-            member.roles.cache.has(discordRole.id),
-          );
-
-          loggers.bot.info(
-            `Revalidating access for ${membersWithRole.size} members after removing role mapping for ${discordRole.name}`,
-          );
-
-          let accessUpdated = 0;
-          let errors = 0;
-
-          for (const [, member] of membersWithRole) {
-            try {
-              const roleIds = member.roles.cache.map((role) => role.id);
-
-              // Get their current whitelist status
-              const userBefore = await whitelistManager.getUserByDiscordId(
-                member.id,
-              );
-              const hadAccessBefore = !!userBefore?.whitelistEntry;
-
-              // Sync their roles (this will remove access if they no longer qualify)
-              if (!interaction.guild) {
-                await interaction.reply({
-                  content: "❌ This command can only be used in a server.",
-                  ephemeral: true,
-                });
-                return;
-              }
-              await whitelistManager.syncUserRolesFromDiscord(
-                member.id,
-                roleIds,
-                interaction.guild.id,
-              );
-
-              // Check their status after sync
-              const userAfter = await whitelistManager.getUserByDiscordId(
-                member.id,
-              );
-              const hasAccessAfter = !!userAfter?.whitelistEntry;
-
-              if (hadAccessBefore !== hasAccessAfter) {
-                accessUpdated++;
-              }
-            } catch (error) {
-              loggers.bot.error(
-                `Error revalidating access for ${member.displayName}`,
-                error,
-              );
-              errors++;
-            }
-          }
-
-          loggers.bot.info(
-            `Role removal revalidation complete: ${accessUpdated} access changed, ${errors} errors`,
-          );
-          
-          // Queue a single batched update after processing all members
-          if (accessUpdated > 0) {
-            const msg = `Role mapping removed for ${discordRole.name}`;
-            whitelistManager.queueBatchedUpdate('bulk-role-removal', msg);
-          }
-        }
-      } else {
-        await interaction.reply({
-          content: `❌ Role mapping not found.`,
-          ephemeral: true,
-        });
-      }
-    } catch (error: unknown) {
-      await interaction.reply({
-        content: `❌ Failed to remove role mapping: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
-      });
-    }
-  }
-
-  @Slash({ description: "List all Discord role mappings" })
-  async listroles(interaction: CommandInteraction): Promise<void> {
-    try {
-      const roleMappings = await whitelistManager.getDiscordRoleMappings();
-
-      if (roleMappings.length === 0) {
-        await interaction.reply({
-          content: "❌ No Discord role mappings found.",
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const embed = new EmbedBuilder()
-        .setTitle("📋 Discord Role Mappings")
-        .setColor(0x0099ff);
-
-      const roleList = roleMappings
-        .map((role) => {
-          const roleTyped = role as { id: number; discordRoleId: string | null; permissions: string | null; guildId: string };
-          const discordRole = roleTyped.discordRoleId
-            ? `<@&${roleTyped.discordRoleId}>`
-            : "Not linked";
-          const permissions = roleTyped.permissions || "No permissions";
-          return `**Role ID: ${roleTyped.id}**\nDiscord: ${discordRole}\nPermissions: ${permissions}\nGuild: ${roleTyped.guildId}`;
-        })
-        .join("\n\n");
-
-      embed.setDescription(roleList);
-
-      await interaction.reply({ embeds: [embed] });
-    } catch (error: unknown) {
-      await interaction.reply({
-        content: `❌ Failed to list role mappings: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
-      });
-    }
-  }
-
-  @Slash({ description: "Get info about a user's whitelist status" })
-  async info(
+    action: string,
     @SlashOption({
-      description: "Discord user to check",
-      name: "user",
+      description: "Discord user (required for info/sync)",
+      name: "discord_user",
       required: false,
       type: ApplicationCommandOptionType.User,
     })
     user: User | null,
     @SlashOption({
-      description: "VRChat username to check",
+      description: "VRChat username to check (optional for info)",
       name: "vrchat_username",
       required: false,
       type: ApplicationCommandOptionType.String,
     })
-    vrchatUsername: string,
+    vrchatUsername: string | null,
     interaction: CommandInteraction,
   ): Promise<void> {
+    // Handle browse action
+    if (action === "browse") {
+      try {
+        await interaction.deferReply();
+
+        const whitelistEntries = await whitelistManager.getWhitelistUsers();
+
+        if (whitelistEntries.length === 0) {
+          await interaction.editReply({
+            content: "❌ No users found in the whitelist.",
+          });
+          return;
+        }
+
+        const pageSize = 10;
+        const totalPages = Math.ceil(whitelistEntries.length / pageSize);
+        const pages: Array<{ embeds: EmbedBuilder[] }> = [];
+
+        for (let i = 0; i < whitelistEntries.length; i += pageSize) {
+          const chunk = whitelistEntries.slice(i, i + pageSize);
+          const description = chunk
+            .map((entry, index: number) => {
+              const entryTyped = entry as {
+                discordId?: string;
+                vrchatUsername?: string;
+                vrcUserId?: string;
+                roles?: string[];
+              };
+              const listIndex = i + index + 1;
+              const mention = entryTyped.discordId
+                ? `<@${entryTyped.discordId}>`
+                : "Unknown Discord user";
+              const vrchatDisplay = entryTyped.vrchatUsername || "Unknown VRChat user";
+              const vrcLink = entryTyped.vrcUserId
+                ? `https://vrchat.com/home/user/${encodeURIComponent(entryTyped.vrcUserId)}`
+                : null;
+              const vrchatLine = vrcLink
+                ? `[${vrchatDisplay}](${vrcLink})`
+                : vrchatDisplay;
+              const whitelistRoles: string = entryTyped.roles?.length
+                ? entryTyped.roles
+                    .map((role: string) => `\`${escapeMarkdown(role)}\``)
+                    .join(", ")
+                : "No whitelist permissions";
+
+              return `**${listIndex}.** ${mention}\n• VRChat: ${vrchatLine}\n• Whitelist: ${whitelistRoles}`;
+            })
+            .join("\n\n");
+
+          const embed = new EmbedBuilder()
+            .setTitle("📋 Whitelist Users")
+            .setColor(0x0099ff)
+            .setDescription(description)
+            .setFooter({
+              text: `Page ${Math.floor(i / pageSize) + 1} of ${totalPages} • Total: ${whitelistEntries.length} users`,
+            })
+            .setTimestamp();
+
+          pages.push({ embeds: [embed] });
+        }
+
+        if (pages.length === 1) {
+          await interaction.editReply(pages[0]);
+          return;
+        }
+
+        const pagination = new Pagination(interaction, pages, {
+          time: 120_000,
+        });
+
+        await pagination.send();
+      } catch (error: unknown) {
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({
+            content: `❌ Failed to list users: ${error instanceof Error ? error.message : "Unknown error"}`,
+          });
+        } else {
+          await interaction.reply({
+            content: `❌ Failed to list users: ${error instanceof Error ? error.message : "Unknown error"}`,
+            ephemeral: true,
+          });
+        }
+      }
+      return;
+    }
+
+    // Handle sync action
+    if (action === "sync") {
+      if (!user) {
+        await interaction.reply({
+          content: "❌ Discord user is required for sync action.",
+          ephemeral: true,
+        });
+        return;
+      }
+
+      try {
+        const member = await interaction.guild?.members.fetch(user.id);
+        if (!member) {
+          await interaction.reply({
+            content: "❌ User not found in this server.",
+            ephemeral: true,
+          });
+          return;
+        }
+
+        const roleIds = member.roles.cache.map((role) => role.id);
+        const shouldBeWhitelisted =
+          await whitelistManager.shouldUserBeWhitelisted(roleIds);
+
+        if (shouldBeWhitelisted) {
+          if (!interaction.guild) {
+            await interaction.reply({
+              content: "❌ This command can only be used in a server.",
+              ephemeral: true,
+            });
+            return;
+          }
+          await whitelistManager.syncUserRolesFromDiscord(
+            user.id,
+            roleIds,
+            interaction.guild.id,
+          );
+
+          const userInfo = await whitelistManager.getUserByDiscordId(user.id);
+          const userTyped = userInfo as {
+            whitelistEntry?: {
+              roleAssignments: Array<{ role: { permissions: string | null } }>;
+            } | null;
+          } | null;
+          
+          // Extract permissions from role assignments properly
+          const allPermissions = new Set<string>();
+          for (const assignment of userTyped?.whitelistEntry?.roleAssignments || []) {
+            if (assignment.role.permissions) {
+              // Split comma-separated permissions and add to set
+              const rolePermissions = assignment.role.permissions
+                .split(',')
+                .map((p: string) => p.trim())
+                .filter(Boolean);
+              rolePermissions.forEach((perm: string) => allPermissions.add(perm));
+            }
+          }
+          
+          const permissions = allPermissions.size > 0 
+            ? Array.from(allPermissions).sort().join(", ")
+            : "None";
+
+          const embed = new EmbedBuilder()
+            .setTitle("✅ User Synced")
+            .setColor(0x00ff00)
+            .addFields(
+              { name: "User", value: `<@${user.id}>`, inline: true },
+              { name: "Permissions", value: permissions, inline: true },
+            )
+            .setTimestamp();
+
+          await interaction.reply({ embeds: [embed] });
+        } else {
+          await whitelistManager.removeUserFromWhitelistIfNoRoles(user.id);
+          await interaction.reply({
+            content: `❌ User <@${user.id}> has no Discord roles that map to whitelist permissions.`,
+            ephemeral: true,
+          });
+        }
+      } catch (error: unknown) {
+        await interaction.reply({
+          content: `❌ Failed to sync user: ${error instanceof Error ? error.message : "Unknown error"}`,
+          ephemeral: true,
+        });
+      }
+      return;
+    }
+
+    // Handle info action
+    if (action !== "info") {
+      await interaction.reply({
+        content: "❌ Invalid action. Use 'info', 'sync', or 'browse'.",
+        ephemeral: true,
+      });
+      return;
+    }
+
     const targetUser = user || interaction.user;
 
     try {
@@ -340,6 +554,72 @@ export class WhitelistCommands {
         } | null;
       } | null = null;
 
+      if (targetUser && targetUser.id !== interaction.user.id) {
+        // If a specific user is provided, get detailed info
+        const detailedUser = await whitelistManager.getUserByDiscordId(targetUser.id);
+
+        if (!detailedUser || !detailedUser.whitelistEntry) {
+          await interaction.reply({
+            content: `❌ User not found in whitelist.`,
+            ephemeral: true,
+          });
+          return;
+        }
+
+        // Extract permissions properly with expiry info
+        const activeRoles: string[] = [];
+        for (const assignment of detailedUser.whitelistEntry?.roleAssignments || []) {
+          if (!assignment.expiresAt || assignment.expiresAt > new Date()) {
+            if (assignment.role.permissions) {
+              const rolePermissions = assignment.role.permissions
+                .split(',')
+                .map((p: string) => p.trim())
+                .filter(Boolean);
+              
+              const expiry = assignment.expiresAt
+                ? ` (expires ${assignment.expiresAt.toDateString()})`
+                : "";
+              
+              rolePermissions.forEach((perm: string) => {
+                activeRoles.push(`${perm}${expiry}`);
+              });
+            }
+          }
+        }
+
+        const vrchatAccounts =
+          detailedUser.vrchatAccounts
+            ?.map(
+              (account: { vrcUserId: string; accountType: string }) => `${account.vrcUserId} (${account.accountType})`,
+            )
+            ?.join("\n") || "No verified VRChat accounts";
+
+        const embed = new EmbedBuilder()
+          .setTitle("👤 User Information")
+          .setColor(0x0099ff)
+          .addFields(
+            { name: "Discord User", value: `<@${detailedUser.discordId}>`, inline: true },
+            { name: "VRChat Accounts", value: vrchatAccounts, inline: true },
+            {
+              name: "Added to Whitelist",
+              value: detailedUser.whitelistEntry?.createdAt?.toDateString() || "Unknown",
+              inline: true,
+            },
+            {
+              name: "Active Roles",
+              value:
+                activeRoles.length > 0
+                  ? activeRoles.join("\n")
+                  : "No roles assigned",
+            },
+          )
+          .setTimestamp();
+
+        await interaction.reply({ embeds: [embed] });
+        return;
+      }
+
+      // Default info behavior (basic info)
       if (targetUser) {
         userInfo = await whitelistManager.getUserByDiscordId(targetUser.id);
       } else if (vrchatUsername) {
@@ -437,266 +717,6 @@ export class WhitelistCommands {
     }
   }
 
-  @Slash({
-    description:
-      "Manually sync a user's whitelist permissions from their Discord roles",
-  })
-  async syncuser(
-    @SlashOption({
-      description: "Discord user to sync",
-      name: "user",
-      required: true,
-      type: ApplicationCommandOptionType.User,
-    })
-    user: User,
-    interaction: CommandInteraction,
-  ): Promise<void> {
-    try {
-      const member = await interaction.guild?.members.fetch(user.id);
-      if (!member) {
-        await interaction.reply({
-          content: "❌ User not found in this server.",
-          ephemeral: true,
-        });
-        return;
-      }
-
-      const roleIds = member.roles.cache.map((role) => role.id);
-      const shouldBeWhitelisted =
-        await whitelistManager.shouldUserBeWhitelisted(roleIds);
-
-      if (shouldBeWhitelisted) {
-        if (!interaction.guild) {
-          await interaction.reply({
-            content: "❌ This command can only be used in a server.",
-            ephemeral: true,
-          });
-          return;
-        }
-        await whitelistManager.syncUserRolesFromDiscord(
-          user.id,
-          roleIds,
-          interaction.guild.id,
-        );
-
-        const userInfo = await whitelistManager.getUserByDiscordId(user.id);
-        const userTyped = userInfo as {
-          whitelistEntry?: {
-            roleAssignments: Array<{ role: { permissions: string | null } }>;
-          } | null;
-        } | null;
-        
-        // Extract permissions from role assignments properly
-        const allPermissions = new Set<string>();
-        for (const assignment of userTyped?.whitelistEntry?.roleAssignments || []) {
-          if (assignment.role.permissions) {
-            // Split comma-separated permissions and add to set
-            const rolePermissions = assignment.role.permissions
-              .split(',')
-              .map((p: string) => p.trim())
-              .filter(Boolean);
-            rolePermissions.forEach((perm: string) => allPermissions.add(perm));
-          }
-        }
-        
-        const permissions = allPermissions.size > 0 
-          ? Array.from(allPermissions).sort().join(", ")
-          : "None";
-
-        const embed = new EmbedBuilder()
-          .setTitle("✅ User Synced")
-          .setColor(0x00ff00)
-          .addFields(
-            { name: "User", value: `<@${user.id}>`, inline: true },
-            { name: "Permissions", value: permissions, inline: true },
-          )
-          .setTimestamp();
-
-        await interaction.reply({ embeds: [embed] });
-      } else {
-        await whitelistManager.removeUserFromWhitelistIfNoRoles(user.id);
-        await interaction.reply({
-          content: `❌ User <@${user.id}> has no Discord roles that map to whitelist permissions.`,
-          ephemeral: true,
-        });
-      }
-    } catch (error: unknown) {
-      await interaction.reply({
-        content: `❌ Failed to sync user: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
-      });
-    }
-  }
-
-
-
-  @Slash({
-    name: "users",
-    description: "Browse whitelist users with VRChat links and whitelist roles",
-  })
-  async users(interaction: CommandInteraction): Promise<void> {
-    try {
-      await interaction.deferReply();
-
-      const whitelistEntries = await whitelistManager.getWhitelistUsers();
-
-      if (whitelistEntries.length === 0) {
-        await interaction.editReply({
-          content: "❌ No users found in the whitelist.",
-        });
-        return;
-      }
-
-      const pageSize = 10;
-      const totalPages = Math.ceil(whitelistEntries.length / pageSize);
-      const pages: Array<{ embeds: EmbedBuilder[] }> = [];
-
-      for (let i = 0; i < whitelistEntries.length; i += pageSize) {
-        const chunk = whitelistEntries.slice(i, i + pageSize);
-        const description = chunk
-          .map((entry, index: number) => {
-            const entryTyped = entry as {
-              discordId?: string;
-              vrchatUsername?: string;
-              vrcUserId?: string;
-              roles?: string[];
-            };
-            const listIndex = i + index + 1;
-            const mention = entryTyped.discordId
-              ? `<@${entryTyped.discordId}>`
-              : "Unknown Discord user";
-            const vrchatDisplay = entryTyped.vrchatUsername || "Unknown VRChat user";
-            const vrcLink = entryTyped.vrcUserId
-              ? `https://vrchat.com/home/user/${encodeURIComponent(entryTyped.vrcUserId)}`
-              : null;
-            const vrchatLine = vrcLink
-              ? `[${vrchatDisplay}](${vrcLink})`
-              : vrchatDisplay;
-            const whitelistRoles: string = entryTyped.roles?.length
-              ? entryTyped.roles
-                  .map((role: string) => `\`${escapeMarkdown(role)}\``)
-                  .join(", ")
-              : "No whitelist permissions";
-
-            return `**${listIndex}.** ${mention}\n• VRChat: ${vrchatLine}\n• Whitelist: ${whitelistRoles}`;
-          })
-          .join("\n\n");
-
-        const embed = new EmbedBuilder()
-          .setTitle("📋 Whitelist Users")
-          .setColor(0x0099ff)
-          .setDescription(description)
-          .setFooter({
-            text: `Page ${Math.floor(i / pageSize) + 1} of ${totalPages} • Total: ${whitelistEntries.length} users`,
-          })
-          .setTimestamp();
-
-        pages.push({ embeds: [embed] });
-      }
-
-      if (pages.length === 1) {
-        await interaction.editReply(pages[0]);
-        return;
-      }
-
-      const pagination = new Pagination(interaction, pages, {
-        time: 120_000,
-      });
-
-      await pagination.send();
-    } catch (error: unknown) {
-      if (interaction.deferred || interaction.replied) {
-        await interaction.editReply({
-          content: `❌ Failed to list users: ${error instanceof Error ? error.message : "Unknown error"}`,
-        });
-      } else {
-        await interaction.reply({
-          content: `❌ Failed to list users: ${error instanceof Error ? error.message : "Unknown error"}`,
-          ephemeral: true,
-        });
-      }
-    }
-  }
-
-  @Slash({ description: "Get information about a specific user" })
-  async userinfo(
-    @SlashOption({
-      description: "Discord user",
-      name: "discord_user",
-      required: true,
-      type: ApplicationCommandOptionType.User,
-    })
-    discordUser: User,
-    interaction: CommandInteraction,
-  ): Promise<void> {
-    try {
-      const user = await whitelistManager.getUserByDiscordId(discordUser.id);
-
-      if (!user || !user.whitelistEntry) {
-        await interaction.reply({
-          content: `❌ User not found in whitelist.`,
-          ephemeral: true,
-        });
-        return;
-      }
-
-      // Extract permissions properly with expiry info
-      const activeRoles: string[] = [];
-      for (const assignment of user.whitelistEntry?.roleAssignments || []) {
-        if (!assignment.expiresAt || assignment.expiresAt > new Date()) {
-          if (assignment.role.permissions) {
-            const rolePermissions = assignment.role.permissions
-              .split(',')
-              .map((p: string) => p.trim())
-              .filter(Boolean);
-            
-            const expiry = assignment.expiresAt
-              ? ` (expires ${assignment.expiresAt.toDateString()})`
-              : "";
-            
-            rolePermissions.forEach((perm: string) => {
-              activeRoles.push(`${perm}${expiry}`);
-            });
-          }
-        }
-      }
-
-      const vrchatAccounts =
-        user.vrchatAccounts
-          ?.map(
-            (account: { vrcUserId: string; accountType: string }) => `${account.vrcUserId} (${account.accountType})`,
-          )
-          ?.join("\n") || "No verified VRChat accounts";
-
-      const embed = new EmbedBuilder()
-        .setTitle("👤 User Information")
-        .setColor(0x0099ff)
-        .addFields(
-          { name: "Discord User", value: `<@${user.discordId}>`, inline: true },
-          { name: "VRChat Accounts", value: vrchatAccounts, inline: true },
-          {
-            name: "Added to Whitelist",
-            value: user.whitelistEntry?.createdAt?.toDateString() || "Unknown",
-            inline: true,
-          },
-          {
-            name: "Active Roles",
-            value:
-              activeRoles.length > 0
-                ? activeRoles.join("\n")
-                : "No roles assigned",
-          },
-        )
-        .setTimestamp();
-
-      await interaction.reply({ embeds: [embed] });
-    } catch (error: unknown) {
-      await interaction.reply({
-        content: `❌ Failed to get user info: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
-      });
-    }
-  }
 
   @Slash({ description: "Get whitelist statistics" })
   async stats(interaction: CommandInteraction): Promise<void> {
@@ -818,62 +838,10 @@ export class WhitelistCommands {
     }
   }
 
-  @Slash({ description: "Clean up expired role assignments" })
-  async cleanup(interaction: CommandInteraction): Promise<void> {
-    try {
-      const cleanedCount = await whitelistManager.cleanupExpiredRoles();
-
-      const embed = new EmbedBuilder()
-        .setTitle("🧹 Cleanup Complete")
-        .setColor(0x00ff00)
-        .addFields({
-          name: "Expired Assignments Removed",
-          value: cleanedCount.toString(),
-        })
-        .setTimestamp();
-
-      await interaction.reply({ embeds: [embed] });
-    } catch (error: unknown) {
-      await interaction.reply({
-        content: `❌ Failed to cleanup: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
-      });
-    }
-  }
-
-  @Slash({
-    description: "Update GitHub repository with current whitelist data",
-  })
-  async updaterepo(interaction: CommandInteraction): Promise<void> {
-    try {
-      await interaction.deferReply();
-
-      await whitelistManager.publishWhitelist(
-        `manual update: latest whitelist`,
-        true, // Force update even if content unchanged
-  interaction.guildId ?? undefined
-      );
-
-      const embed = new EmbedBuilder()
-        .setTitle("📝 Repository Updated")
-        .setColor(0x00ff00)
-        .setDescription(
-          "Successfully updated GitHub repository with current whitelist data",
-        )
-        .setTimestamp();
-
-      await interaction.editReply({ embeds: [embed] });
-    } catch (error: unknown) {
-      await interaction.editReply({
-        content: `❌ Failed to update repository: ${error instanceof Error ? error.message : "Unknown error"}`,
-      });
-    }
-  }
-
   @Slash({
     description: "Validate and cleanup whitelist access for all server members",
   })
-  async validateaccess(
+  async validate(
     @SlashOption({
       description: "Specific Discord user to validate (optional)",
       name: "user",
@@ -1169,10 +1137,16 @@ export class WhitelistCommands {
 
         await interaction.editReply({ embeds: [embed] });
 
+        // Cleanup expired roles as part of validation
+        const cleanedCount = await whitelistManager.cleanupExpiredRoles();
+        if (cleanedCount > 0) {
+          loggers.bot.info(`Cleaned up ${cleanedCount} expired role assignments during validation`);
+        }
+
         // Update GitHub repository if any changes were made
-        if (accessGranted > 0 || accessRevoked > 0) {
+        if (accessGranted > 0 || accessRevoked > 0 || cleanedCount > 0) {
           try {
-            const msg = `Bulk validation: ${accessGranted} granted, ${accessRevoked} revoked`;
+            const msg = `Bulk validation: ${accessGranted} granted, ${accessRevoked} revoked, ${cleanedCount} expired cleaned`;
             whitelistManager.queueBatchedUpdate('bulk-validation', msg);
             loggers.bot.info(
               `Queued GitHub repository update after bulk validation`,

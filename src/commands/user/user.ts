@@ -23,13 +23,13 @@ import { loggers } from "../../utility/logger.js";
 @SlashGroup("user")
 export class UserCommands {
   @Slash({
-    name: "get-permission",
-    description: "Check a user's current permission level.",
+    name: "permission",
+    description: "Check user permissions or list all permission levels.",
   })
-  async getPermission(
+  async permission(
     @SlashOption({
       name: "user",
-      description: "User to check (defaults to yourself)",
+      description: "User to check (optional, if not provided lists all permission levels)",
       type: ApplicationCommandOptionType.User,
       required: false,
     })
@@ -38,7 +38,31 @@ export class UserCommands {
   ) {
     if (!interaction.guildId) {return;}
 
-    const targetUserId = user?.id || interaction.user.id;
+    // If no user provided, list all permissions
+    if (!user) {
+      const permissions = [
+        "🔴 **BOT_OWNER** (100) - Full bot access (configured via BOT_OWNER_ID environment variable)",
+        "🟠 **STAFF** (80) - Staff-level administrative access (requires Staff role)",
+        "🟡 **DEV_GUARD** (75) - Development and administrative access (requires Dev Guard role)",
+        "🟢 **TRAINER** (60) - Training and mentoring access (requires Trainer role) - *Cannot access Host Attendance commands*",
+        "🟢 **HOST_ATTENDANCE** (50) - Can manage attendance events (requires Host Attendance role) - *Cannot access Trainer commands*",
+        "🔵 **SHIELD_MEMBER** (25) - Shield member access (requires Shield Member role)",
+        "⚪ **USER** (0) - Basic user access (default)",
+      ];
+
+      await interaction.reply({
+        content:
+          `📋 **Role-Based Permission System**\n\n` +
+          `Permissions are automatically assigned based on Discord roles:\n\n` +
+          `${permissions.join("\n")}\n\n` +
+          `💡 **Note:** To change a user's permissions, assign/remove the appropriate Discord roles using server settings.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // Get specific user's permission
+    const targetUserId = user.id;
 
     try {
       // Get the target member
@@ -68,32 +92,6 @@ export class UserCommands {
         flags: MessageFlags.Ephemeral,
       });
     }
-  }
-
-  @Slash({
-    name: "list-permissions",
-    description:
-      "List all available permission levels and their associated roles.",
-  })
-  async listPermissions(interaction: CommandInteraction) {
-    const permissions = [
-      "🔴 **BOT_OWNER** (100) - Full bot access (configured via BOT_OWNER_ID environment variable)",
-      "🟠 **STAFF** (80) - Staff-level administrative access (requires Staff role)",
-      "🟡 **DEV_GUARD** (75) - Development and administrative access (requires Dev Guard role)",
-      "🟢 **TRAINER** (60) - Training and mentoring access (requires Trainer role) - *Cannot access Host Attendance commands*",
-      "🟢 **HOST_ATTENDANCE** (50) - Can manage attendance events (requires Host Attendance role) - *Cannot access Trainer commands*",
-      "🔵 **SHIELD_MEMBER** (25) - Shield member access (requires Shield Member role)",
-      "⚪ **USER** (0) - Basic user access (default)",
-    ];
-
-    await interaction.reply({
-      content:
-        `📋 **Role-Based Permission System**\n\n` +
-        `Permissions are automatically assigned based on Discord roles:\n\n` +
-        `${permissions.join("\n")}\n\n` +
-        `💡 **Note:** To change a user's permissions, assign/remove the appropriate Discord roles using server settings.`,
-      flags: MessageFlags.Ephemeral,
-    });
   }
 
   // Helper method to get numeric value (duplicate from permissionUtils for simplicity)

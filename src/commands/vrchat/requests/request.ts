@@ -41,13 +41,22 @@ import {
 })
 @SlashGroup("vrchat")
 @Guard(VRChatLoginGuard)
-export class VRChatBackupRequestCommand {
+export class VRChatRequestCommand {
   @Slash({
-    name: "backup-request",
-    description: "Request a backup for SHIELD.",
+    name: "request",
+    description: "Request backup or log dispatch for SHIELD.",
   })
   @Guard(ShieldMemberGuard)
-  async backupRequest(
+  async request(
+    @SlashChoice({ name: "Backup Request", value: "backup" })
+    @SlashChoice({ name: "Dispatch Log", value: "dispatch" })
+    @SlashOption({
+      name: "type",
+      description: "Type of request",
+      type: ApplicationCommandOptionType.String,
+      required: true,
+    })
+    type: string,
     @SlashOption({
       name: "role",
       description:
@@ -174,7 +183,7 @@ export class VRChatBackupRequestCommand {
       worldInfo = worldResult.worldText;
     }
 
-    // Create reply message
+    // Create reply message based on type
     const roleMention = `<@&${roleId}>`;
     const requestType =
       roleId === "814239954641223760"
@@ -187,7 +196,10 @@ export class VRChatBackupRequestCommand {
       incidentStatus === "active" ? "Active 🔴" : "Resolved 🟢";
     const situationText = situation || "[SITUATION NOT PROVIDED]";
 
-    const replyMsg = `\`\`\`
+    let replyMsg: string;
+    if (type === "backup") {
+      // Backup request format (with role mention at top)
+      replyMsg = `\`\`\`
 ${roleMention}
 **Request**: ${requestType}
 **World**: ${world ? worldInfo : "[WORLD NOT PROVIDED]"}
@@ -195,6 +207,16 @@ ${roleMention}
 **Squad**: ${squadText}
 **Status**: ${statusText}
 \`\`\``;
+    } else {
+      // Dispatch log format
+      replyMsg = `\`\`\`
+World: ${world ? worldInfo : "[WORLD NOT PROVIDED]"}
+Request: ${requestType}
+Situation: ${situationText}
+Squad: ${squadText}
+Status: ${statusText}
+\`\`\``;
+    }
 
     await interaction.reply({ content: replyMsg });
   }
@@ -260,3 +282,4 @@ ${roleMention}
     }
   }
 }
+

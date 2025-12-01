@@ -7,8 +7,9 @@ import {
     ButtonStyle,
     InteractionContextType,
     ApplicationIntegrationType,
+    ApplicationCommandOptionType,
 } from "discord.js";
-import { Discord, Slash, SlashGroup } from "discordx";
+import { Discord, Slash, SlashGroup, SlashOption } from "discordx";
 import { loggers } from "../../../utility/logger.js";
 
 interface StatusIncident {
@@ -37,7 +38,8 @@ interface StatusIncident {
 
 @Discord()
 @SlashGroup({
-    name: "status", description: "VRChat status commands", 
+    name: "vrchat",
+    description: "VRChat related commands.",
     contexts: [
         InteractionContextType.Guild,
         InteractionContextType.PrivateChannel,
@@ -47,13 +49,23 @@ interface StatusIncident {
         ApplicationIntegrationType.UserInstall,
     ],
 })
-@SlashGroup("status")
+@SlashGroup("vrchat")
 export class VRChatStatusCommand {
     @Slash({
-        name: "check",
-        description: "Check current VRChat service status and incidents",
+        name: "status",
+        description: "Check VRChat service status and incidents (use show_history option for history)",
     })
-    async check(interaction: CommandInteraction) {
+    async status(
+        @SlashOption({
+            name: "show_history",
+            description: "Show incident history instead of current status",
+            type: ApplicationCommandOptionType.Boolean,
+            required: false,
+        })
+        showHistory: boolean | null,
+        interaction: CommandInteraction,
+    ) {
+        const showHistoryFlag = showHistory ?? false;
         await interaction.deferReply();
 
         try {
@@ -163,84 +175,79 @@ export class VRChatStatusCommand {
 
             await interaction.editReply({ embeds: [errorEmbed] });
         }
-    }
 
-    @Slash({
-        name: "history",
-        description: "View incident update history",
-    })
-    async history(interaction: CommandInteraction) {
-        await interaction.deferReply();
+        // Handle history view
+        if (showHistoryFlag) {
+            try {
+                const response = await fetch(
+                    "https://status.vrchat.com/api/v2/incidents.json",
+                );
+                const data = await response.json();
+                const incidents: StatusIncident[] = data.incidents;
 
-        try {
-            const response = await fetch(
-                "https://status.vrchat.com/api/v2/incidents.json",
-            );
-            const data = await response.json();
-            const incidents: StatusIncident[] = data.incidents;
+                if (!incidents || incidents.length === 0) {
+                    const embed = new EmbedBuilder()
+                        .setTitle("📋 No Incidents")
+                        .setDescription("No incident history available.")
+                        .setColor(Colors.Blue);
 
-            if (!incidents || incidents.length === 0) {
-                const embed = new EmbedBuilder()
-                    .setTitle("📋 No Incidents")
-                    .setDescription("No incident history available.")
-                    .setColor(Colors.Blue);
+                    await interaction.editReply({ embeds: [embed] });
+                    return;
+                }
 
-                await interaction.editReply({ embeds: [embed] });
-                return;
+                const incident = incidents[0];
+
+                if (
+                    !incident.incident_updates ||
+                    incident.incident_updates.length === 0
+                ) {
+                    const embed = new EmbedBuilder()
+                        .setTitle(`📋 ${incident.name} - History`)
+                        .setDescription("No update history available for this incident.")
+                        .setColor(Colors.Blue);
+
+                    await interaction.editReply({ embeds: [embed] });
+                    return;
+                }
+
+                // Create embeds for each update (up to 10)
+                const embeds: EmbedBuilder[] = [];
+                const updates = incident.incident_updates.slice(0, 10);
+
+                updates.forEach((update, index) => {
+                    const updateEmbed = new EmbedBuilder()
+                        .setTitle(`${incident.name} - Update ${index + 1}`)
+                        .setDescription(update.body)
+                        .addFields({
+                            name: "Status",
+                            value: update.status.toUpperCase(),
+                            inline: true,
+                        })
+                        .addFields({
+                            name: "Posted",
+                            value: new Date(update.created_at).toLocaleString(),
+                            inline: true,
+                        })
+                        .setColor(
+                            update.status === "resolved" ? Colors.Green : Colors.Orange,
+                        )
+                        .setFooter({
+                            text: `Update ${index + 1} of ${Math.min(updates.length, 10)}`,
+                        });
+
+                    embeds.push(updateEmbed);
+                });
+
+                await interaction.editReply({ embeds });
+            } catch (error) {
+                loggers.vrchat.error("Error fetching incident history", error);
+                const errorEmbed = new EmbedBuilder()
+                    .setTitle("❌ Error")
+                    .setDescription("Failed to fetch incident history.")
+                    .setColor(Colors.Red);
+
+                await interaction.editReply({ embeds: [errorEmbed] });
             }
-
-            const incident = incidents[0];
-
-            if (
-                !incident.incident_updates ||
-                incident.incident_updates.length === 0
-            ) {
-                const embed = new EmbedBuilder()
-                    .setTitle(`📋 ${incident.name} - History`)
-                    .setDescription("No update history available for this incident.")
-                    .setColor(Colors.Blue);
-
-                await interaction.editReply({ embeds: [embed] });
-                return;
-            }
-
-            // Create embeds for each update (up to 10)
-            const embeds: EmbedBuilder[] = [];
-            const updates = incident.incident_updates.slice(0, 10);
-
-            updates.forEach((update, index) => {
-                const updateEmbed = new EmbedBuilder()
-                    .setTitle(`${incident.name} - Update ${index + 1}`)
-                    .setDescription(update.body)
-                    .addFields({
-                        name: "Status",
-                        value: update.status.toUpperCase(),
-                        inline: true,
-                    })
-                    .addFields({
-                        name: "Posted",
-                        value: new Date(update.created_at).toLocaleString(),
-                        inline: true,
-                    })
-                    .setColor(
-                        update.status === "resolved" ? Colors.Green : Colors.Orange,
-                    )
-                    .setFooter({
-                        text: `Update ${index + 1} of ${Math.min(updates.length, 10)}`,
-                    });
-
-                embeds.push(updateEmbed);
-            });
-
-            await interaction.editReply({ embeds });
-        } catch (error) {
-            loggers.vrchat.error("Error fetching incident history", error);
-            const errorEmbed = new EmbedBuilder()
-                .setTitle("❌ Error")
-                .setDescription("Failed to fetch incident history.")
-                .setColor(Colors.Red);
-
-            await interaction.editReply({ embeds: [errorEmbed] });
         }
     }
 }
