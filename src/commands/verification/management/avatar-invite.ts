@@ -45,6 +45,7 @@ export class VRChatAvatarInviteCommand {
     // Get guild settings to retrieve the avatar world ID
     // GuildGuard ensures guildId exists
     const guildSettings = await prisma.guildSettings.findUnique({
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
       where: { guildId: interaction.guildId! },
     });
 
