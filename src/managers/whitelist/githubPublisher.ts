@@ -193,13 +193,13 @@ export class GitHubPublisher {
           format: "armored",
         });
         // Extract the armored signature string
-        // In openpgp v6, sign() with format: "armored" returns a Signature object
-        // that is a ReadableStream - we need to read it as text
+        // In openpgp v6, sign() with format: "armored" returns a Signature ReadableStream
+        // We need to read it as text and join the chunks
         if (typeof signed === "string") {
           signature = signed;
-        } else if (signed && typeof signed.getReader === "function") {
-          // Read the signature stream as text
-          const chunks: Uint8Array[] = [];
+        } else {
+          // Read the signature stream - with format: "armored", it should be text
+          const textParts: string[] = [];
           const reader = signed.getReader();
           try {
             while (true) {
@@ -207,23 +207,13 @@ export class GitHubPublisher {
               if (done) {
                 break;
               }
-              chunks.push(value);
+              // With format: "armored", value should be a string
+              textParts.push(String(value));
             }
           } finally {
             reader.releaseLock();
           }
-          // Combine chunks and convert to string
-          const totalLength = chunks.reduce((acc, chunk) => acc + chunk.length, 0);
-          const combined = new Uint8Array(totalLength);
-          let offset = 0;
-          for (const chunk of chunks) {
-            combined.set(chunk, offset);
-            offset += chunk.length;
-          }
-          signature = new TextDecoder().decode(combined);
-        } else {
-          // Fallback: try to convert to string directly
-          signature = String(signed);
+          signature = textParts.join("");
         }
       } catch (e) {
         const errorData =
