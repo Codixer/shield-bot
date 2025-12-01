@@ -1,5 +1,3 @@
-import { loggers } from "../../utility/logger.js";
-
 /**
  * GitHub publishing operations for whitelist
  */
@@ -114,15 +112,13 @@ export class GitHubPublisher {
     const newTreeSha = (newTree as { sha?: string })?.sha;
     if (!newTreeSha) {throw new Error("Failed to create new tree");}
 
-    // Step 5: Create a new commit (optionally PGP-signed)
+    // Step 5: Create a new commit
     const message =
       commitMessage?.trim() && commitMessage.length > 0
         ? commitMessage
         : `chore(whitelist): update encoded (${encodedFilePath}) and decoded (${decodedFilePath}) at ${new Date().toISOString()}`;
 
-    // Optional author/committer and PGP signature support
-    const signEnabled =
-      String(process.env.GIT_SIGN_COMMITS || "").toLowerCase() === "true";
+    // Optional author/committer identity
     const authorName = process.env.GIT_AUTHOR_NAME || undefined;
     const authorEmail = process.env.GIT_AUTHOR_EMAIL || undefined;
     const committerName = process.env.GIT_COMMITTER_NAME || authorName;
@@ -138,110 +134,23 @@ export class GitHubPublisher {
         ? { name: committerName, email: committerEmail, date: nowIso }
         : undefined;
 
-    let signature: string | undefined = undefined;
-
-    if (signEnabled) {
-      try {
-        const privateKeyArmored = process.env.GIT_PGP_PRIVATE_KEY;
-        const passphrase = process.env.GIT_PGP_PASSPHRASE || "";
-        if (!privateKeyArmored) {
-          throw new Error(
-            "GIT_SIGN_COMMITS is true but GIT_PGP_PRIVATE_KEY is not set",
-          );
-        }
-        if (!author || !committer) {
-          throw new Error(
-            "GIT_SIGN_COMMITS is true but author/committer identity env vars are missing",
-          );
-        }
-
-        // Build raw commit payload matching what GitHub expects for signing
-        const payload = this.buildRawCommitPayload({
-          treeSha: newTreeSha,
-          parentSha: latestCommitSha,
-          author: author,
-          committer: committer,
-          message,
-        });
-
-        // Dynamic import to avoid cost if not signing
-        const openpgp = await import("openpgp");
-        const privateKey = await openpgp.readPrivateKey({
-          armoredKey: privateKeyArmored,
-        });
-        let decryptedKey = privateKey;
-        if (passphrase) {
-          try {
-            decryptedKey = await openpgp.decryptKey({ privateKey, passphrase });
-          } catch (decryptError) {
-            // If key is already decrypted, use it as-is
-            if (
-              decryptError instanceof Error &&
-              decryptError.message.includes("already decrypted")
-            ) {
-              decryptedKey = privateKey;
-            } else {
-              throw decryptError;
-            }
-          }
-        }
-        const pgpMessage = await openpgp.createMessage({ text: payload });
-        const signed = await openpgp.sign({
-          message: pgpMessage,
-          signingKeys: decryptedKey,
-          detached: true,
-          format: "armored",
-        });
-        // Extract the armored signature string
-        // In openpgp v6, sign() with format: "armored" returns a Signature ReadableStream
-        // We need to read it as text and join the chunks
-        if (typeof signed === "string") {
-          signature = signed;
-        } else {
-          // Read the signature stream - with format: "armored", it should be text
-          const textParts: string[] = [];
-          const reader = signed.getReader();
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) {
-                break;
-              }
-              // With format: "armored", value should be a string
-              textParts.push(String(value));
-            }
-          } finally {
-            reader.releaseLock();
-          }
-          signature = textParts.join("");
-        }
-      } catch (e) {
-        const errorData =
-          e instanceof Error
-            ? { message: e.message, stack: e.stack, name: e.name }
-            : { error: String(e) };
-        loggers.bot.warn(
-          "Failed to sign commit, falling back to unsigned commit",
-          errorData,
-        );
-      }
-    }
-
     const commitBody: {
       message: string;
       tree: string;
       parents: string[];
       author?: { name: string; email: string; date: string };
       committer?: { name: string; email: string; date: string };
-      signature?: string;
     } = {
       message,
       tree: newTreeSha,
       parents: [latestCommitSha],
     };
-    if (author) {commitBody.author = author;}
-    if (committer) {commitBody.committer = committer;}
-    if (signature) {commitBody.signature = signature;}
+    if (author) {
+      commitBody.author = author;
+    }
+    if (committer) {
+      commitBody.committer = committer;
+    }
 
     const newCommit = await gh(`/repos/${owner}/${repo}/git/commits`, {
       method: "POST",
@@ -264,44 +173,5 @@ export class GitHubPublisher {
     };
   }
 
-  /**
-   * Build the raw commit payload used for PGP signing.
-   * Format matches Git commit object:
-   *   tree <treeSha>\n
-   *   parent <parentSha>\n
-   *   author Name <email> <unixSeconds> +0000\n
-   *   committer Name <email> <unixSeconds> +0000\n
-   *   \n
-   *   <message>\n
-   * Note: Exactly one newline after the message (no trailing empty line)
-   */
-  private buildRawCommitPayload(input: {
-    treeSha: string;
-    parentSha: string;
-    author: { name: string; email: string; date: string };
-    committer: { name: string; email: string; date: string };
-    message: string;
-  }): string {
-    const toUnixAndTz = (iso: string) => {
-      const d = new Date(iso);
-      const unix = Math.floor(d.getTime() / 1000);
-      // Use UTC to avoid host-dependent offsets; ensures JSON date and payload align
-      const tz = "+0000";
-      return `${unix} ${tz}`;
-    };
-
-    const authorLine = `author ${input.author.name} <${input.author.email}> ${toUnixAndTz(input.author.date)}`;
-    const committerLine = `committer ${input.committer.name} <${input.committer.email}> ${toUnixAndTz(input.committer.date)}`;
-
-    const lines = [
-      `tree ${input.treeSha}`,
-      `parent ${input.parentSha}`,
-      authorLine,
-      committerLine,
-      "",
-      input.message,
-    ];
-    return lines.join("\n") + "\n";
-  }
 }
 
