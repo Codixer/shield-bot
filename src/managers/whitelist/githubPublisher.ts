@@ -169,9 +169,22 @@ export class GitHubPublisher {
         const privateKey = await openpgp.readPrivateKey({
           armoredKey: privateKeyArmored,
         });
-        const decryptedKey = passphrase
-          ? await openpgp.decryptKey({ privateKey, passphrase })
-          : privateKey;
+        let decryptedKey = privateKey;
+        if (passphrase) {
+          try {
+            decryptedKey = await openpgp.decryptKey({ privateKey, passphrase });
+          } catch (decryptError) {
+            // If key is already decrypted, use it as-is
+            if (
+              decryptError instanceof Error &&
+              decryptError.message.includes("already decrypted")
+            ) {
+              decryptedKey = privateKey;
+            } else {
+              throw decryptError;
+            }
+          }
+        }
         const pgpMessage = await openpgp.createMessage({ text: payload });
         const signed = await openpgp.sign({
           message: pgpMessage,
@@ -179,7 +192,10 @@ export class GitHubPublisher {
           detached: true,
           format: "armored",
         });
-        signature = typeof signed === "string" ? signed : String(signed);
+        // Extract the armored signature string
+        // In openpgp v6, sign() with format: "armored" returns a Signature object
+        // We need to read it as a string using the armor() method
+        signature = await signed.armor();
       } catch (e) {
         const errorData =
           e instanceof Error
@@ -231,13 +247,14 @@ export class GitHubPublisher {
 
   /**
    * Build the raw commit payload used for PGP signing.
-   * Format:
+   * Format matches Git commit object:
    *   tree <treeSha>\n
    *   parent <parentSha>\n
    *   author Name <email> <unixSeconds> +0000\n
    *   committer Name <email> <unixSeconds> +0000\n
    *   \n
    *   <message>\n
+   * Note: Exactly one newline after the message (no trailing empty line)
    */
   private buildRawCommitPayload(input: {
     treeSha: string;
@@ -264,9 +281,8 @@ export class GitHubPublisher {
       committerLine,
       "",
       input.message,
-      "",
     ];
-    return lines.join("\n");
+    return lines.join("\n") + "\n";
   }
 }
 
