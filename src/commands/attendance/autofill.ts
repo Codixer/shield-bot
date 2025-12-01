@@ -2,8 +2,6 @@ import { Discord, Slash, Guard, SlashGroup } from "discordx";
 import {
   CommandInteraction,
   MessageFlags,
-  InteractionContextType,
-  ApplicationIntegrationType,
   ChannelType,
   ActionRowBuilder,
   StringSelectMenuBuilder,
@@ -23,8 +21,6 @@ const attendanceManager = new AttendanceManager();
 @SlashGroup({
   name: "attendance",
   description: "VRChat attendance tracking commands.",
-  contexts: [InteractionContextType.Guild],
-  integrationTypes: [ApplicationIntegrationType.GuildInstall],
 })
 @SlashGroup("attendance")
 @Guard(AttendanceHostGuard)

@@ -1,10 +1,8 @@
-import { Discord, Slash, SlashGroup, SlashOption } from "discordx";
+import { Discord, Slash, SlashGroup, SlashOption, Guard } from "discordx";
 import {
   ApplicationCommandOptionType,
   CommandInteraction,
   MessageFlags,
-  InteractionContextType,
-  ApplicationIntegrationType,
   User,
 } from "discord.js";
 import {
@@ -12,13 +10,12 @@ import {
   PermissionLevel,
 } from "../../utility/permissionUtils.js";
 import { loggers } from "../../utility/logger.js";
+import { GuildGuard } from "../../utility/guards.js";
 
 @Discord()
 @SlashGroup({
   name: "user",
   description: "User management commands",
-  contexts: [InteractionContextType.Guild],
-  integrationTypes: [ApplicationIntegrationType.GuildInstall],
 })
 @SlashGroup("user")
 export class UserCommands {
@@ -26,6 +23,7 @@ export class UserCommands {
     name: "permission",
     description: "Check user permissions or list all permission levels.",
   })
+  @Guard(GuildGuard)
   async permission(
     @SlashOption({
       name: "user",
@@ -36,8 +34,6 @@ export class UserCommands {
     user: User | null,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) {return;}
-
     // If no user provided, list all permissions
     if (!user) {
       const permissions = [

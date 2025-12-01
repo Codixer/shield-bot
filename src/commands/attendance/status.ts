@@ -3,8 +3,6 @@ import {
   CommandInteraction,
   ApplicationCommandOptionType,
   MessageFlags,
-  InteractionContextType,
-  ApplicationIntegrationType,
   User,
 } from "discord.js";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
@@ -17,12 +15,6 @@ const attendanceManager = new AttendanceManager();
 @SlashGroup({
   name: "attendance",
   description: "VRChat attendance tracking commands.",
-  contexts: [
-    InteractionContextType.Guild,
-  ],
-  integrationTypes: [
-    ApplicationIntegrationType.GuildInstall,
-  ],
 })
 @SlashGroup("attendance")
 @Guard(AttendanceHostGuard)

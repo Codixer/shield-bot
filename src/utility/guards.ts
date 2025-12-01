@@ -27,6 +27,21 @@ async function requireGuild(
 }
 
 /**
+ * Guard to ensure command is run in a guild context
+ */
+export async function GuildGuard(
+  interaction: Interaction,
+  _client: Client,
+  next: Next,
+): Promise<unknown> {
+  const guildCheck = await requireGuild(interaction);
+  if (!guildCheck) {
+    return undefined;
+  }
+  return next();
+}
+
+/**
  * Helper function to get guild member from interaction
  */
 async function requireGuildMember(

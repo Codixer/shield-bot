@@ -10,34 +10,19 @@ import {
   CommandInteraction,
   ApplicationCommandOptionType,
   MessageFlags,
-  InteractionContextType,
-  ApplicationIntegrationType,
   AutocompleteInteraction,
 } from "discord.js";
 import {
-  findFriendInstanceOrWorld,
-  getFriendInstanceInfo,
   getInstanceInfoByShortName,
   getUserById,
-  hasFriendLocationConsent,
 } from "../../../utility/vrchat.js";
-import { VRChatLoginGuard } from "../../../utility/guards.js";
-import { ShieldMemberGuard } from "../../../utility/guards.js";
+import { VRChatLoginGuard, ShieldMemberGuard, GuildGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
-import {
-  resolveWorldDisplay,
-} from "../../../utility/vrchat/tracking.js";
 
 @Discord()
 @SlashGroup({
   name: "vrchat",
   description: "VRChat related commands.",
-  contexts: [
-    InteractionContextType.Guild,
-  ],
-  integrationTypes: [
-    ApplicationIntegrationType.GuildInstall,
-  ],
 })
 @SlashGroup("vrchat")
 @Guard(VRChatLoginGuard)
@@ -46,7 +31,7 @@ export class VRChatRequestCommand {
     name: "request",
     description: "Request backup or log dispatch for SHIELD.",
   })
-  @Guard(ShieldMemberGuard)
+  @Guard(GuildGuard, ShieldMemberGuard)
   async request(
     @SlashChoice({ name: "Backup Request", value: "backup" })
     @SlashChoice({ name: "Dispatch Log", value: "dispatch" })
@@ -92,11 +77,11 @@ export class VRChatRequestCommand {
     status: string,
     @SlashOption({
       name: "world",
-      description: "World Link or Detected over vrc account",
+      description: "World link (required for dispatch logs, optional for backup requests)",
       type: ApplicationCommandOptionType.String,
       required: false,
     })
-    world: string,
+    world: string | null,
     @SlashOption({
       name: "account",
       description:
@@ -123,7 +108,6 @@ export class VRChatRequestCommand {
 
     // Get the user's main account if no account specified
     let vrcUserId = account;
-    let accountUsername: string | null = null;
     if (!vrcUserId) {
       const user = await prisma.user.findUnique({
         where: { discordId: interaction.user.id },
@@ -136,17 +120,7 @@ export class VRChatRequestCommand {
         vrcUserId = mainAccount
           ? mainAccount.vrcUserId
           : user.vrchatAccounts[0].vrcUserId;
-        if (mainAccount) {
-          const vrcUser = await getUserById(mainAccount.vrcUserId);
-          const userTyped = vrcUser as { displayName?: string } | null;
-          accountUsername = userTyped?.displayName ?? null;
-        }
       }
-    } else {
-      // If account is provided, get its username from VRChat API
-      const vrcUser = await getUserById(vrcUserId);
-      const userTyped = vrcUser as { displayName?: string } | null;
-      accountUsername = userTyped?.displayName ?? null;
     }
 
     if (!vrcUserId) {
@@ -167,20 +141,19 @@ export class VRChatRequestCommand {
       return;
     }
 
+    // Validate world is required for dispatch logs
+    if (type === "dispatch" && !world) {
+      await interaction.reply({
+        content: "World link is required for dispatch logs. Please provide a world link (vrch.at or vrc.group).",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
     // Get world info if provided
     let worldInfo = "";
     if (world) {
-      const worldResult = await resolveWorldDisplay({
-        world,
-        vrcUserId,
-        accountUsername,
-        findFriendInstanceOrWorld,
-        getFriendInstanceInfo,
-        getInstanceInfoByShortName,
-        getUserById,
-        hasFriendLocationConsent,
-      });
-      worldInfo = worldResult.worldText;
+      worldInfo = await this.resolveWorldFromLink(world);
     }
 
     // Create reply message based on type
@@ -280,6 +253,65 @@ Status: ${statusText}
 
       await interaction.respond(choices.slice(0, 25));
     }
+  }
+
+  private async resolveWorldFromLink(world: string): Promise<string> {
+    // Check if it's a valid world link
+    if (
+      world.startsWith("https://vrc.group/") ||
+      world.startsWith("https://vrch.at/")
+    ) {
+      const match = world.match(/(?:vrc\.group|vrch\.at)\/([^/?#]+)/);
+      const shortName = match ? match[1] : null;
+      if (shortName) {
+        try {
+          const instanceInfo = await getInstanceInfoByShortName(shortName);
+          if (instanceInfo?.world?.name) {
+            const worldName = instanceInfo.world.name;
+            let instanceId = instanceInfo.instanceId || instanceInfo.id || "";
+            if (typeof instanceId !== "string") {
+              instanceId = String(instanceId);
+            }
+            
+            // Extract instance number if it's a public instance
+            const instanceMatch = instanceId.match(/^([0-9]+)~/);
+            const instanceNumber = instanceMatch ? instanceMatch[1] : undefined;
+            
+            let worldNameWithInstance = worldName;
+            if (instanceNumber) {
+              worldNameWithInstance += ` (Instance #${instanceNumber})`;
+            }
+            
+            // Build join link
+            let joinLink = "";
+            if (instanceId.includes("nonce") && instanceInfo.worldId) {
+              joinLink = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${instanceId}`;
+            } else if (
+              instanceInfo.location &&
+              typeof instanceInfo.location === "string" &&
+              instanceInfo.location.includes("nonce") &&
+              instanceInfo.worldId
+            ) {
+              joinLink = `https://vrchat.com/home/launch?worldId=${instanceInfo.worldId}&instanceId=${instanceInfo.location}`;
+            } else if (instanceInfo.shortName) {
+              joinLink = `https://vrch.at/${instanceInfo.shortName}`;
+            } else if (instanceInfo.secureName) {
+              joinLink = `https://vrch.at/${instanceInfo.secureName}`;
+            } else {
+              joinLink = world;
+            }
+            
+            return `[${worldNameWithInstance}](${joinLink})`;
+          }
+        } catch (_) {
+          // If we can't resolve the link, just return it as-is
+          return world;
+        }
+      }
+    }
+    
+    // If not a valid link format, return as-is
+    return world;
   }
 }
 

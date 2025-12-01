@@ -8,24 +8,19 @@ import {
 import {
   CommandInteraction,
   ApplicationCommandOptionType,
-  InteractionContextType,
-  ApplicationIntegrationType,
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
   Colors,
   ActionRowBuilder,
 } from "discord.js";
-import { VRChatLoginGuard } from "../../../utility/guards.js";
-import { StaffGuard } from "../../../utility/guards.js";
+import { VRChatLoginGuard, StaffGuard, GuildGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
 
 @Discord()
 @SlashGroup({
   name: "vrchat",
   description: "VRChat related commands.",
-  contexts: [InteractionContextType.Guild],
-  integrationTypes: [ApplicationIntegrationType.GuildInstall],
 })
 @SlashGroup("vrchat")
 @Guard(VRChatLoginGuard, StaffGuard)
@@ -34,6 +29,7 @@ export class VRChatAvatarInviteCommand {
     name: "avatar-invite",
     description: "Send a message allowing users to request an invite to an avatar world",
   })
+  @Guard(GuildGuard)
   async avatarInvite(
       @SlashOption({
         name: "channel",
@@ -46,16 +42,10 @@ export class VRChatAvatarInviteCommand {
   ) {
     await interaction.deferReply();
 
-    if (!interaction.guildId) {
-      await interaction.editReply({
-        content: "❌ This command can only be used in a server.",
-      });
-      return;
-    }
-
     // Get guild settings to retrieve the avatar world ID
+    // GuildGuard ensures guildId exists
     const guildSettings = await prisma.guildSettings.findUnique({
-      where: { guildId: interaction.guildId },
+      where: { guildId: interaction.guildId! },
     });
 
     if (!guildSettings || !guildSettings.avatarWorldId) {

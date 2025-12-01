@@ -5,8 +5,6 @@ import {
     ActionRowBuilder,
     ButtonBuilder,
     ButtonStyle,
-    InteractionContextType,
-    ApplicationIntegrationType,
     ApplicationCommandOptionType,
 } from "discord.js";
 import { Discord, Slash, SlashGroup, SlashOption } from "discordx";
@@ -40,14 +38,6 @@ interface StatusIncident {
 @SlashGroup({
     name: "vrchat",
     description: "VRChat related commands.",
-    contexts: [
-        InteractionContextType.Guild,
-        InteractionContextType.PrivateChannel,
-    ],
-    integrationTypes: [
-        ApplicationIntegrationType.GuildInstall,
-        ApplicationIntegrationType.UserInstall,
-    ],
 })
 @SlashGroup("vrchat")
 export class VRChatStatusCommand {

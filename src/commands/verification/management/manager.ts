@@ -7,8 +7,6 @@ import {
   SectionBuilder,
   TextDisplayBuilder,
   ActionRowBuilder,
-  ApplicationIntegrationType,
-  InteractionContextType,
   SeparatorBuilder,
   SeparatorSpacingSize,
   type MessageActionRowComponentBuilder,
@@ -18,19 +16,13 @@ import {
 } from "discord.js";
 import { Discord, Guard, Slash, SlashGroup, SlashOption } from "discordx";
 import { prisma } from "../../../main.js";
-import { VRChatLoginGuard } from "../../../utility/guards.js";
+import { VRChatLoginGuard, GuildGuard } from "../../../utility/guards.js";
 import { userHasPermissionFromRoles, PermissionLevel } from "../../../utility/permissionUtils.js";
 
 @Discord()
 @SlashGroup({
   name: "verify",
   description: "VRChat verification commands.",
-  contexts: [
-    InteractionContextType.Guild,
-  ],
-  integrationTypes: [
-    ApplicationIntegrationType.GuildInstall,
-  ],
 })
 @SlashGroup("verify")
 @Guard(VRChatLoginGuard)
@@ -39,6 +31,7 @@ export class VRChatVerifyManagerCommand {
     name: "manage",
     description: "Manage MAIN/ALT status for verified VRChat accounts. Staff can manage any user's accounts.",
   })
+  @Guard(GuildGuard)
   async manage(
     @SlashOption({
       name: "user",
@@ -52,7 +45,7 @@ export class VRChatVerifyManagerCommand {
     const member = interaction.member as GuildMember;
     if (!member) {
       await interaction.reply({
-        content: "This command can only be used in a server.",
+        content: "Unable to verify your permissions.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -148,17 +141,11 @@ export class VRChatVerifyManagerCommand {
       for (const acc of verifiedAccounts) {
         const profileLink = `<https://vrchat.com/home/user/${acc.vrcUserId}>`;
         const displayName = acc.vrchatUsername || acc.vrcUserId;
-        const consent = await prisma.friendLocationConsent.findFirst({
-          where: { ownerVrcUserId: acc.vrcUserId },
-        });
-        const consentStatus = consent
-          ? "Tracking: Enabled"
-          : "Tracking: Disabled";
         const discordPing = `<@${discordId}>`;
 
         container.addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
-            `[${displayName}](${profileLink}) - ${consentStatus} - Linked to ${discordPing}`,
+            `[${displayName}](${profileLink}) - Linked to ${discordPing}`,
           ),
         );
 

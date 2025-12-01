@@ -241,10 +241,6 @@ export class VRCStaffAccountManagerButtonHandler {
         where: { id: vrcAccount.id },
       });
 
-      // Also delete any friend location consent records
-      await prisma.friendLocationConsent.deleteMany({
-        where: { ownerVrcUserId: vrcUserId },
-      });
 
       // Get roles and account type before whitelist update for logging
       let rolesBeforeDelete: string[] = [];
@@ -393,17 +389,11 @@ export class VRCStaffAccountManagerButtonHandler {
       for (const acc of verifiedAccounts) {
         const profileLink = `<https://vrchat.com/home/user/${acc.vrcUserId}>`;
         const displayName = acc.vrchatUsername || acc.vrcUserId;
-        const consent = await prisma.friendLocationConsent.findFirst({
-          where: { ownerVrcUserId: acc.vrcUserId },
-        });
-        const consentStatus = consent
-          ? "Tracking: Enabled"
-          : "Tracking: Disabled";
         const discordPing = `<@${targetDiscordId}>`;
 
         container.addTextDisplayComponents(
           new TextDisplayBuilder().setContent(
-            `[${displayName}](${profileLink}) - ${consentStatus} - Linked to ${discordPing}`,
+            `[${displayName}](${profileLink}) - Linked to ${discordPing}`,
           ),
         );
 

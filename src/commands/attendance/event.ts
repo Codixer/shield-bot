@@ -1,17 +1,16 @@
-import { Discord, Slash, SlashOption, SlashGroup, SlashChoice } from "discordx";
+import { Discord, Slash, SlashOption, SlashGroup, SlashChoice, Guard } from "discordx";
 import {
   CommandInteraction,
   ApplicationCommandOptionType,
   MessageFlags,
   AutocompleteInteraction,
   BaseInteraction,
-  InteractionContextType,
-  ApplicationIntegrationType,
   User,
   EmbedBuilder,
 } from "discord.js";
 import { Pagination } from "@discordx/pagination";
 import { AttendanceManager } from "../../managers/attendance/attendanceManager.js";
+import { GuildGuard } from "../../utility/guards.js";
 
 const attendanceManager = new AttendanceManager();
 
@@ -19,12 +18,6 @@ const attendanceManager = new AttendanceManager();
 @SlashGroup({
   name: "attendance",
   description: "VRChat attendance tracking commands.",
-  contexts: [
-    InteractionContextType.Guild,
-  ],
-  integrationTypes: [
-    ApplicationIntegrationType.GuildInstall,
-  ],
 })
 @SlashGroup("attendance")
 export class VRChatAttendanceEventCommand {
@@ -32,6 +25,7 @@ export class VRChatAttendanceEventCommand {
     name: "event",
     description: "Manage attendance events (create/list/select/delete)",
   })
+  @Guard(GuildGuard)
   async event(
     @SlashChoice({ name: "Create", value: "create" })
     @SlashChoice({ name: "List", value: "list" })

@@ -6,12 +6,10 @@ import {
   EmbedBuilder,
   Colors,
   AutocompleteInteraction,
-  InteractionContextType,
-  ApplicationIntegrationType,
   ButtonBuilder,
   ButtonStyle,
 } from "discord.js";
-import { VRChatLoginGuard } from "../../../utility/guards.js";
+import { VRChatLoginGuard, GuildGuard } from "../../../utility/guards.js";
 import { getUserById, searchUsers } from "../../../utility/vrchat.js";
 import type { VRChatUser } from "../../../utility/vrchat/types.js";
 
@@ -19,12 +17,6 @@ import type { VRChatUser } from "../../../utility/vrchat/types.js";
 @SlashGroup({
   name: "verify",
   description: "VRChat verification commands.",
-  contexts: [
-    InteractionContextType.Guild,
-  ],
-  integrationTypes: [
-    ApplicationIntegrationType.GuildInstall,
-  ],
 })
 @SlashGroup("verify")
 @Guard(VRChatLoginGuard)
@@ -33,6 +25,7 @@ export class VRChatVerifyAccountCommand {
     name: "account",
     description: "Start the verification process.",
   })
+  @Guard(GuildGuard)
   async verify(
     @SlashOption({
       name: "vrc_user",

@@ -8,10 +8,8 @@ import {
 } from "discordx";
 import {
   ApplicationCommandOptionType,
-  ApplicationIntegrationType,
   CommandInteraction,
   GuildMember,
-  InteractionContextType,
   MessageFlags,
   User,
   AutocompleteInteraction,
@@ -46,8 +44,6 @@ const MONTH_NAMES = [
 @SlashGroup({
   name: "patrol",
   description: "Voice patrol timer",
-  contexts: [InteractionContextType.Guild],
-  integrationTypes: [ApplicationIntegrationType.GuildInstall],
 })
 @SlashGroup("patrol")
 export class PatrolTimerCommands {
