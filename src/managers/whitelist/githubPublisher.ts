@@ -181,9 +181,13 @@ export class GitHubPublisher {
         });
         signature = typeof signed === "string" ? signed : String(signed);
       } catch (e) {
+        const errorData =
+          e instanceof Error
+            ? { message: e.message, stack: e.stack, name: e.name }
+            : { error: String(e) };
         loggers.bot.warn(
           "Failed to sign commit, falling back to unsigned commit",
-          e,
+          errorData,
         );
       }
     }
