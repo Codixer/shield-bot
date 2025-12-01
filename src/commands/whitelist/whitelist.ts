@@ -42,7 +42,7 @@ export class WhitelistCommands {
     discordRole: Role | null,
     @SlashOption({
       description:
-        "Whitelist permissions (comma-separated, required for setup): station, truavatar, trudoor, forceAvatar, forceDoor",
+        "Permissions (comma-separated): station, truavatar, trudoor, forceAvatar, forceDoor",
       name: "permissions",
       required: false,
       type: ApplicationCommandOptionType.String,
