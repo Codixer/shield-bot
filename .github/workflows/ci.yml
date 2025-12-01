@@ -1,0 +1,192 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run ESLint
+        run: yarn lint
+        continue-on-error: false
+
+      - name: Annotate ESLint results
+        if: failure()
+        run: |
+          echo "::error::ESLint found issues. Please run 'yarn lint:fix' or fix them manually."
+          echo "You can view the full ESLint output in the job logs above."
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run tests
+        run: yarn test --run
+        continue-on-error: false
+
+      - name: Annotate test results
+        if: failure()
+        run: |
+          echo "::error::Tests failed. Please check the test output above for details."
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Run tests with coverage
+        run: yarn test:coverage --run
+        continue-on-error: false
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            coverage/
+          retention-days: 30
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/coverage-final.json
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request'
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          github-token: ${{ github.token }}
+          lcov-file: ./coverage/lcov.info
+          delete-old-comments: true
+          fail-if-coverage-less-than: 0
+        continue-on-error: true
+
+      - name: Add coverage summary to job
+        run: |
+          if [ -f "coverage/coverage-summary.json" ]; then
+            # Parse coverage summary using node (more reliable than jq)
+            node -e "
+              const fs = require('fs');
+              const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
+              const total = summary.total;
+              console.log('## 📊 Coverage Summary');
+              console.log('');
+              console.log('| Metric | Coverage |');
+              console.log('|--------|----------|');
+              console.log(\`| **Lines** | \${total.lines.pct.toFixed(2)}% |\`);
+              console.log(\`| Statements | \${total.statements.pct.toFixed(2)}% |\`);
+              console.log(\`| Functions | \${total.functions.pct.toFixed(2)}% |\`);
+              console.log(\`| Branches | \${total.branches.pct.toFixed(2)}% |\`);
+              console.log('');
+              console.log('📦 Coverage artifacts are available for download.');
+            " >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Coverage summary file not found. Coverage data may not be available." >> $GITHUB_STEP_SUMMARY
+          fi
+        continue-on-error: true
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "yarn"
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build project
+        run: yarn build
+        continue-on-error: false
+
+      - name: Check build output
+        run: |
+          if [ ! -d "build" ]; then
+            echo "::error::Build directory was not created"
+            exit 1
+          fi
+          if [ ! -f "build/main.js" ]; then
+            echo "::error::Build output file build/main.js was not created"
+            exit 1
+          fi
+          echo "::notice::Build completed successfully"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: build/
+          retention-days: 7
+
+  summary:
+    name: CI Summary
+    runs-on: ubuntu-latest
+    needs: [lint, test, coverage, build]
+    if: always()
+    steps:
+      - name: Check CI status
+        run: |
+          if [ "${{ needs.lint.result }}" != "success" ] || \
+             [ "${{ needs.test.result }}" != "success" ] || \
+             [ "${{ needs.coverage.result }}" != "success" ] || \
+             [ "${{ needs.build.result }}" != "success" ]; then
+            echo "::error::One or more CI jobs failed"
+            exit 1
+          fi
+          echo "::notice::All CI jobs passed successfully"
+

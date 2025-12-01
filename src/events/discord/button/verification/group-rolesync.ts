@@ -80,7 +80,7 @@ export class VRChatGroupRoleSyncButtonHandler {
     } else {
       // Build error message based on error type
       let errorMessage = "";
-      let title = "❌ Role Sync Failed";
+      const title = "❌ Role Sync Failed";
 
       switch (result.errorType) {
         case "permission":
