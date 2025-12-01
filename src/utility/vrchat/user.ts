@@ -91,7 +91,8 @@ export async function searchUsers({
     offset,
     // developerType is not a parameter in searchAllUsers
   });
-  return (result as { data?: VRChatUser[] })?.data || [];
+  // searchAllUsers returns an array directly, not an object with a data property
+  return (result as VRChatUser[]) || [];
 }
 
 /**
