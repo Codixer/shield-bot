@@ -27,6 +27,9 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
       - name: Run ESLint
         run: yarn lint
         continue-on-error: false
@@ -53,6 +56,9 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
       - name: Run tests
         run: yarn test --run
         continue-on-error: false
@@ -77,6 +83,9 @@ jobs:
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
+
+      - name: Generate Prisma Client
+        run: npx prisma generate
 
       - name: Run tests with coverage
         run: yarn test:coverage --run
@@ -150,9 +159,21 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Generate Prisma Client
+        run: npx prisma generate
+
       - name: Build project
         run: yarn build
         continue-on-error: false
+
+      - name: Annotate build errors
+        if: failure()
+        run: |
+          echo "::error::Build failed. Check the output above for TypeScript errors."
+          echo "Common issues:"
+          echo "- Missing Prisma client (should be fixed now with 'prisma generate')"
+          echo "- Implicit 'any' types need explicit type annotations"
+          echo "- Run 'yarn build' locally to see detailed errors"
 
       - name: Check build output
         run: |

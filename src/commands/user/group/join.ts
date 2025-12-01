@@ -52,7 +52,7 @@ export class GroupSelfInviteCommand {
       }
 
       // Use the main account if available, otherwise first verified account
-      const mainAccount = user.vrchatAccounts.find((acc) => acc.accountType === "MAIN");
+      const mainAccount = user.vrchatAccounts.find((acc: { accountType: string }) => acc.accountType === "MAIN");
       const vrcAccount = mainAccount || user.vrchatAccounts[0];
 
       // Send group invite

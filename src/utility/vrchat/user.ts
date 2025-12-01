@@ -151,7 +151,7 @@ export async function getVRChatAccountStatus(discordId: string) {
 
   const boundAccounts = user?.vrchatAccounts || [];
   const verifiedAccounts = boundAccounts.filter(
-    (acc) => acc.accountType === "MAIN" || acc.accountType === "ALT",
+    (acc: { accountType: string }) => acc.accountType === "MAIN" || acc.accountType === "ALT",
   );
 
   return {

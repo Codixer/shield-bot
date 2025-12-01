@@ -54,7 +54,7 @@ export class VRChatAttendancePasteCommand {
         const events = await attendanceManager.getAllEvents();
         const query = focused.value.toString().toLowerCase();
         const choices = events
-          .filter((event) => {
+          .filter((event: { id: number; date: Date; host?: { discordId: string | null } | null }) => {
             const idStr = `${event.id}`;
             const dateStr = event.date.toLocaleDateString();
             const hostId = event.host?.discordId || "";
@@ -66,17 +66,23 @@ export class VRChatAttendancePasteCommand {
             );
           })
           .slice(0, 25)
-          .map((event) => {
+          .map((event: { 
+            id: number; 
+            date: Date; 
+            squads: Array<{ members: Array<{ userId: number }> }>; 
+            staff: Array<{ userId: number }>; 
+            host?: { discordId: string | null } | null 
+          }) => {
             const dateStr = event.date.toLocaleDateString();
             const hostId = event.host?.discordId || "Unknown";
             
             // Calculate total attendees
             const squadMemberIds = new Set(
-              event.squads.flatMap((squad) => 
-                squad.members.map((member) => member.userId)
+              event.squads.flatMap((squad: { members: Array<{ userId: number }> }) => 
+                squad.members.map((member: { userId: number }) => member.userId)
               )
             );
-            const staffIds = new Set(event.staff.map((s) => s.userId));
+            const staffIds = new Set(event.staff.map((s: { userId: number }) => s.userId));
             const allAttendeeIds = new Set([...squadMemberIds, ...staffIds]);
             const attendeeCount = allAttendeeIds.size;
             
@@ -134,7 +140,7 @@ export class VRChatAttendancePasteCommand {
     // Attending Staff
     if (eventSummary.staff.length > 0) {
       const staffList = eventSummary.staff
-        .map((staff) => `<@${staff.user.discordId}>`)
+        .map((staff: { user: { discordId: string } }) => `<@${staff.user.discordId}>`)
         .join(" ");
       text += `Attending Staff: ${staffList}\n`;
     } else {

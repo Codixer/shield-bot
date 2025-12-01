@@ -63,11 +63,11 @@ export class VRChatAttendanceListCommand {
 
         // Calculate total attendees
         const squadMemberIds = new Set(
-          event.squads.flatMap((squad) => 
-            squad.members.map((member) => member.userId)
+          event.squads.flatMap((squad: { members: Array<{ userId: number }> }) => 
+            squad.members.map((member: { userId: number }) => member.userId)
           )
         );
-        const staffIds = new Set(event.staff.map((s) => s.userId));
+        const staffIds = new Set(event.staff.map((s: { userId: number }) => s.userId));
         const allAttendeeIds = new Set([...squadMemberIds, ...staffIds]);
         const attendeeCount = allAttendeeIds.size;
 

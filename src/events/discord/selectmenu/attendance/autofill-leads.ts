@@ -75,11 +75,11 @@ export class AutofillLeadsSelectMenuHandler {
         data: { isLead: true },
       });
 
-      const leadMembers = squad.members.filter((m) =>
+      const leadMembers = squad.members.filter((m: { userId: number }) =>
         userIds.includes(m.userId),
       );
       const leadMentions = leadMembers
-        .map((m) => `<@${m.user.discordId}>`)
+        .map((m: { user: { discordId: string } }) => `<@${m.user.discordId}>`)
         .join(", ");
 
       const squadChannel = interaction.guild?.channels.cache.get(squad.name);

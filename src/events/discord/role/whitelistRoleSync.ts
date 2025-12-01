@@ -104,7 +104,7 @@ export class WhitelistRoleSync {
       // Get current role assignments by Discord role ID for comparison
       const currentWhitelistRoles =
         currentUser?.whitelistEntry?.roleAssignments?.map(
-          (a) => a.role.discordRoleId || a.role.id,
+          (a: { role: { discordRoleId: string | null; id: string } }) => a.role.discordRoleId || a.role.id,
         ) || [];
       const {
         roles: expectedWhitelistRoles,

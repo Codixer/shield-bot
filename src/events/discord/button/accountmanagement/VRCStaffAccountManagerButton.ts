@@ -57,7 +57,7 @@ export class VRCStaffAccountManagerButtonHandler {
 
       // Find the specific VRChat account
       const vrcAccount = user.vrchatAccounts.find(
-        (acc) => acc.vrcUserId === vrcUserId,
+        (acc: { vrcUserId: string }) => acc.vrcUserId === vrcUserId,
       );
       if (!vrcAccount) {
         await interaction.reply({
@@ -119,7 +119,7 @@ export class VRCStaffAccountManagerButtonHandler {
   ) {
     // Check if user already has a MAIN account
     const currentMain = user.vrchatAccounts.find(
-      (acc) => acc.accountType === "MAIN",
+      (acc: { accountType: string }) => acc.accountType === "MAIN",
     );
 
     if (currentMain && currentMain.vrcUserId !== vrcUserId) {
@@ -329,10 +329,10 @@ export class VRCStaffAccountManagerButtonHandler {
 
     // Separate verified and unverified accounts
     const verifiedAccounts = user.vrchatAccounts.filter(
-      (acc) => acc.accountType === "MAIN" || acc.accountType === "ALT",
+      (acc: { accountType: string }) => acc.accountType === "MAIN" || acc.accountType === "ALT",
     );
     const unverifiedAccounts = user.vrchatAccounts.filter(
-      (acc) => acc.accountType === "UNVERIFIED",
+      (acc: { accountType: string }) => acc.accountType === "UNVERIFIED",
     );
 
     if (verifiedAccounts.length === 0 && unverifiedAccounts.length === 0) {

@@ -32,7 +32,7 @@ export class DiscordSync {
 
     // Check if user has any verified VRChat accounts (MAIN or ALT)
     const hasVerifiedAccount = user.vrchatAccounts?.some(
-      (acc) => acc.accountType === "MAIN" || acc.accountType === "ALT"
+      (acc: { accountType: string }) => acc.accountType === "MAIN" || acc.accountType === "ALT"
     ) ?? false;
 
     if (!hasVerifiedAccount) {
@@ -58,7 +58,7 @@ export class DiscordSync {
     // Filter mapped roles by guild if guildId is provided
     let validMappedRoles = mappedRoles;
     if (guildId) {
-      validMappedRoles = mappedRoles.filter(role => role.guildId === guildId);
+      validMappedRoles = mappedRoles.filter((role: { guildId: string | null }) => role.guildId === guildId);
       
       if (validMappedRoles.length < mappedRoles.length) {
         const invalidCount = mappedRoles.length - validMappedRoles.length;
@@ -99,12 +99,12 @@ export class DiscordSync {
       return;
     }
     const existingAssignments = whitelistEntry.roleAssignments || [];
-    const existingRoleIds = new Set(existingAssignments.map((a) => a.roleId));
-    const newRoleIds = new Set(validMappedRoles.map((r) => r.id));
+    const existingRoleIds = new Set(existingAssignments.map((a: { roleId: number }) => a.roleId));
+    const newRoleIds = new Set(validMappedRoles.map((r: { id: number }) => r.id));
 
     // Remove assignments that are no longer valid (role no longer mapped to Discord roles)
     const assignmentsToRemove = existingAssignments.filter(
-      (a) => !newRoleIds.has(a.roleId),
+      (a: { roleId: number }) => !newRoleIds.has(a.roleId),
     );
     for (const assignment of assignmentsToRemove) {
       await prisma.whitelistRoleAssignment.delete({
@@ -113,7 +113,7 @@ export class DiscordSync {
     }
 
     // Add new role assignments for mapped roles that don't exist yet
-    const rolesToAdd = validMappedRoles.filter((r) => !existingRoleIds.has(r.id));
+    const rolesToAdd = validMappedRoles.filter((r: { id: number }) => !existingRoleIds.has(r.id));
     for (const role of rolesToAdd) {
       await prisma.whitelistRoleAssignment.create({
         data: {
@@ -202,7 +202,7 @@ export class DiscordSync {
       // If not in cache, try to fetch from verification guild or first guild
       if (!member) {
         // Check if any account has a verification guild ID
-        const verificationGuildId = user.vrchatAccounts.find(acc => acc.verificationGuildId)?.verificationGuildId;
+        const verificationGuildId = user.vrchatAccounts.find((acc: { verificationGuildId: string | null }) => acc.verificationGuildId)?.verificationGuildId;
         
         if (verificationGuildId) {
           try {

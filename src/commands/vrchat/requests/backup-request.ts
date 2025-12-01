@@ -251,7 +251,7 @@ ${roleMention}
         return;
       }
 
-      const choices = user.vrchatAccounts.map((acc) => ({
+      const choices = user.vrchatAccounts.map((acc: { vrchatUsername: string | null; vrcUserId: string; accountType: string }) => ({
         name: `${acc.vrchatUsername || acc.vrcUserId} (${acc.accountType})`,
         value: acc.vrcUserId,
       }));

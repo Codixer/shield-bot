@@ -42,7 +42,7 @@ export class VRChatAvatarInviteButtonHandler {
 
       // Use the MAIN account, or first ALT if no MAIN exists
       const mainAccount = user.vrchatAccounts.find(
-        (acc) => acc.accountType === "MAIN"
+        (acc: { accountType: string }) => acc.accountType === "MAIN"
       );
       const vrcAccount = mainAccount || user.vrchatAccounts[0];
 

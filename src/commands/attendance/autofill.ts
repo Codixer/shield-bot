@@ -344,7 +344,7 @@ export class VRChatAttendanceAutofillCommand {
     // Create select menus for each squad (max 5 per message due to Discord limits)
     const components: ActionRowBuilder<StringSelectMenuBuilder>[] = [];
     const squadsWithMembers = sortedSquads.filter(
-      (squad) => squad.members.length > 0 && !squad.members.every((m) => m.hasLeft)
+      (squad) => squad.members.length > 0 && !squad.members.every((m: { hasLeft: boolean }) => m.hasLeft)
     );
 
     for (const squad of squadsWithMembers.slice(0, 5)) {
@@ -352,13 +352,13 @@ export class VRChatAttendanceAutofillCommand {
       const squadDisplayName = squadChannel?.name || squad.name;
 
       // Get active members (not marked as left)
-      const activeMembers = squad.members.filter((m) => !m.hasLeft);
+      const activeMembers = squad.members.filter((m: { hasLeft: boolean }) => !m.hasLeft);
 
       if (activeMembers.length === 0) {continue;}
 
       // Build options with Discord user mentions
       const options = await Promise.all(
-        activeMembers.map(async (member) => {
+        activeMembers.map(async (member: { user: { discordId: string } }) => {
           let displayName = member.user.discordId;
 
           try {

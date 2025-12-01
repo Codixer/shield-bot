@@ -664,7 +664,7 @@ export class WhitelistCommands {
       const vrchatAccounts =
         user.vrchatAccounts
           ?.map(
-            (account) => `${account.vrcUserId} (${account.accountType})`,
+            (account: { vrcUserId: string; accountType: string }) => `${account.vrcUserId} (${account.accountType})`,
           )
           ?.join("\n") || "No verified VRChat accounts";
 
@@ -1023,7 +1023,7 @@ export class WhitelistCommands {
         const userAfter = await whitelistManager.getUserByDiscordId(user.id);
         const hasAccessAfter = !!userAfter?.whitelistEntry;
         const rolesAfter =
-          userAfter?.whitelistEntry?.roleAssignments?.map((a) => a.role.discordRoleId || a.role.id) ||
+          userAfter?.whitelistEntry?.roleAssignments?.map((a: { role: { discordRoleId: string | null; id: string } }) => a.role.discordRoleId || a.role.id) ||
           [];
 
         const embed = new EmbedBuilder()

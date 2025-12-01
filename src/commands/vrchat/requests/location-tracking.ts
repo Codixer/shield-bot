@@ -49,7 +49,7 @@ export class VRChatLocationTrackingCommand {
     // For now, just show the accounts - full implementation would toggle consent
     const accountList = user.vrchatAccounts
       .map(
-        (acc) => `${acc.vrchatUsername || acc.vrcUserId} (${acc.accountType})`,
+        (acc: { vrchatUsername: string | null; vrcUserId: string; accountType: string }) => `${acc.vrchatUsername || acc.vrcUserId} (${acc.accountType})`,
       )
       .join("\n");
 

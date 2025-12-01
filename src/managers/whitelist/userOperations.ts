@@ -181,7 +181,7 @@ export class WhitelistUserOperations {
     // Get current role assignments for logging
     const currentAssignments = user.whitelistEntry.roleAssignments || [];
     const roleIds = currentAssignments.map(
-      (assignment) => assignment.role.discordRoleId || String(assignment.role.id),
+      (assignment: { role: { discordRoleId: string | null; id: number } }) => assignment.role.discordRoleId || String(assignment.role.id),
     );
 
     // Remove whitelist entry (this will cascade delete role assignments)

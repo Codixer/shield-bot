@@ -96,7 +96,7 @@ export class WhitelistGeneration {
           vrchatUsername: vrchatAccount.vrchatUsername || vrchatAccount.vrcUserId,
           roles: Array.from(allPermissions),
           roleNames: entry.roleAssignments.map(
-            (assignment) => assignment.role.permissions,
+            (assignment: { role: { permissions: unknown } }) => assignment.role.permissions,
           ),
           createdAt: entry.createdAt,
           accountType: vrchatAccount.accountType || "UNKNOWN",

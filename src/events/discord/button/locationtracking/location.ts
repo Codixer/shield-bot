@@ -20,7 +20,7 @@ export class LocationTrackingButtonHandler {
     });
     if (!user || !user.vrchatAccounts) {return;}
     const verifiedAccounts = user.vrchatAccounts.filter(
-      (acc) => acc.accountType === "MAIN" || acc.accountType === "ALT",
+      (acc: { accountType: string }) => acc.accountType === "MAIN" || acc.accountType === "ALT",
     );
     // Update consent in DB
     if (action === "tracking") {
