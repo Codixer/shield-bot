@@ -18,7 +18,7 @@ export async function handleFriendUpdate(content: unknown) {
     const { userId, user } = typedContent;
 
     // Log the received content for debugging
-    // console.log("[Friend Update] ", { userId, user });
+    loggers.bot.debug("[Friend Update] ", { userId, user });
 
     if (!userId || !user) {
       loggers.vrchat.warn("Missing userId or user data");

@@ -23,6 +23,12 @@ const envSchema = z.object({
 
   ENV: z.enum(["development", "production", "test"]).default("development"),
 
+  // Logging Configuration (Optional)
+  LOG_LEVEL: z
+    .enum(["DEBUG", "INFO", "WARN", "ERROR"])
+    .default("INFO")
+    .transform((val) => val.toUpperCase()),
+
   // VRChat Configuration (Optional - bot can run without VRChat)
   VRCHAT_USERNAME: z.string().optional(),
   VRCHAT_PASSWORD: z.string().optional(),

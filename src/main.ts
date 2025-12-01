@@ -24,7 +24,7 @@ import { initializeSchedules } from "./schedules/schedules.js";
 import { PrismaMariaDb } from '@prisma/adapter-mariadb'
 import { whitelistManager } from "./managers/whitelist/whitelistManager.js";
 import { validateEnv, getEnv, hasVRChatCredentials } from "./config/env.js";
-import { loggers, logger } from "./utility/logger.js";
+import { loggers, logger, LogLevel } from "./utility/logger.js";
 import { ConfigError } from "./utility/errors.js";
 import { ExceptionConstants } from "./config/constants.js";
 import { BOT_INTENTS, BOT_CONFIG } from "./config/discord.js";
@@ -33,6 +33,16 @@ import { BOT_INTENTS, BOT_CONFIG } from "./config/discord.js";
 let env;
 try {
   env = validateEnv();
+  
+  // Set log level from environment variable
+  const logLevelMap: Record<string, LogLevel> = {
+    DEBUG: LogLevel.DEBUG,
+    INFO: LogLevel.INFO,
+    WARN: LogLevel.WARN,
+    ERROR: LogLevel.ERROR,
+  };
+  const logLevel = logLevelMap[env.LOG_LEVEL] ?? LogLevel.INFO;
+  logger.setLevel(logLevel);
 } catch (error) {
   loggers.startup.error("Failed to validate environment variables", error);
   process.exit(1);
