@@ -194,13 +194,17 @@ export class GroupRoleSyncManager {
       // Check if bot can manage this member
       const canManage = await this.canBotManageMember(groupId, vrcUserId);
       if (!canManage) {
-        return;
+        throw new Error(
+          "The bot cannot manage your VRChat group roles because your VRChat role is equal to or higher than the bot's role in the group hierarchy.",
+        );
       }
 
       // Get the member's current VRChat group roles
       const groupMember = await getGroupMember(groupId, vrcUserId);
       if (!groupMember) {
-        return;
+        throw new Error(
+          "You are not a member of the VRChat group. Please join the group first.",
+        );
       }
 
       // Get role mappings for this guild
@@ -212,18 +216,23 @@ export class GroupRoleSyncManager {
       });
 
       if (roleMappings.length === 0) {
+        // No role mappings is not an error - just nothing to sync
         return;
       }
 
       // Get Discord member to check their roles
-      const guild = await bot.guilds.fetch(guildId);
+      const guild = await bot.guilds.fetch(guildId).catch(() => null);
       if (!guild) {
-        return;
+        throw new Error(
+          "Failed to fetch Discord guild. The bot may not be in the server or there may be a connectivity issue.",
+        );
       }
 
-      const member = await guild.members.fetch(discordId);
+      const member = await guild.members.fetch(discordId).catch(() => null);
       if (!member) {
-        return;
+        throw new Error(
+          "Failed to fetch your Discord member information. Please ensure you are still in the server.",
+        );
       }
 
       // Get the VRChat role IDs the member currently has (non-management only)
@@ -266,6 +275,8 @@ export class GroupRoleSyncManager {
       }
 
       // Apply VRChat role changes
+      const roleErrors: string[] = [];
+      
       if (vrcRolesToAdd.length > 0) {
         for (const roleId of vrcRolesToAdd) {
           try {
@@ -275,6 +286,12 @@ export class GroupRoleSyncManager {
               `Failed to add VRChat role ${roleId}`,
               error,
             );
+            // Preserve VRChatError details if available
+            if (error instanceof Error) {
+              roleErrors.push(`Failed to add role: ${error.message}`);
+            } else {
+              roleErrors.push(`Failed to add role: ${String(error)}`);
+            }
           }
         }
       }
@@ -288,8 +305,21 @@ export class GroupRoleSyncManager {
               `Failed to remove VRChat role ${roleId}`,
               error,
             );
+            // Preserve VRChatError details if available
+            if (error instanceof Error) {
+              roleErrors.push(`Failed to remove role: ${error.message}`);
+            } else {
+              roleErrors.push(`Failed to remove role: ${String(error)}`);
+            }
           }
         }
+      }
+
+      // If there were any role change errors, throw an aggregate error
+      if (roleErrors.length > 0) {
+        throw new Error(
+          `Failed to update some roles: ${roleErrors.join("; ")}`,
+        );
       }
 
       // Log the sync if there were changes
