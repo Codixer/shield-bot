@@ -66,40 +66,75 @@ export class GroupSelfRoleSyncCommand {
       const vrcAccount = mainAccount || user.vrchatAccounts[0];
 
       // Sync roles
-      await groupRoleSyncManager.syncUserRoles(
+      const result = await groupRoleSyncManager.syncUserRoles(
         interaction.guildId,
         interaction.user.id,
         vrcAccount.vrcUserId,
       );
 
-      const embed = new EmbedBuilder()
-        .setTitle("✅ Roles Synced!")
-        .setDescription(
-          `Your VRChat group roles have been synchronized with your Discord roles.\n\n**Account:** ${vrcAccount.vrchatUsername || vrcAccount.vrcUserId}`,
-        )
-        .setColor(Colors.Green)
-        .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" })
-        .setTimestamp();
+      if (result.success) {
+        const embed = new EmbedBuilder()
+          .setTitle("✅ Roles Synced!")
+          .setDescription(
+            `Your VRChat group roles have been synchronized with your Discord roles.\n\n**Account:** ${vrcAccount.vrchatUsername || vrcAccount.vrcUserId}`,
+          )
+          .setColor(Colors.Green)
+          .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" })
+          .setTimestamp();
 
-      await interaction.editReply({ embeds: [embed] });
+        await interaction.editReply({ embeds: [embed] });
+      } else {
+        // Build error message based on error type
+        let errorMessage = "";
+
+        switch (result.errorType) {
+          case "permission":
+            if (result.reason.includes("cannot manage") || result.reason.includes("higher than the bot")) {
+              errorMessage = `❌ **Insufficient Permissions**\n\n${result.reason}\n\nThis is expected for members with high-ranking roles. If you believe this is an error, please contact the development team.`;
+            } else {
+              errorMessage = `❌ **Permission Error**\n\n${result.reason}\n\nIf you believe this is an error, please contact the development team.`;
+            }
+            break;
+          case "validation":
+            if (result.reason.includes("not a member") || result.reason.includes("join the group")) {
+              errorMessage = `❌ **Not a Group Member**\n\n${result.reason}\n\nPlease join the VRChat group first using \`/group join\`, then try syncing your roles again.`;
+            } else if (result.reason.includes("failed to fetch")) {
+              errorMessage = `❌ **Fetch Failed**\n\n${result.reason}\n\nPlease try again later. If this issue persists, contact the development team.`;
+            } else {
+              errorMessage = `❌ **Validation Error**\n\n${result.reason}\n\nPlease verify your account status and try again.`;
+            }
+            break;
+          case "api":
+            errorMessage = `❌ **Role Update Failed**\n\n${result.reason}\n\nPlease contact the development team for assistance.`;
+            break;
+          case "unknown":
+          default:
+            errorMessage = `❌ **Sync Failed**\n\n**Reason:** ${result.reason}\n\nPlease contact the development team for assistance.`;
+            break;
+        }
+
+        const embed = new EmbedBuilder()
+          .setTitle("❌ Role Sync Failed")
+          .setDescription(errorMessage)
+          .setColor(Colors.Red)
+          .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" });
+
+        if (result.requiresDevContact) {
+          embed.addFields({
+            name: "Need Help?",
+            value: "If this issue persists, please contact the development team with the error details above.",
+            inline: false,
+          });
+        }
+
+        await interaction.editReply({ embeds: [embed] });
+      }
     } catch (error: unknown) {
       loggers.vrchat.error("Self Role Sync error", error);
 
-      let errorMessage = "Failed to sync roles. Please try again later.";
-      if (error instanceof Error && error.message?.includes("not in group")) {
-        errorMessage =
-          "You are not a member of the VRChat group yet. Please join the group first using `/group join`.";
-      } else if (
-        error instanceof Error &&
-        (error.message?.includes("403") ||
-        error.message?.includes("401"))
-      ) {
-        errorMessage = "Bot does not have permission to manage group roles.";
-      }
-
       const embed = new EmbedBuilder()
         .setTitle("❌ Role Sync Failed")
-        .setDescription(errorMessage)
+        .setDescription("An unexpected error occurred. Please contact the development team.")
         .setColor(Colors.Red)
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" });
 

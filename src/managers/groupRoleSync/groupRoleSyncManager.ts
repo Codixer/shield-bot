@@ -9,6 +9,18 @@ import { GuildMember, EmbedBuilder, Colors, TextChannel } from "discord.js";
 import { loggers } from "../../utility/logger.js";
 
 /**
+ * Result type for role sync operations
+ */
+export type SyncResult = 
+  | { success: true }
+  | { 
+      success: false; 
+      reason: string; 
+      requiresDevContact: boolean;
+      errorType: "permission" | "validation" | "api" | "unknown";
+    };
+
+/**
  * Manager for syncing VRChat group roles to Discord roles
  */
 export class GroupRoleSyncManager {
@@ -173,12 +185,13 @@ export class GroupRoleSyncManager {
    * @param guildId Discord guild ID
    * @param discordId Discord user ID
    * @param vrcUserId VRChat user ID
+   * @returns SyncResult indicating success or failure with details
    */
   async syncUserRoles(
     guildId: string,
     discordId: string,
     vrcUserId: string,
-  ): Promise<void> {
+  ): Promise<SyncResult> {
     try {
       // Get guild settings to find the VRChat group ID
       const settings = await prisma.guildSettings.findUnique({
@@ -186,7 +199,7 @@ export class GroupRoleSyncManager {
       });
 
       if (!settings?.vrcGroupId) {
-        return;
+        return { success: true }; // No group configured, nothing to sync
       }
 
       const groupId = settings.vrcGroupId;
@@ -194,17 +207,23 @@ export class GroupRoleSyncManager {
       // Check if bot can manage this member
       const canManage = await this.canBotManageMember(groupId, vrcUserId);
       if (!canManage) {
-        throw new Error(
-          "The bot cannot manage your VRChat group roles because your VRChat role is equal to or higher than the bot's role in the group hierarchy.",
-        );
+        return {
+          success: false,
+          reason: "The bot cannot manage your VRChat group roles because your VRChat role is equal to or higher than the bot's role in the group hierarchy.",
+          requiresDevContact: false,
+          errorType: "permission",
+        };
       }
 
       // Get the member's current VRChat group roles
       const groupMember = await getGroupMember(groupId, vrcUserId);
       if (!groupMember) {
-        throw new Error(
-          "You are not a member of the VRChat group. Please join the group first.",
-        );
+        return {
+          success: false,
+          reason: "You are not a member of the VRChat group. Please join the group first.",
+          requiresDevContact: false,
+          errorType: "validation",
+        };
       }
 
       // Get role mappings for this guild
@@ -217,22 +236,28 @@ export class GroupRoleSyncManager {
 
       if (roleMappings.length === 0) {
         // No role mappings is not an error - just nothing to sync
-        return;
+        return { success: true };
       }
 
       // Get Discord member to check their roles
       const guild = await bot.guilds.fetch(guildId).catch(() => null);
       if (!guild) {
-        throw new Error(
-          "Failed to fetch Discord guild. The bot may not be in the server or there may be a connectivity issue.",
-        );
+        return {
+          success: false,
+          reason: "Failed to fetch Discord guild. The bot may not be in the server or there may be a connectivity issue.",
+          requiresDevContact: true,
+          errorType: "validation",
+        };
       }
 
       const member = await guild.members.fetch(discordId).catch(() => null);
       if (!member) {
-        throw new Error(
-          "Failed to fetch your Discord member information. Please ensure you are still in the server.",
-        );
+        return {
+          success: false,
+          reason: "Failed to fetch your Discord member information. Please ensure you are still in the server.",
+          requiresDevContact: true,
+          errorType: "validation",
+        };
       }
 
       // Get the VRChat role IDs the member currently has (non-management only)
@@ -315,11 +340,14 @@ export class GroupRoleSyncManager {
         }
       }
 
-      // If there were any role change errors, throw an aggregate error
+      // If there were any role change errors, return failure result
       if (roleErrors.length > 0) {
-        throw new Error(
-          `Failed to update some roles: ${roleErrors.join("; ")}`,
-        );
+        return {
+          success: false,
+          reason: `Failed to update some roles: ${roleErrors.join("; ")}`,
+          requiresDevContact: true,
+          errorType: "api",
+        };
       }
 
       // Log the sync if there were changes
@@ -332,12 +360,25 @@ export class GroupRoleSyncManager {
           "sync",
         );
       }
+
+      return { success: true };
     } catch (error) {
+      // Handle unexpected errors
       loggers.vrchat.error(
         `Error syncing roles for ${discordId}`,
         error,
       );
-      throw error;
+      
+      const errorMessage = error instanceof Error 
+        ? error.message 
+        : "An unexpected error occurred while syncing roles.";
+      
+      return {
+        success: false,
+        reason: errorMessage,
+        requiresDevContact: true,
+        errorType: "unknown",
+      };
     }
   }
 
@@ -431,7 +472,14 @@ export class GroupRoleSyncManager {
     discordId: string,
     vrcUserId: string,
   ): Promise<void> {
-    await this.syncUserRoles(guildId, discordId, vrcUserId);
+    const result = await this.syncUserRoles(guildId, discordId, vrcUserId);
+    if (!result.success && result.errorType === "unknown") {
+      // Only log unexpected errors for background operations
+      loggers.vrchat.warn(
+        `Failed to sync roles when user joined group: ${result.reason}`,
+        { guildId, discordId, vrcUserId },
+      );
+    }
   }
 
   /**
@@ -443,7 +491,14 @@ export class GroupRoleSyncManager {
     discordId: string,
     vrcUserId: string,
   ): Promise<void> {
-    await this.syncUserRoles(guildId, discordId, vrcUserId);
+    const result = await this.syncUserRoles(guildId, discordId, vrcUserId);
+    if (!result.success && result.errorType === "unknown") {
+      // Only log unexpected errors for background operations
+      loggers.vrchat.warn(
+        `Failed to sync roles on Discord role update: ${result.reason}`,
+        { guildId, discordId, vrcUserId },
+      );
+    }
   }
 
   /**

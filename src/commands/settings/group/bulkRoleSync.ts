@@ -130,11 +130,16 @@ export class GroupBulkRoleSyncCommand {
           }
 
           if (!dryRun) {
-            await groupRoleSyncManager.syncUserRoles(
+            const result = await groupRoleSyncManager.syncUserRoles(
               interaction.guildId,
               vrcAccount.user.discordId,
               vrcAccount.vrcUserId,
             );
+            
+            if (!result.success && result.errorType === "unknown") {
+              // Only count unexpected errors as failures
+              throw new Error(result.reason);
+            }
             
             // Wait 500ms between users to prevent rate limiting
             await new Promise(resolve => setTimeout(resolve, 500));

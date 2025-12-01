@@ -95,23 +95,24 @@ export class GroupRoleSyncCommand {
       }> = [];
 
       for (const vrcAccount of discordUser.vrchatAccounts) {
-        try {
-          await groupRoleSyncManager.syncUserRoles(
-            interaction.guildId,
-            user.id,
-            vrcAccount.vrcUserId,
-          );
+        const result = await groupRoleSyncManager.syncUserRoles(
+          interaction.guildId,
+          user.id,
+          vrcAccount.vrcUserId,
+        );
+        
+        if (result.success) {
           syncedAccounts.push({
             username: vrcAccount.vrchatUsername || "Unknown",
             userId: vrcAccount.vrcUserId,
             success: true,
           });
-        } catch (error: unknown) {
+        } else {
           syncedAccounts.push({
             username: vrcAccount.vrchatUsername || "Unknown",
             userId: vrcAccount.vrcUserId,
             success: false,
-            error: error instanceof Error ? error.message : "Unknown error",
+            error: result.reason,
           });
         }
       }
