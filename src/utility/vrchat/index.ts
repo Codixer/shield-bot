@@ -20,6 +20,7 @@ const COOKIE_FILE = path.join(COOKIE_DIR, "cookies.json");
 // vrc-ts will handle cookies automatically if COOKIES_PATH is set
 // We'll configure it to use our custom cookie directory
 export const vrchatApi = new VRChatAPI({
+  useCookies: true,
   cookiePath: COOKIE_FILE,
   userAgent: USER_AGENT,
 });
