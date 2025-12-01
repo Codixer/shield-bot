@@ -390,7 +390,7 @@ ${!settings.promotionChannelId || !settings.promotionRecruitRoleId ? "\n⚠️ P
       const existingPromotions = await prisma.voicePatrolPromotion.findMany({
         where: { guildId: interaction.guildId },
       });
-      const promotedUserIds = new Set(existingPromotions.map((p: { userId: number }) => p.userId));
+      const promotedUserIds = new Set(existingPromotions.map((p: { userId: string }) => p.userId));
 
       // Check each recruit
       const eligible: Array<{ userId: string; hours: number }> = [];

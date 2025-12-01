@@ -1023,7 +1023,7 @@ export class WhitelistCommands {
         const userAfter = await whitelistManager.getUserByDiscordId(user.id);
         const hasAccessAfter = !!userAfter?.whitelistEntry;
         const rolesAfter =
-          userAfter?.whitelistEntry?.roleAssignments?.map((a: { role: { discordRoleId: string | null; id: string } }) => a.role.discordRoleId || a.role.id) ||
+          userAfter?.whitelistEntry?.roleAssignments?.map((a: { role: { discordRoleId: string | null; id: number } }) => a.role.discordRoleId || String(a.role.id)) ||
           [];
 
         const embed = new EmbedBuilder()
