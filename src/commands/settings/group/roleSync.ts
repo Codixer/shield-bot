@@ -5,6 +5,7 @@ import {
   EmbedBuilder,
   Colors,
   User,
+  MessageFlags,
 } from "discord.js";
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
@@ -34,12 +35,12 @@ export class GroupRoleSyncCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
 
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       // Check if VRChat group is configured
       const settings = await prisma.guildSettings.findUnique({

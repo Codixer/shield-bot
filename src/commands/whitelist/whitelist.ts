@@ -5,6 +5,7 @@ import {
   escapeMarkdown,
   Role,
   User,
+  MessageFlags,
 } from "discord.js";
 import { Pagination } from "@discordx/pagination";
 import { Discord, Slash, SlashGroup, SlashOption, Guard, SlashChoice } from "discordx";
@@ -58,7 +59,7 @@ export class WhitelistCommands {
         if (roleMappings.length === 0) {
           await interaction.reply({
             content: "❌ No Discord role mappings found.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }
@@ -88,7 +89,7 @@ export class WhitelistCommands {
         if (!discordRole) {
           await interaction.reply({
             content: "❌ Discord role is required for remove action.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }
@@ -96,7 +97,7 @@ export class WhitelistCommands {
         if (!interaction.guild) {
           await interaction.reply({
             content: "❌ This command can only be used in a server.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }
@@ -141,7 +142,7 @@ export class WhitelistCommands {
                 if (!interaction.guild) {
                   await interaction.reply({
                     content: "❌ This command can only be used in a server.",
-                    ephemeral: true,
+                    flags: MessageFlags.Ephemeral,
                   });
                   return;
                 }
@@ -182,7 +183,7 @@ export class WhitelistCommands {
         } else {
           await interaction.reply({
             content: `❌ Role mapping not found.`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
         return;
@@ -192,7 +193,7 @@ export class WhitelistCommands {
       if (action !== "setup") {
         await interaction.reply({
           content: "❌ Invalid action. Use 'setup', 'remove', or 'list'.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -200,7 +201,7 @@ export class WhitelistCommands {
       if (!discordRole) {
         await interaction.reply({
           content: "❌ Discord role is required for setup action.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -208,7 +209,7 @@ export class WhitelistCommands {
       if (!permissions) {
         await interaction.reply({
           content: "❌ Permissions are required for setup action.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -220,7 +221,7 @@ export class WhitelistCommands {
       if (permissionList.length === 0) {
         await interaction.reply({
           content: "❌ You must provide at least one permission.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -240,7 +241,7 @@ export class WhitelistCommands {
       if (invalidPermissions.length > 0) {
         await interaction.reply({
           content: `❌ Invalid permissions (contain non-unicode characters): ${invalidPermissions.join(", ")}`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -248,7 +249,7 @@ export class WhitelistCommands {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -322,7 +323,7 @@ export class WhitelistCommands {
     } catch (error: unknown) {
       await interaction.reply({
         content: `❌ Failed to setup role mapping: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
@@ -435,7 +436,7 @@ export class WhitelistCommands {
         } else {
           await interaction.reply({
             content: `❌ Failed to list users: ${error instanceof Error ? error.message : "Unknown error"}`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
       }
@@ -447,7 +448,7 @@ export class WhitelistCommands {
       if (!user) {
         await interaction.reply({
           content: "❌ Discord user is required for sync action.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -457,7 +458,7 @@ export class WhitelistCommands {
         if (!member) {
           await interaction.reply({
             content: "❌ User not found in this server.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }
@@ -470,7 +471,7 @@ export class WhitelistCommands {
           if (!interaction.guild) {
             await interaction.reply({
               content: "❌ This command can only be used in a server.",
-              ephemeral: true,
+              flags: MessageFlags.Ephemeral,
             });
             return;
           }
@@ -518,13 +519,13 @@ export class WhitelistCommands {
           await whitelistManager.removeUserFromWhitelistIfNoRoles(user.id);
           await interaction.reply({
             content: `❌ User <@${user.id}> has no Discord roles that map to whitelist permissions.`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
         }
       } catch (error: unknown) {
         await interaction.reply({
           content: `❌ Failed to sync user: ${error instanceof Error ? error.message : "Unknown error"}`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       }
       return;
@@ -534,7 +535,7 @@ export class WhitelistCommands {
     if (action !== "info") {
       await interaction.reply({
         content: "❌ Invalid action. Use 'info', 'sync', or 'browse'.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -561,7 +562,7 @@ export class WhitelistCommands {
         if (!detailedUser || !detailedUser.whitelistEntry) {
           await interaction.reply({
             content: `❌ User not found in whitelist.`,
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }
@@ -637,7 +638,7 @@ export class WhitelistCommands {
       if (!userInfo) {
         await interaction.reply({
           content: "❌ User not found in the system.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -712,7 +713,7 @@ export class WhitelistCommands {
     } catch (error: unknown) {
       await interaction.reply({
         content: `❌ Failed to get user info: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
@@ -754,7 +755,7 @@ export class WhitelistCommands {
     } catch (error: unknown) {
       await interaction.reply({
         content: `❌ Failed to get statistics: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }

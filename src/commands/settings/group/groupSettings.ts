@@ -5,6 +5,7 @@ import {
   EmbedBuilder,
   Colors,
   GuildBasedChannel,
+  MessageFlags,
 } from "discord.js";
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
@@ -37,7 +38,7 @@ export class GroupSettingsCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -46,7 +47,7 @@ export class GroupSettingsCommand {
       if (!groupId.startsWith("grp_")) {
         await interaction.reply({
           content: "❌ Invalid group ID format. It should start with 'grp_'.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -70,12 +71,12 @@ export class GroupSettingsCommand {
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Settings" })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     } catch (error: unknown) {
       loggers.bot.error("Error setting group ID", error);
       await interaction.reply({
         content: `❌ Failed to set group ID: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
@@ -89,7 +90,7 @@ export class GroupSettingsCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -101,7 +102,7 @@ export class GroupSettingsCommand {
       if (!settings?.vrcGroupId) {
         await interaction.reply({
           content: "ℹ️ No VRChat group ID is currently configured.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -113,12 +114,12 @@ export class GroupSettingsCommand {
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Settings" })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     } catch (error: unknown) {
       loggers.bot.error("Error viewing group ID", error);
       await interaction.reply({
         content: `❌ Failed to view group ID: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
@@ -132,7 +133,7 @@ export class GroupSettingsCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -144,7 +145,7 @@ export class GroupSettingsCommand {
       if (!settings?.vrcGroupId) {
         await interaction.reply({
           content: "ℹ️ No VRChat group ID is currently configured.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -163,12 +164,12 @@ export class GroupSettingsCommand {
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Settings" })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     } catch (error: unknown) {
       loggers.bot.error("Error clearing group ID", error);
       await interaction.reply({
         content: `❌ Failed to clear group ID: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
@@ -192,7 +193,7 @@ export class GroupSettingsCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -215,12 +216,12 @@ export class GroupSettingsCommand {
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Settings" })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     } catch (error: unknown) {
       loggers.bot.error("Error setting promotion logs", error);
       await interaction.reply({
         content: `❌ Failed to set promotion logs channel: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
@@ -234,7 +235,7 @@ export class GroupSettingsCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -251,12 +252,12 @@ export class GroupSettingsCommand {
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Settings" })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     } catch (error: unknown) {
       loggers.bot.error("Error clearing promotion logs", error);
       await interaction.reply({
         content: `❌ Failed to clear promotion logs: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }

@@ -5,6 +5,7 @@ import {
   EmbedBuilder,
   Colors,
   Role,
+  MessageFlags,
 } from "discord.js";
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
@@ -46,7 +47,7 @@ export class GroupRoleMappingCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -60,7 +61,7 @@ export class GroupRoleMappingCommand {
         await interaction.reply({
           content:
             "❌ No VRChat group ID configured. Please set it first using `/settings group set-group-id`.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -70,7 +71,7 @@ export class GroupRoleMappingCommand {
         await interaction.reply({
           content:
             "❌ Invalid VRChat role ID format. It should start with 'grol_'.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -109,12 +110,12 @@ export class GroupRoleMappingCommand {
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     } catch (error: unknown) {
       loggers.bot.error("Error mapping role", error);
       await interaction.reply({
         content: `❌ Failed to map role: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
@@ -144,7 +145,7 @@ export class GroupRoleMappingCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -160,7 +161,7 @@ export class GroupRoleMappingCommand {
       if (!mapping) {
         await interaction.reply({
           content: `❌ No mapping found for Discord role <@&${discordRole.id}> to VRChat role \`${vrcRoleId}\`.`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -180,12 +181,12 @@ export class GroupRoleMappingCommand {
         .setFooter({ text: "S.H.I.E.L.D. Bot - Group Role Sync" })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     } catch (error: unknown) {
       loggers.bot.error("Error unmapping role", error);
       await interaction.reply({
         content: `❌ Failed to unmap role: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
@@ -199,7 +200,7 @@ export class GroupRoleMappingCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -212,7 +213,7 @@ export class GroupRoleMappingCommand {
         await interaction.reply({
           content:
             "ℹ️ No role mappings configured. Use `/group role map` to create mappings.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -249,12 +250,12 @@ export class GroupRoleMappingCommand {
         })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
     } catch (error: unknown) {
       loggers.bot.error("Error listing mappings", error);
       await interaction.reply({
         content: `❌ Failed to list mappings: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
@@ -268,12 +269,12 @@ export class GroupRoleMappingCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
 
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       const settings = await prisma.guildSettings.findUnique({
         where: { guildId: interaction.guildId },

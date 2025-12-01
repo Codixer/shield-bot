@@ -4,6 +4,7 @@ import {
   ChannelType,
   ApplicationCommandOptionType,
   GuildBasedChannel,
+  MessageFlags,
 } from "discord.js";
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
@@ -33,7 +34,7 @@ export class WhitelistSettingsCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -47,14 +48,14 @@ export class WhitelistSettingsCommand {
         if (!settings?.whitelistLogChannelId) {
           await interaction.reply({
             content: "ℹ️ No whitelist log channel is currently configured.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }
 
         await interaction.reply({
           content: `ℹ️ Whitelist log channel is currently set to <#${settings.whitelistLogChannelId}>`,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -73,13 +74,13 @@ export class WhitelistSettingsCommand {
 
       await interaction.reply({
         content: `✅ Whitelist log channel has been set to <#${channel.id}>`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     } catch (error: unknown) {
       loggers.bot.error("Error setting log channel", error);
       await interaction.reply({
         content: `❌ Failed to set log channel: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
@@ -93,7 +94,7 @@ export class WhitelistSettingsCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -105,7 +106,7 @@ export class WhitelistSettingsCommand {
       if (!settings?.whitelistLogChannelId) {
         await interaction.reply({
           content: "ℹ️ No whitelist log channel is currently configured.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -119,7 +120,7 @@ export class WhitelistSettingsCommand {
 
       await interaction.reply({
         content: "✅ Whitelist log channel has been cleared.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     } catch (error: unknown) {
       loggers.bot.error(
@@ -128,7 +129,7 @@ export class WhitelistSettingsCommand {
       );
       await interaction.reply({
         content: `❌ Failed to clear log channel: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }

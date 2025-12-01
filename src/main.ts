@@ -5,6 +5,7 @@ import multer from "@koa/multer";
 import {
   Interaction,
   Message,
+  MessageFlags,
 } from "discord.js";
 import { Client } from "discordx";
 import bodyParser from "@koa/bodyparser";
@@ -143,7 +144,7 @@ bot.on("interactionCreate", async (interaction: Interaction) => {
       try {
         await interaction.reply({
           content: "❌ An error occurred while processing your request.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
       } catch (replyError) {
         // Ignore errors from trying to reply (might be too late)

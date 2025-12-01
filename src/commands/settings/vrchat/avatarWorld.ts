@@ -2,6 +2,7 @@ import { Discord, Guard, Slash, SlashGroup, SlashOption } from "discordx";
 import {
   CommandInteraction,
   ApplicationCommandOptionType,
+  MessageFlags,
 } from "discord.js";
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
@@ -30,7 +31,7 @@ export class VRChatSettingsCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -44,14 +45,14 @@ export class VRChatSettingsCommand {
         if (!settings?.avatarWorldId) {
           await interaction.reply({
             content: "ℹ️ No avatar world is currently configured.",
-            ephemeral: true,
+            flags: MessageFlags.Ephemeral,
           });
           return;
         }
 
         await interaction.reply({
           content: `ℹ️ Avatar world is currently set to: \`${settings.avatarWorldId}\``,
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -60,7 +61,7 @@ export class VRChatSettingsCommand {
       if (!worldId.startsWith("wrld_")) {
         await interaction.reply({
           content: "❌ Invalid world ID format. World IDs should start with `wrld_`.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -79,13 +80,13 @@ export class VRChatSettingsCommand {
 
       await interaction.reply({
         content: `✅ Avatar world has been set to: \`${worldId}\``,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     } catch (error: unknown) {
       loggers.bot.error("Error setting avatar world", error);
       await interaction.reply({
         content: `❌ Failed to set avatar world: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
@@ -99,7 +100,7 @@ export class VRChatSettingsCommand {
       if (!interaction.guildId) {
         await interaction.reply({
           content: "❌ This command can only be used in a server.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -111,7 +112,7 @@ export class VRChatSettingsCommand {
       if (!settings?.avatarWorldId) {
         await interaction.reply({
           content: "ℹ️ No avatar world is currently configured.",
-          ephemeral: true,
+          flags: MessageFlags.Ephemeral,
         });
         return;
       }
@@ -125,7 +126,7 @@ export class VRChatSettingsCommand {
 
       await interaction.reply({
         content: "✅ Avatar world setting has been cleared.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     } catch (error: unknown) {
       loggers.bot.error(
@@ -134,7 +135,7 @@ export class VRChatSettingsCommand {
       );
       await interaction.reply({
         content: `❌ Failed to clear avatar world: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
     }
   }
