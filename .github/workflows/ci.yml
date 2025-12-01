@@ -124,10 +124,10 @@ jobs:
           fail-if-coverage-less-than: 0
         continue-on-error: true
 
-      - name: Add coverage summary to job
+      - name: Generate coverage summary
         run: |
           if [ -f "coverage/coverage-summary.json" ]; then
-            # Parse coverage summary using node (more reliable than jq)
+            # Parse coverage-summary.json (Istanbul format from json-summary reporter)
             node -e "
               const fs = require('fs');
               const summary = JSON.parse(fs.readFileSync('coverage/coverage-summary.json', 'utf8'));
@@ -141,10 +141,77 @@ jobs:
               console.log(\`| Functions | \${total.functions.pct.toFixed(2)}% |\`);
               console.log(\`| Branches | \${total.branches.pct.toFixed(2)}% |\`);
               console.log('');
-              console.log('📦 Coverage artifacts are available for download.');
+              console.log('📦 Full coverage reports are available in the uploaded artifacts.');
+            " >> $GITHUB_STEP_SUMMARY
+          elif [ -f "coverage/coverage-final.json" ]; then
+            # Parse coverage-final.json (v8 format) - use @c8/parse for better parsing
+            node -e "
+              const fs = require('fs');
+              const path = require('path');
+              const coverage = JSON.parse(fs.readFileSync('coverage/coverage-final.json', 'utf8'));
+              
+              // Calculate totals from v8 coverage format
+              let stats = { statements: [0, 0], functions: [0, 0], branches: [0, 0], lines: [0, 0] };
+              
+              for (const file in coverage) {
+                const fileCoverage = coverage[file];
+                // Statements
+                if (fileCoverage.s) {
+                  for (const stmt in fileCoverage.s) {
+                    stats.statements[1]++;
+                    if (fileCoverage.s[stmt] > 0) stats.statements[0]++;
+                  }
+                }
+                // Functions
+                if (fileCoverage.f) {
+                  for (const func in fileCoverage.f) {
+                    stats.functions[1]++;
+                    if (fileCoverage.f[func] > 0) stats.functions[0]++;
+                  }
+                }
+                // Branches
+                if (fileCoverage.b) {
+                  for (const branch in fileCoverage.b) {
+                    const branchCounts = fileCoverage.b[branch];
+                    stats.branches[1] += branchCounts.length;
+                    stats.branches[0] += branchCounts.filter(c => c > 0).length;
+                  }
+                }
+                // Lines (approximate from statements)
+                if (fileCoverage.statementMap && fileCoverage.s) {
+                  const lines = new Set();
+                  for (const stmt in fileCoverage.statementMap) {
+                    const stmtInfo = fileCoverage.statementMap[stmt];
+                    const line = stmtInfo.start.line;
+                    lines.add(line);
+                    if (fileCoverage.s[stmt] > 0) {
+                      stats.lines[0]++;
+                    }
+                  }
+                  stats.lines[1] += lines.size;
+                }
+              }
+              
+              const calcPct = (covered, total) => total > 0 ? ((covered / total) * 100).toFixed(2) : '0.00';
+              
+              console.log('## 📊 Coverage Summary');
+              console.log('');
+              console.log('| Metric | Coverage |');
+              console.log('|--------|----------|');
+              console.log(\`| **Lines** | \${calcPct(stats.lines[0], stats.lines[1])}% |\`);
+              console.log(\`| Statements | \${calcPct(stats.statements[0], stats.statements[1])}% |\`);
+              console.log(\`| Functions | \${calcPct(stats.functions[0], stats.functions[1])}% |\`);
+              console.log(\`| Branches | \${calcPct(stats.branches[0], stats.branches[1])}% |\`);
+              console.log('');
+              console.log('📦 Full coverage reports are available in the uploaded artifacts.');
             " >> $GITHUB_STEP_SUMMARY
           else
-            echo "⚠️ Coverage summary file not found. Coverage data may not be available." >> $GITHUB_STEP_SUMMARY
+            echo "## 📊 Coverage Summary" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "⚠️ Coverage files not found. Coverage reports may not have been generated." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Checking coverage directory..." >> $GITHUB_STEP_SUMMARY
+            ls -la coverage/ 2>/dev/null || echo "Coverage directory does not exist" >> $GITHUB_STEP_SUMMARY
           fi
         continue-on-error: true
 

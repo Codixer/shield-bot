@@ -8,7 +8,7 @@ export default defineConfig({
     exclude: ["node_modules", "build", "src/generated"],
     coverage: {
       provider: "v8",
-      reporter: ["text", "json", "html", "lcov"],
+      reporter: ["text", "json", "html", "lcov", "json-summary"],
       exclude: [
         "node_modules/",
         "build/",
