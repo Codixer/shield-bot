@@ -110,6 +110,7 @@ export class WhitelistGeneration {
     if (accountsNeedingUpdate.length > 0) {
       const updatePromises = accountsNeedingUpdate.map(async (account) => {
         try {
+          // getUserById will auto-correct if account.vrcUserId is actually a username
           const userInfo = await getUserById(account.vrcUserId);
           const userTyped = userInfo as { displayName?: string; username?: string } | null;
           const vrchatUsername =
@@ -117,8 +118,16 @@ export class WhitelistGeneration {
             userTyped?.username ||
             account.vrcUserId;
 
+          // Refresh account data in case vrcUserId was updated by auto-correction
+          const updatedAccount = await prisma.vRChatAccount.findUnique({
+            where: { id: account.id },
+            select: { vrcUserId: true },
+          });
+          
+          const currentVrcUserId = updatedAccount?.vrcUserId || account.vrcUserId;
+
           // Update the cached username in the database
-          if (vrchatUsername !== account.vrcUserId) {
+          if (vrchatUsername !== currentVrcUserId) {
             await prisma.vRChatAccount.update({
               where: { id: account.id },
               data: {
@@ -128,13 +137,20 @@ export class WhitelistGeneration {
             });
 
             // Update the username in the result array
+            // Try both the original and potentially corrected vrcUserId
             const resultEntry = usersWithCurrentNames.find(
-              (entry: unknown) =>
-                (entry as { vrcUserId: string }).vrcUserId === account.vrcUserId,
+              (entry: unknown) => {
+                const entryVrcUserId = (entry as { vrcUserId: string }).vrcUserId;
+                return entryVrcUserId === account.vrcUserId || entryVrcUserId === currentVrcUserId;
+              },
             );
             if (resultEntry) {
               (resultEntry as { vrchatUsername: string }).vrchatUsername =
                 vrchatUsername;
+              // Update vrcUserId in result if it was corrected
+              if (currentVrcUserId !== account.vrcUserId) {
+                (resultEntry as { vrcUserId: string }).vrcUserId = currentVrcUserId;
+              }
             }
           }
         } catch (error) {

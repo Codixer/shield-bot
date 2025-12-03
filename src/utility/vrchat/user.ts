@@ -114,16 +114,94 @@ export async function acceptFriendRequest(notificationId: string): Promise<unkno
 }
 
 /**
+ * Attempt to resolve a username to a user ID by searching VRChat API
+ * and optionally update the database record
+ */
+async function resolveUsernameToUserId(
+  username: string,
+  updateDatabase: boolean = true,
+): Promise<string | null> {
+  try {
+    loggers.vrchat.info(
+      `Attempting to resolve username "${username}" to user ID...`,
+    );
+    
+    const searchResults = await searchUsers({ search: username, n: 1 });
+    
+    if (searchResults.length === 0) {
+      loggers.vrchat.warn(`No VRChat user found with username: "${username}"`);
+      return null;
+    }
+    
+    const vrcUser = searchResults[0] as { id: string; displayName?: string; username?: string };
+    const resolvedUserId = vrcUser.id;
+    
+    // Check if the found user matches the username (case-insensitive)
+    const foundUsername = vrcUser.displayName || vrcUser.username || "";
+    if (
+      foundUsername.toLowerCase() !== username.toLowerCase() &&
+      resolvedUserId !== username
+    ) {
+      loggers.vrchat.warn(
+        `Username "${username}" resolved to different user "${foundUsername}" (${resolvedUserId})`,
+      );
+    }
+    
+    // Update database records that have this username stored as vrcUserId
+    if (updateDatabase && isValidVRChatUserId(resolvedUserId)) {
+      try {
+        const updated = await prisma.vRChatAccount.updateMany({
+          where: { vrcUserId: username },
+          data: { vrcUserId: resolvedUserId },
+        });
+        
+        if (updated.count > 0) {
+          loggers.vrchat.info(
+            `Updated ${updated.count} database record(s) from username "${username}" to user ID "${resolvedUserId}"`,
+          );
+        }
+      } catch (dbError) {
+        loggers.vrchat.warn(
+          `Failed to update database records for username "${username}":`,
+          dbError,
+        );
+      }
+    }
+    
+    return resolvedUserId;
+  } catch (error) {
+    loggers.vrchat.error(
+      `Failed to resolve username "${username}" to user ID:`,
+      error,
+    );
+    return null;
+  }
+}
+
+/**
  * Get user by ID
+ * If a username is provided instead of a user ID, attempts to resolve it automatically
  */
 export async function getUserById(userId: string): Promise<VRChatUser | null> {
   if (!userId) {throw new Error("User ID is required");}
   
   // Validate that userId is in the correct format (starts with "usr_")
   if (!isValidVRChatUserId(userId)) {
-    const errorMessage = `Invalid VRChat user ID format: "${userId}". Expected format: "usr_...". This appears to be a username rather than a user ID.`;
-    loggers.vrchat.error(errorMessage);
-    throw new Error(errorMessage);
+    // Attempt to auto-correct by resolving username to user ID
+    loggers.vrchat.warn(
+      `Invalid VRChat user ID format detected: "${userId}". Attempting to resolve as username...`,
+    );
+    
+    const resolvedUserId = await resolveUsernameToUserId(userId, true);
+    
+    if (!resolvedUserId) {
+      const errorMessage = `Invalid VRChat user ID format: "${userId}". Expected format: "usr_...". This appears to be a username rather than a user ID, and the username could not be resolved.`;
+      loggers.vrchat.error(errorMessage);
+      throw new Error(errorMessage);
+    }
+    
+    // Use the resolved user ID
+    userId = resolvedUserId;
   }
   
   try {
