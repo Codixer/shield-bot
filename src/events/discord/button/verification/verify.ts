@@ -7,7 +7,7 @@ import {
 import { Discord, ButtonComponent } from "discordx";
 import { prisma } from "../../../../main.js";
 import { ButtonBuilder } from "discord.js";
-import { getUserById } from "../../../../utility/vrchat.js";
+import { getUserById, isValidVRChatUserId } from "../../../../utility/vrchat.js";
 import { loggers } from "../../../../utility/logger.js";
 @Discord()
 export class VRChatVerifyButtonHandler {
@@ -23,6 +23,19 @@ export class VRChatVerifyButtonHandler {
       await interaction.reply({
         content:
           "Could not determine Discord or VRChat user ID from the button.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // Validate VRChat user ID format
+    if (!isValidVRChatUserId(vrcUserId)) {
+      loggers.bot.error(
+        `Invalid VRChat user ID format in handleAdd: "${vrcUserId}". Expected format: "usr_...".`,
+      );
+      await interaction.reply({
+        content:
+          "❌ Invalid VRChat user ID format. Please contact support if this error persists.",
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -106,6 +119,19 @@ export class VRChatVerifyButtonHandler {
       await interaction.reply({
         content:
           "Could not determine Discord or VRChat user ID from the button.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // Validate VRChat user ID format
+    if (!isValidVRChatUserId(vrcUserId)) {
+      loggers.bot.error(
+        `Invalid VRChat user ID format in handleConfirm: "${vrcUserId}". Expected format: "usr_...".`,
+      );
+      await interaction.reply({
+        content:
+          "❌ Invalid VRChat user ID format. Please contact support if this error persists.",
         flags: MessageFlags.Ephemeral,
       });
       return;

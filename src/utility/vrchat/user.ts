@@ -3,7 +3,16 @@
 import { RequestError, NotificationIdType } from "vrc-ts";
 import { vrchatApi } from "./index.js";
 import { prisma } from "../../main.js";
+import { loggers } from "../logger.js";
 import type { VRChatUser } from "./types.js";
+
+/**
+ * Validate that a string is a valid VRChat user ID format
+ * VRChat user IDs start with "usr_"
+ */
+export function isValidVRChatUserId(userId: string): boolean {
+  return typeof userId === "string" && userId.startsWith("usr_");
+}
 
 /**
  * Send a friend request to a user
@@ -109,6 +118,13 @@ export async function acceptFriendRequest(notificationId: string): Promise<unkno
  */
 export async function getUserById(userId: string): Promise<VRChatUser | null> {
   if (!userId) {throw new Error("User ID is required");}
+  
+  // Validate that userId is in the correct format (starts with "usr_")
+  if (!isValidVRChatUserId(userId)) {
+    const errorMessage = `Invalid VRChat user ID format: "${userId}". Expected format: "usr_...". This appears to be a username rather than a user ID.`;
+    loggers.vrchat.error(errorMessage);
+    throw new Error(errorMessage);
+  }
   
   try {
     return await vrchatApi.userApi.getUserById({ userId });

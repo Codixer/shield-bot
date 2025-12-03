@@ -1,5 +1,6 @@
 import { getUserById } from "../../utility/vrchat.js";
 import { prisma } from "../../main.js";
+import { loggers } from "../../utility/logger.js";
 
 /**
  * Whitelist content generation and encoding
@@ -136,10 +137,13 @@ export class WhitelistGeneration {
                 vrchatUsername;
             }
           }
-        } catch (_error) {
+        } catch (error) {
           // Log error but continue - we already have a fallback username
-          // Using console.warn here as this is in a manager, not a command handler
-          // In the future, this could use the logger utility
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          loggers.bot.warn(
+            `Failed to update username for vrcUserId "${account.vrcUserId}": ${errorMessage}`,
+            error,
+          );
         }
       });
 

@@ -40,3 +40,6 @@ export function loadCookie(): string | null {
 
 // Export instance methods
 export * from "./instance.js";
+
+// Export user methods
+export * from "./user.js";
