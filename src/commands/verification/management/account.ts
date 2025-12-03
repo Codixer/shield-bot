@@ -10,7 +10,7 @@ import {
   ButtonStyle,
 } from "discord.js";
 import { VRChatLoginGuard, GuildGuard } from "../../../utility/guards.js";
-import { getUserById, searchUsers } from "../../../utility/vrchat.js";
+import { getUserById, searchUsers, isValidVRChatUserId } from "../../../utility/vrchat.js";
 import type { VRChatUser } from "../../../utility/vrchat/types.js";
 
 @Discord()
@@ -61,9 +61,18 @@ export class VRChatVerifyAccountCommand {
     } catch {
       userInfo = null;
     }
-    if (!userInfo) {
+    if (!userInfo || !userInfo.id) {
       await interaction.reply({
         content: `Could not fetch VRChat user details. Please try again or check the user ID.\n\n- Make sure you WAIT for the autocomplete to load results and SELECT it from the list.`,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    // Validate that userInfo.id is a proper user ID format
+    if (!isValidVRChatUserId(userInfo.id)) {
+      await interaction.reply({
+        content: `❌ Invalid VRChat user ID format received from API. Please contact staff.`,
         flags: MessageFlags.Ephemeral,
       });
       return;
@@ -85,6 +94,7 @@ export class VRChatVerifyAccountCommand {
       .setFooter({ text: "VRChat Account Binding" });
 
     // Use the discord and VRChat IDs in the confirm button's custom_id
+    // userInfo.id is guaranteed to be a valid user ID format at this point
     const addUnverifiedBtn = new ButtonBuilder()
       .setCustomId(`vrchat-add:${interaction.user.id}:${userInfo.id}`)
       .setLabel("Add unverified (can be taken over)")
