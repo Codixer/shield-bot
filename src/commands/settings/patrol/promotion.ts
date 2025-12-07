@@ -19,7 +19,6 @@ import { loggers } from "../../../utility/logger.js";
   root: "patrol",
 })
 @SlashGroup("promotion", "patrol")
-@SlashGroup("patrol", "settings")
 @Guard(StaffGuard)
 export class SettingsPatrolPromotionCommands {
   @Slash({

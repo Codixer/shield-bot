@@ -12,11 +12,6 @@ import { prisma } from "../../../main.js";
 import { loggers } from "../../../utility/logger.js";
 
 @Discord()
-@SlashGroup({
-  name: "group",
-  description: "VRChat group settings",
-  root: "settings",
-})
 @SlashGroup("group", "settings")
 @Guard(StaffGuard)
 export class GroupSettingsCommand {
