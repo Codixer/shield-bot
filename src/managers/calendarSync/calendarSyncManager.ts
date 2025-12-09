@@ -43,6 +43,11 @@ export class CalendarSyncManager {
     guildId: string,
     vrchatGroupId: string,
   ) {
+    if (!prisma) {
+      throw new Error("Prisma client is not initialized. Please ensure Prisma client is generated and imported correctly.");
+    }
+
+    // Prisma converts model names to camelCase, so DiscordEventSync becomes discordEventSync
     const existing = await prisma.discordEventSync.findUnique({
       where: { discordEventId },
     });
@@ -95,6 +100,11 @@ export class CalendarSyncManager {
     guildId: string,
   ): Promise<{ success: boolean; vrchatEventId?: string; error?: string }> {
     try {
+      if (!prisma) {
+        loggers.bot.error("Prisma client is not initialized");
+        return { success: false, error: "Database connection not available" };
+      }
+
       // Check if guild has VRChat group configured
       const settings = await prisma.guildSettings.findUnique({
         where: { guildId },
@@ -210,6 +220,11 @@ export class CalendarSyncManager {
     guildId: string,
   ): Promise<{ success: boolean; error?: string }> {
     try {
+      if (!prisma) {
+        loggers.bot.error("Prisma client is not initialized");
+        return { success: false, error: "Database connection not available" };
+      }
+
       // Find sync record
       const syncRecord = await prisma.discordEventSync.findUnique({
         where: { discordEventId },
