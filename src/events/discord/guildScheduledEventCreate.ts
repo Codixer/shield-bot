@@ -104,7 +104,7 @@ export class GuildScheduledEventCreateEvent {
         : "Not set";
 
       // Create VRChat event URL
-      const vrchatEventUrl = `https://vrchat.com/home/group/${settings.vrcGroupId}/events/${vrchatEventId}`;
+      const vrchatEventUrl = `https://vrchat.com/home/group/${settings.vrcGroupId}/calendar/${vrchatEventId}`;
       
       // Create Discord event URL
       const discordEventUrl = `https://discord.com/events/${event.guildId}/${event.id}`;

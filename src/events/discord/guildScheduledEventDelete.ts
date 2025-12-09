@@ -144,7 +144,7 @@ export class GuildScheduledEventDeleteEvent {
 
       // Add VRChat link if we have the group ID (even though event is deleted)
       if (settings?.vrcGroupId) {
-        const vrchatEventUrl = `https://vrchat.com/home/group/${settings.vrcGroupId}/events/${vrchatEventId}`;
+        const vrchatEventUrl = `https://vrchat.com/home/group/${settings.vrcGroupId}/calendar/${vrchatEventId}`;
         descriptionParts.push(`• [VRChat Event (deleted)](${vrchatEventUrl})`);
       }
 
@@ -169,7 +169,7 @@ export class GuildScheduledEventDeleteEvent {
 
       // Add VRChat button if we have the group ID
       if (settings?.vrcGroupId) {
-        const vrchatEventUrl = `https://vrchat.com/home/group/${settings.vrcGroupId}/events/${vrchatEventId}`;
+        const vrchatEventUrl = `https://vrchat.com/home/group/${settings.vrcGroupId}/calendar/${vrchatEventId}`;
         const vrchatButton = new ButtonBuilder()
           .setLabel("View on VRChat")
           .setStyle(ButtonStyle.Link)
