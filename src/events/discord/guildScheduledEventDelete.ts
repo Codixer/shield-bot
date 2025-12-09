@@ -106,12 +106,12 @@ export class GuildScheduledEventDeleteEvent {
         where: { guildId: event.guildId },
       });
 
-      // Format dates
+      // Format dates using Discord timestamps
       const startDate = event.scheduledStartTimestamp
-        ? new Date(event.scheduledStartTimestamp).toLocaleString()
+        ? `<t:${Math.floor(event.scheduledStartTimestamp / 1000)}:F>`
         : "Not set";
       const endDate = event.scheduledEndTimestamp
-        ? new Date(event.scheduledEndTimestamp).toLocaleString()
+        ? `<t:${Math.floor(event.scheduledEndTimestamp / 1000)}:F>`
         : "Not set";
 
       // Create Discord event URL (event is deleted but link might still work for a short time)

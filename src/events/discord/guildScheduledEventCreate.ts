@@ -95,12 +95,12 @@ export class GuildScheduledEventCreateEvent {
         return;
       }
 
-      // Format dates
+      // Format dates using Discord timestamps
       const startDate = event.scheduledStartTimestamp
-        ? new Date(event.scheduledStartTimestamp).toLocaleString()
+        ? `<t:${Math.floor(event.scheduledStartTimestamp / 1000)}:F>`
         : "Not set";
       const endDate = event.scheduledEndTimestamp
-        ? new Date(event.scheduledEndTimestamp).toLocaleString()
+        ? `<t:${Math.floor(event.scheduledEndTimestamp / 1000)}:F>`
         : "Not set";
 
       // Create VRChat event URL
