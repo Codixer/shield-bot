@@ -13,7 +13,7 @@ import { loggers } from "../logger.js";
  * @throws {VRChatError} If the event creation fails
  * 
  * Defaults applied:
- * - category: "hangout" (if not provided)
+ * - category: "roleplay" (if not provided)
  * - languages: English (LanguageTypes.English)
  * - platforms: All platforms (PC, Android, iOS)
  * - roleIds: Empty array (no role restrictions)
@@ -49,8 +49,8 @@ export async function createVRChatCalendarEvent(
     }
 
     // Map category string to EventCategoryType enum
-    // Default to "hangout" if not provided
-    let category: EventCategoryType = EventCategoryType.Hangout;
+    // Default to "roleplay" if not provided
+    let category: EventCategoryType = EventCategoryType.Roleplaying;
     if (eventData.category) {
       const categoryMap: Record<string, EventCategoryType> = {
         music: EventCategoryType.Music,
@@ -63,7 +63,7 @@ export async function createVRChatCalendarEvent(
         roleplaying: EventCategoryType.Roleplaying,
         performance: EventCategoryType.Performance,
       };
-      category = categoryMap[eventData.category.toLowerCase()] || EventCategoryType.Hangout;
+      category = categoryMap[eventData.category.toLowerCase()] || EventCategoryType.Roleplaying;
     }
 
     // Convert tags array - filter out undefined/null values
