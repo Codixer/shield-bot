@@ -5,7 +5,7 @@ import { loggers } from "../../utility/logger.js";
 @Discord()
 export class GuildScheduledEventUpdateEvent {
   @On({ event: "guildScheduledEventUpdate" })
-  async onGuildScheduledEventUpdate([oldEvent, newEvent]: ArgsOf<"guildScheduledEventUpdate">) {
+  async onGuildScheduledEventUpdate([_oldEvent, newEvent]: ArgsOf<"guildScheduledEventUpdate">) {
     try {
       loggers.bot.debug(
         `Discord scheduled event updated: ${newEvent.name} (${newEvent.id}) in guild ${newEvent.guildId}`,
