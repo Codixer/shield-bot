@@ -11,6 +11,7 @@ export const BOT_INTENTS = [
   IntentsBitField.Flags.Guilds,
   IntentsBitField.Flags.GuildMembers,
   IntentsBitField.Flags.GuildVoiceStates,
+  IntentsBitField.Flags.GuildScheduledEvents,
 ] as const;
 
 /**

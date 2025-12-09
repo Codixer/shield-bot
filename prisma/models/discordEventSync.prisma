@@ -1,0 +1,16 @@
+// Discord Scheduled Event to VRChat Calendar Event Sync Mapping
+model DiscordEventSync {
+  id              Int       @id @default(autoincrement())
+  guildId         String    // Discord guild ID
+  discordEventId  String    @unique // Discord scheduled event ID
+  vrchatEventId   String?   // VRChat calendar event ID (nullable in case creation fails)
+  vrchatGroupId   String    // VRChat group ID (e.g., grp_xxx)
+  lastSyncedAt    DateTime? // Last time the sync was performed
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([guildId])
+  @@index([discordEventId])
+  @@index([vrchatGroupId])
+  @@index([guildId, discordEventId])
+}
