@@ -66,24 +66,14 @@ export async function createVRChatCalendarEvent(
       category = categoryMap[eventData.category.toLowerCase()] || EventCategoryType.Hangout;
     }
 
-    // Convert tags array to tuple format (max 5 tags)
-    const tags: [string?, string?, string?, string?, string?] = eventData.tags
-      ? [
-          eventData.tags[0],
-          eventData.tags[1],
-          eventData.tags[2],
-          eventData.tags[3],
-          eventData.tags[4],
-        ]
-      : [undefined, undefined, undefined, undefined, undefined];
-
-    // Default language to English (LanguageTypes.English = "eng")
-    const languages: [LanguageTypes?, LanguageTypes?, LanguageTypes?] = [
-      LanguageTypes.English,
-      undefined,
-      undefined,
-    ];
-
+    // Convert tags array - filter out undefined/null values
+    // API doesn't accept null/undefined in arrays (they become null in JSON)
+    const tagsArray = eventData.tags?.filter((tag): tag is string => Boolean(tag)) || [];
+    
+    // Default language to English - only include defined values
+    // API rejects null/undefined values in arrays
+    const filteredLanguages: LanguageTypes[] = [LanguageTypes.English];
+    
     // Default platforms to all platforms (PC, Android, iOS)
     // Empty array is also valid, but including all platforms is more inclusive
     const platforms: PlatformType[] = [
@@ -91,6 +81,44 @@ export async function createVRChatCalendarEvent(
       PlatformType.ANDROID,
       PlatformType.IOS,
     ];
+
+    // Construct tuple types - only include values that actually exist
+    // This ensures JSON serialization doesn't include null/undefined values
+    // For languages: construct tuple with only defined values (max 3)
+    const languagesTuple: [LanguageTypes?, LanguageTypes?, LanguageTypes?] = (() => {
+      const result: LanguageTypes[] = [];
+      if (filteredLanguages[0]) {
+        result.push(filteredLanguages[0]);
+      }
+      if (filteredLanguages[1]) {
+        result.push(filteredLanguages[1]);
+      }
+      if (filteredLanguages[2]) {
+        result.push(filteredLanguages[2]);
+      }
+      return result as [LanguageTypes?, LanguageTypes?, LanguageTypes?];
+    })();
+    
+    // For tags: construct tuple with only defined values (max 5)
+    const tagsTuple: [string?, string?, string?, string?, string?] = (() => {
+      const result: string[] = [];
+      if (tagsArray[0]) {
+        result.push(tagsArray[0]);
+      }
+      if (tagsArray[1]) {
+        result.push(tagsArray[1]);
+      }
+      if (tagsArray[2]) {
+        result.push(tagsArray[2]);
+      }
+      if (tagsArray[3]) {
+        result.push(tagsArray[3]);
+      }
+      if (tagsArray[4]) {
+        result.push(tagsArray[4]);
+      }
+      return result as [string?, string?, string?, string?, string?];
+    })();
 
     const result = await vrchatApi.groupApi.createGroupEvent({
       groupId: groupId as GroupIdType,
@@ -101,8 +129,8 @@ export async function createVRChatCalendarEvent(
       category,
       platforms,
       roleIds: [], // Empty array is allowed (no role restrictions)
-      languages,
-      tags,
+      languages: languagesTuple,
+      tags: tagsTuple,
       sendCreationNotification: eventData.sendCreationNotification ?? true,
     });
 
@@ -194,13 +222,15 @@ export async function updateVRChatCalendarEvent(
     }
 
     // Convert tags array to tuple format (max 5 tags)
-    const tags: [string?, string?, string?, string?, string?] | undefined = eventData.tags
+    // Filter out undefined/null values - API doesn't accept them
+    const tagsArray = eventData.tags?.filter((tag): tag is string => Boolean(tag)) || [];
+    const tags: [string?, string?, string?, string?, string?] | undefined = tagsArray.length > 0
       ? [
-          eventData.tags[0],
-          eventData.tags[1],
-          eventData.tags[2],
-          eventData.tags[3],
-          eventData.tags[4],
+          tagsArray[0],
+          tagsArray[1],
+          tagsArray[2],
+          tagsArray[3],
+          tagsArray[4],
         ]
       : undefined;
 
@@ -215,6 +245,7 @@ export async function updateVRChatCalendarEvent(
     // Default language to English if updating (preserve existing if not changing)
     // Since we can't fetch existing event easily, default to English
     // Note: For update, languages is LanguageTypes[] (not tuple)
+    // Only include defined values - API doesn't accept null/undefined in array
     const languages: LanguageTypes[] | undefined = [
       LanguageTypes.English,
     ];
