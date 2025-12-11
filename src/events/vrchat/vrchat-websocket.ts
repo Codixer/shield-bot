@@ -18,14 +18,29 @@ import { handleFriendAdd } from "./handlers/friend/handleFriendAdded.js";
 // import { handleGroupLeft } from "./handlers/group/handleGroupLeft.js";
 // import { handleGroupRoleUpdated } from "./handlers/group/handleGroupRoleUpdated.js";
 import { handleNotification } from "./handlers/notification/notification.js";
+import { WebSocketConstants } from "../../config/constants.js";
 
 // WebSocket instance
 let ws: VRCWebSocket | null = null;
+
+// Reconnection state
+let reconnectTimeout: NodeJS.Timeout | null = null;
+let reconnectAttempts = 0;
+let autoReconnectEnabled = true;
 
 /**
  * Stop the VRChat WebSocket listener
  */
 export function stopVRChatWebSocketListener() {
+  // Disable auto-reconnect when manually stopping
+  autoReconnectEnabled = false;
+  
+  // Clear any pending reconnection attempts
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+  
   if (ws) {
     try {
       // vrc-ts WebSocket may have different cleanup methods
@@ -41,13 +56,63 @@ export function stopVRChatWebSocketListener() {
     }
     ws = null;
   }
+  reconnectAttempts = 0;
   loggers.vrchat.info("VRChat WebSocket listener stopped");
+}
+
+/**
+ * Attempt to reconnect the WebSocket with exponential backoff
+ */
+function attemptReconnect() {
+  // Check if auto-reconnect is disabled
+  if (!autoReconnectEnabled) {
+    loggers.vrchat.info("Auto-reconnect is disabled");
+    return;
+  }
+
+  // Check if we've exceeded max attempts
+  if (
+    WebSocketConstants.MAX_RECONNECT_ATTEMPTS !== Infinity &&
+    reconnectAttempts >= WebSocketConstants.MAX_RECONNECT_ATTEMPTS
+  ) {
+    loggers.vrchat.error(
+      `Max reconnection attempts (${WebSocketConstants.MAX_RECONNECT_ATTEMPTS}) reached. Stopping reconnection attempts.`,
+    );
+    autoReconnectEnabled = false;
+    return;
+  }
+
+  // Calculate delay with exponential backoff
+  const delay = Math.min(
+    WebSocketConstants.INITIAL_RECONNECT_DELAY *
+      Math.pow(WebSocketConstants.RECONNECT_DELAY_MULTIPLIER, reconnectAttempts),
+    WebSocketConstants.MAX_RECONNECT_DELAY,
+  );
+
+  reconnectAttempts++;
+  loggers.vrchat.info(
+    `Attempting to reconnect WebSocket (attempt ${reconnectAttempts}) in ${delay}ms...`,
+  );
+
+  reconnectTimeout = setTimeout(() => {
+    reconnectTimeout = null;
+    startVRChatWebSocketListener();
+  }, delay);
 }
 
 /**
  * Start the VRChat WebSocket listener
  */
 export function startVRChatWebSocketListener() {
+  // Enable auto-reconnect when starting
+  autoReconnectEnabled = true;
+  
+  // Clear any pending reconnection attempts
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+
   // Check if already connected
   if (ws) {
     loggers.vrchat.warn("WebSocket already connected");
@@ -57,6 +122,10 @@ export function startVRChatWebSocketListener() {
   // Check if API is logged in
   if (!vrchatApi.currentUser) {
     loggers.vrchat.error("Not logged in to VRChat. Please log in first.");
+    // Try to reconnect later if auto-reconnect is enabled
+    if (autoReconnectEnabled) {
+      attemptReconnect();
+    }
     return;
   }
 
@@ -145,11 +214,17 @@ export function startVRChatWebSocketListener() {
       try {
         wsWithEvents.on("open", () => {
           loggers.vrchat.info("Connected to VRChat WebSocket");
+          // Reset reconnect attempts on successful connection
+          reconnectAttempts = 0;
         });
 
         wsWithEvents.on("close", () => {
           loggers.vrchat.warn("VRChat WebSocket disconnected");
           ws = null;
+          // Attempt to reconnect if auto-reconnect is enabled
+          if (autoReconnectEnabled) {
+            attemptReconnect();
+          }
         });
       } catch {
         // Event listeners may not be available in this format
@@ -161,5 +236,9 @@ export function startVRChatWebSocketListener() {
   } catch (error) {
     loggers.vrchat.error("Failed to start VRChat WebSocket listener", error);
     ws = null;
+    // Attempt to reconnect on error if auto-reconnect is enabled
+    if (autoReconnectEnabled) {
+      attemptReconnect();
+    }
   }
 }

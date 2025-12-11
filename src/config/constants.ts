@@ -65,3 +65,13 @@ export const RateLimitConstants = {
   DEFAULT_TIMEOUT: 1000,
 } as const;
 
+/**
+ * WebSocket reconnection constants
+ */
+export const WebSocketConstants = {
+  INITIAL_RECONNECT_DELAY: 1000, // 1 second
+  MAX_RECONNECT_DELAY: 60000, // 60 seconds
+  RECONNECT_DELAY_MULTIPLIER: 2, // Exponential backoff multiplier
+  MAX_RECONNECT_ATTEMPTS: Infinity, // Retry indefinitely (or set to a number for max attempts)
+} as const;
+
