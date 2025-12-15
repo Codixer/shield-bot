@@ -45,7 +45,6 @@
     "openpgp": "^6.3.0",
     "otplib": "^12.0.1",
     "vrc-ts": "^1.0.17",
-    "vrchat": "^2.20.6",
     "zod": "^4.2.0"
   },
   "devDependencies": {
