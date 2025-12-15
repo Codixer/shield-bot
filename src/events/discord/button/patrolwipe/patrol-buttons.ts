@@ -24,6 +24,9 @@ export class PatrolButtonHandlers {
     
     // Perform the wipe for the specific user
     await patrolTimer.reset(interaction.guildId, userId);
+    
+    // Log the command usage
+    await patrolTimer.logCommandUsage(interaction.guildId, "wipe", interaction.user.id, userId);
 
     await interaction.update({
       content: `✅ Successfully wiped all patrol data for <@${userId}>.`,

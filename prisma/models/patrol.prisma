@@ -6,6 +6,7 @@ model VoicePatrolTime {
   userId    String // Discord User ID
   user      User     @relation(fields: [userId], references: [discordId])
   totalMs   BigInt   @default(0)
+  channelId String? // Channel ID where the hours were accumulated (for logging)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

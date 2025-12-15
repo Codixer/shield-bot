@@ -301,6 +301,7 @@ export class PatrolTimerCommands {
         });
         return;
       }
+      await patrolTimer.logCommandUsage(interaction.guildId, action, interaction.user.id);
       await interaction.reply({
         content: "⏸️ Patrol time tracking paused for the entire guild. Time will not accumulate until unpaused.",
         flags: ephemeral ? MessageFlags.Ephemeral : undefined,
@@ -311,6 +312,7 @@ export class PatrolTimerCommands {
     // Handle unpause-guild action
     if (action === "unpause-guild") {
       await patrolTimer.unpauseGuild(interaction.guildId);
+      await patrolTimer.logCommandUsage(interaction.guildId, action, interaction.user.id);
       await interaction.reply({
         content: "▶️ Patrol time tracking resumed for the entire guild.",
         flags: ephemeral ? MessageFlags.Ephemeral : undefined,
@@ -336,6 +338,7 @@ export class PatrolTimerCommands {
         });
         return;
       }
+      await patrolTimer.logCommandUsage(interaction.guildId, action, interaction.user.id, user.id);
       await interaction.reply({
         content: `⏸️ Patrol time tracking paused for <@${user.id}>. Their time will not accumulate until unpaused.`,
         flags: ephemeral ? MessageFlags.Ephemeral : undefined,
@@ -354,6 +357,7 @@ export class PatrolTimerCommands {
       }
 
       await patrolTimer.unpauseUser(interaction.guildId, user.id);
+      await patrolTimer.logCommandUsage(interaction.guildId, action, interaction.user.id, user.id);
       await interaction.reply({
         content: `▶️ Patrol time tracking resumed for <@${user.id}>.`,
         flags: ephemeral ? MessageFlags.Ephemeral : undefined,
@@ -419,6 +423,9 @@ export class PatrolTimerCommands {
       const actionText = totalMs > 0 ? "Added" : "Subtracted";
       const absMs = Math.abs(totalMs);
       const timeStr = `${MONTH_NAMES[targetMonth - 1]} ${targetYear}`;
+      const details = `${actionText} ${msToReadable(absMs)} ${totalMs > 0 ? "to" : "from"} patrol time for ${timeStr}`;
+      
+      await patrolTimer.logCommandUsage(interaction.guildId, action, interaction.user.id, user.id, details);
       
       await interaction.reply({
         content: `${actionText} ${msToReadable(absMs)} ${totalMs > 0 ? "to" : "from"} <@${user.id}>'s patrol time for ${timeStr}.`,

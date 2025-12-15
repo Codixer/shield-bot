@@ -5,6 +5,12 @@ import {
   GuildMember,
   VoiceChannel,
   VoiceState,
+  EmbedBuilder,
+  Colors,
+  ButtonBuilder,
+  ButtonStyle,
+  ActionRowBuilder,
+  TextChannel,
 } from "discord.js";
 import { prisma } from "../../main.js";
 import { loggers } from "../../utility/logger.js";
@@ -100,6 +106,7 @@ export class PatrolTimerManager {
       promotionChannelId?: string | null;
       promotionMinHours?: number | null;
       promotionRecruitRoleId?: string | null;
+      patrolLogChannelId?: string | null;
     };
   }
 
@@ -149,13 +156,34 @@ export class PatrolTimerManager {
       const wasTracked = isInTrackedCategory(leftChannelId);
       const nowTracked = isInTrackedCategory(joinedChannelId);
 
+      // If moving from one patrol channel to another patrol channel, update channelId without resetting
+      if (wasTracked && nowTracked && leftChannelId !== joinedChannelId && joinedChannelId) {
+        const guildMap = this.tracked.get(guildId);
+        const tracked = guildMap?.get(member.id);
+        if (tracked) {
+          // Update the channelId in the tracking map
+          tracked.channelId = joinedChannelId;
+          // Update persisted session
+          await prisma.activeVoicePatrolSession
+            .upsert({
+              where: { guildId_userId: { guildId, userId: member.id } },
+              update: { channelId: joinedChannelId },
+              create: { guildId, userId: member.id, channelId: joinedChannelId, startedAt: tracked.startedAt },
+            })
+            .catch((err: unknown) =>
+              loggers.patrol.error("Failed to update session channel", err),
+            );
+        }
+        return; // Don't stop/start tracking, just update channel
+      }
+
       // If leaving a tracked channel, stop and persist
-      if (wasTracked && (!nowTracked || leftChannelId !== joinedChannelId)) {
-        await this.stopTrackingAndPersist(guildId, member);
+      if (wasTracked && !nowTracked) {
+        await this.stopTrackingAndPersist(guildId, member, leftChannelId);
       }
 
       // If joining a tracked channel, start tracking
-      if (nowTracked && (!wasTracked || leftChannelId !== joinedChannelId)) {
+      if (nowTracked && !wasTracked) {
         if (joinedChannelId) {
           this.startTracking(guildId, member, joinedChannelId);
         }
@@ -191,7 +219,7 @@ export class PatrolTimerManager {
     // console.log(`[PatrolTimer] Start ${member.user.tag} in ${channelId}`);
   }
 
-  private async stopTrackingAndPersist(guildId: string, member: GuildMember) {
+  private async stopTrackingAndPersist(guildId: string, member: GuildMember, leftChannelId?: string | null) {
     const guildMap = this.tracked.get(guildId);
     if (!guildMap) {return;}
     const tracked = guildMap.get(member.id);
@@ -226,11 +254,13 @@ export class PatrolTimerManager {
       );
     // Ensure a corresponding User row exists for this Discord ID
     await this.ensureUser(member.id);
+    // Use the tracked channelId or fall back to leftChannelId parameter
+    const channelIdForLogging = tracked.channelId || leftChannelId || null;
     // Upsert DB row and increment time
     await prisma.voicePatrolTime.upsert({
       where: { guildId_userId: { guildId, userId: member.id } },
-      update: { totalMs: { increment: BigInt(delta) } },
-      create: { guildId, userId: member.id, totalMs: BigInt(delta) },
+      update: { totalMs: { increment: BigInt(delta) }, channelId: channelIdForLogging },
+      create: { guildId, userId: member.id, totalMs: BigInt(delta), channelId: channelIdForLogging },
     });
 
     // Also persist monthly totals, splitting across month boundaries (UTC)
@@ -240,6 +270,12 @@ export class PatrolTimerManager {
       tracked.startedAt,
       new Date(nowMs),
     );
+
+    // Log patrol completion
+    await this.logPatrolCompletion(guildId, member.id, delta, channelIdForLogging);
+
+    // Send DM notification if user hasn't opted out
+    await this.sendPatrolCompletionDM(member, delta, channelIdForLogging);
 
     // Check for promotion eligibility
     await this.checkPromotion(guildId, member);
@@ -278,7 +314,9 @@ export class PatrolTimerManager {
           // User left while bot was down, stop and persist
           const member = guild.members.cache.get(userId);
           if (member) {
-            await this.stopTrackingAndPersist(guild.id, member);
+            // Get channelId from tracked data
+            const tracked = guildMap.get(userId);
+            await this.stopTrackingAndPersist(guild.id, member, tracked?.channelId);
           } else {
             // Member not in cache, perhaps left guild, just delete session
             guildMap.delete(userId);
@@ -790,6 +828,199 @@ export class PatrolTimerManager {
         if (a.year !== b.year) {return b.year - a.year;}
         return b.month - a.month;
       });
+  }
+
+  /**
+   * Format milliseconds to human-readable string (e.g., "1h 30m 45s")
+   */
+  private formatDuration(ms: number): string {
+    const s = Math.floor(ms / 1000);
+    const days = Math.floor(s / 86400);
+    const hours = Math.floor((s % 86400) / 3600);
+    const minutes = Math.floor((s % 3600) / 60);
+    const seconds = s % 60;
+    const parts: string[] = [];
+    if (days) {parts.push(`${days}d`);}
+    if (hours) {parts.push(`${hours}h`);}
+    if (minutes) {parts.push(`${minutes}m`);}
+    if (seconds || parts.length === 0) {parts.push(`${seconds}s`);}
+    return parts.join(" ");
+  }
+
+  /**
+   * Send DM to user when patrol session completes (if not opted out)
+   */
+  private async sendPatrolCompletionDM(
+    member: GuildMember,
+    durationMs: number,
+    channelId: string | null,
+  ) {
+    try {
+      // Get user preferences
+      const user = await prisma.user.findUnique({
+        where: { discordId: member.id },
+        include: { userPreferences: true },
+      });
+
+      // Check if user has opted out of patrol DMs
+      if (user?.userPreferences?.patrolDmDisabled) {
+        return; // User has opted out
+      }
+
+      // Try to get channel name
+      const guild = member.guild;
+      let channelName = "Unknown Channel";
+      if (channelId) {
+        const channel = guild.channels.cache.get(channelId);
+        if (channel) {
+          channelName = channel.name;
+        }
+      }
+
+      const durationStr = this.formatDuration(durationMs);
+
+      // Create embed
+      const embed = new EmbedBuilder()
+        .setTitle("✅ Patrol Session Completed")
+        .setDescription(
+          `Your patrol session has ended.\n\n**Duration:** ${durationStr}\n**Channel:** ${channelName}`,
+        )
+        .setColor(Colors.Green)
+        .setFooter({ text: "S.H.I.E.L.D. Bot - Patrol System" })
+        .setTimestamp();
+
+      // Add button to disable DMs
+      const disableButton = new ButtonBuilder()
+        .setCustomId(`patrol-dm-disable:${member.id}`)
+        .setLabel("Disable Patrol DM")
+        .setStyle(ButtonStyle.Secondary);
+
+      const row = new ActionRowBuilder<ButtonBuilder>().addComponents(disableButton);
+
+      // Send DM
+      try {
+        await member.user.send({
+          embeds: [embed],
+          components: [row],
+        });
+        loggers.patrol.info(`Sent patrol completion DM to ${member.user.tag}`);
+      } catch (dmError: unknown) {
+        // If DM fails (user has DMs disabled, etc.), log but don't throw
+        loggers.patrol.warn(`Failed to send patrol completion DM to ${member.id}`, dmError);
+      }
+    } catch (err) {
+      loggers.patrol.error("sendPatrolCompletionDM error", err);
+    }
+  }
+
+  /**
+   * Log patrol completion to the configured log channel
+   */
+  private async logPatrolCompletion(
+    guildId: string,
+    userId: string,
+    durationMs: number,
+    channelId: string | null,
+  ) {
+    try {
+      const settings = await this.getSettings(guildId);
+      if (!settings.patrolLogChannelId) {
+        return; // No log channel configured
+      }
+
+      const channel = await this.client.channels.fetch(settings.patrolLogChannelId);
+      if (!channel || !channel.isTextBased() || channel.isDMBased()) {
+        loggers.patrol.warn(`Invalid patrol log channel ${settings.patrolLogChannelId} in guild ${guildId}`);
+        return;
+      }
+
+      // Get channel name - channel is now guaranteed to be a guild text channel
+      const textChannel = channel as TextChannel;
+      const guild = textChannel.guild;
+      let channelName = "Unknown Channel";
+      if (channelId) {
+        const patrolChannel = guild.channels.cache.get(channelId);
+        if (patrolChannel) {
+          channelName = patrolChannel.name;
+        }
+      }
+
+      const durationStr = this.formatDuration(durationMs);
+
+      // Create log embed
+      const embed = new EmbedBuilder()
+        .setTitle("📊 Patrol Session Completed")
+        .addFields(
+          { name: "User", value: `<@${userId}>`, inline: true },
+          { name: "Duration", value: durationStr, inline: true },
+          { name: "Channel", value: channelName, inline: true },
+        )
+        .setColor(Colors.Blue)
+        .setFooter({ text: "S.H.I.E.L.D. Bot - Patrol System" })
+        .setTimestamp();
+
+      await textChannel.send({ embeds: [embed] });
+      loggers.patrol.debug(`Logged patrol completion for ${userId} in guild ${guildId}`);
+    } catch (err) {
+      loggers.patrol.error("logPatrolCompletion error", err);
+    }
+  }
+
+  /**
+   * Log command usage to the configured log channel
+   */
+  async logCommandUsage(
+    guildId: string,
+    action: string,
+    executorId: string,
+    targetUserId?: string,
+    details?: string,
+  ) {
+    try {
+      const settings = await this.getSettings(guildId);
+      if (!settings.patrolLogChannelId) {
+        return; // No log channel configured
+      }
+
+      const channel = await this.client.channels.fetch(settings.patrolLogChannelId);
+      if (!channel || !channel.isTextBased() || channel.isDMBased()) {
+        loggers.patrol.warn(`Invalid patrol log channel ${settings.patrolLogChannelId} in guild ${guildId}`);
+        return;
+      }
+
+      // channel is now guaranteed to be a guild text channel
+      const textChannel = channel as TextChannel;
+
+      // Format action name for display
+      const actionDisplay = action
+        .split("-")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
+
+      // Create log embed
+      const embed = new EmbedBuilder()
+        .setTitle("⚙️ Patrol Command Usage")
+        .addFields(
+          { name: "Action", value: actionDisplay, inline: true },
+          { name: "Executor", value: `<@${executorId}>`, inline: true },
+        )
+        .setColor(Colors.Orange)
+        .setFooter({ text: "S.H.I.E.L.D. Bot - Patrol System" })
+        .setTimestamp();
+
+      if (targetUserId) {
+        embed.addFields({ name: "Target User", value: `<@${targetUserId}>`, inline: true });
+      }
+
+      if (details) {
+        embed.addFields({ name: "Details", value: details, inline: false });
+      }
+
+      await textChannel.send({ embeds: [embed] });
+      loggers.patrol.debug(`Logged command usage: ${action} by ${executorId} in guild ${guildId}`);
+    } catch (err) {
+      loggers.patrol.error("logCommandUsage error", err);
+    }
   }
 
   // Internals
