@@ -192,8 +192,8 @@ export class AttendanceManager {
       const embed = new EmbedBuilder()
         .setTitle("📋 AOC Squad Split Reminder")
         .setDescription(
-          `A host just moved you from your AOC squad to a normal patrol squad.\n\n` +
-          `If you just ***leaded*** your AOC instigation, please remember to make a log in ${logChannelMention}.`,
+          `You from your AOC squad to a normal patrol squad.\n` +
+          `If you just ***leaded*** the AOC instigation, please remember to make a log in ${logChannelMention}.`,
         )
         .setColor(Colors.Orange)
         .setFooter({ text: "S.H.I.E.L.D. Bot - Attendance System" })
