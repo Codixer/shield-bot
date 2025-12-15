@@ -11,7 +11,6 @@ import { prisma } from "../../../main.js";
 import { loggers } from "../../../utility/logger.js";
 
 @Discord()
-@SlashGroup({ name: "patrol", description: "Patrol settings", root: "settings" })
 @SlashGroup("patrol", "settings")
 @Guard(StaffGuard)
 export class SettingsPatrolLogChannelCommand {
