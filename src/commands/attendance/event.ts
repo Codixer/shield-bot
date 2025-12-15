@@ -114,13 +114,15 @@ export class VRChatAttendanceEventCommand {
               const allAttendeeIds = new Set([...squadMemberIds, ...staffIds]);
               const attendeeCount = allAttendeeIds.size;
 
+              // Use cached member if available, otherwise just use ID (don't fetch to avoid rate limits)
               let hostName = "Unknown";
               if (event.host?.discordId) {
-                try {
-                  const hostUser = await autoInteraction.guild?.members.fetch(event.host.discordId);
-                  hostName = hostUser?.user.username || hostUser?.user.tag || event.host.discordId;
-                } catch {
-                  hostName = event.host.discordId;
+                const cachedMember = autoInteraction.guild?.members.cache.get(event.host.discordId);
+                if (cachedMember) {
+                  hostName = cachedMember.user.username || cachedMember.user.tag || event.host.discordId;
+                } else {
+                  // Don't fetch - just use ID to avoid rate limits in autocomplete
+                  hostName = `User ${event.host.discordId.slice(0, 8)}...`;
                 }
               }
 
