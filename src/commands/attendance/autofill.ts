@@ -232,6 +232,7 @@ export class VRChatAttendanceAutofillCommand {
             dbUser.id,
             channelId,
             previousSquad,
+            interaction.guildId || undefined,
           );
           splitCount++;
 

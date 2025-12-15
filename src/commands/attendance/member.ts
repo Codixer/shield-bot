@@ -196,7 +196,18 @@ export class VRChatAttendanceMemberCommand {
         previousSquadName = previousSquadChannel?.name || previousSquadChannelId;
       }
 
-      await attendanceManager.moveUserToSquad(eventId, dbUser.id, squad);
+      // Use markUserAsSplit to handle AOC special case
+      if (previousSquadChannelId) {
+        await attendanceManager.markUserAsSplit(
+          eventId,
+          dbUser.id,
+          squad,
+          previousSquadChannelId,
+          cmdInteraction.guildId || undefined,
+        );
+      } else {
+        await attendanceManager.moveUserToSquad(eventId, dbUser.id, squad);
+      }
 
       await cmdInteraction.reply({
         content: `Split <@${user.id}> to ${squadName}${previousSquadName ? ` (Split from ${previousSquadName})` : ""}`,

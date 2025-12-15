@@ -1,5 +1,7 @@
 import type { CommandInteraction } from "discord.js";
-import { prisma } from "../../main.js";
+import { prisma, bot } from "../../main.js";
+import { EmbedBuilder, Colors } from "discord.js";
+import { loggers } from "../../utility/logger.js";
 
 export class AttendanceManager {
   async createEvent(date: Date, hostId?: number, cohostId?: number) {
@@ -98,16 +100,114 @@ export class AttendanceManager {
     userId: number,
     newSquadName: string,
     splitFrom: string,
+    guildId?: string,
   ) {
-    await this.moveUserToSquad(eventId, userId, newSquadName);
-    const member = await prisma.squadMember.findFirst({
-      where: { squad: { eventId, name: newSquadName }, userId },
-    });
-    if (member) {
-      await prisma.squadMember.update({
-        where: { id: member.id },
-        data: { isSplit: true, splitFrom },
+    // Check if splitting from AOC - if so, keep them in AOC and add to new squad
+    const guildSettings = guildId 
+      ? await prisma.guildSettings.findUnique({ where: { guildId } })
+      : null;
+    
+    const aocChannelId = (guildSettings as { aocChannelId?: string | null } | null)?.aocChannelId;
+    const isSplittingFromAOC = aocChannelId && splitFrom === aocChannelId;
+
+    if (isSplittingFromAOC) {
+      // Keep user in AOC squad, but also add them to new squad
+      // First, get the AOC squad member to check if they were a lead
+      const aocSquad = await prisma.squad.findFirst({
+        where: { eventId, name: aocChannelId },
       });
+      
+      let wasLeadInAOC = false;
+      if (aocSquad) {
+        const aocMember = await prisma.squadMember.findFirst({
+          where: { squadId: aocSquad.id, userId },
+        });
+        wasLeadInAOC = aocMember?.isLead || false;
+      }
+
+      // Add to new squad without removing from AOC
+      await this.addUserToSquad(eventId, userId, newSquadName);
+      const member = await prisma.squadMember.findFirst({
+        where: { squad: { eventId, name: newSquadName }, userId },
+      });
+      if (member) {
+        await prisma.squadMember.update({
+          where: { id: member.id },
+          data: { isSplit: true, splitFrom },
+        });
+      }
+
+      // Send DM reminder if they were a lead in AOC
+      if (wasLeadInAOC && guildId) {
+        const instigationLogChannelId = (guildSettings as { instigationLogChannelId?: string | null } | null)?.instigationLogChannelId;
+        await this.sendAOCSplitReminderDM(userId, guildId, instigationLogChannelId);
+      }
+    } else {
+      // Normal split - move user (removes from old squad, adds to new)
+      await this.moveUserToSquad(eventId, userId, newSquadName);
+      const member = await prisma.squadMember.findFirst({
+        where: { squad: { eventId, name: newSquadName }, userId },
+      });
+      if (member) {
+        await prisma.squadMember.update({
+          where: { id: member.id },
+          data: { isSplit: true, splitFrom },
+        });
+      }
+    }
+  }
+
+  /**
+   * Send DM reminder to user when they're split from AOC and were a lead
+   */
+  private async sendAOCSplitReminderDM(
+    userId: number,
+    guildId: string,
+    instigationLogChannelId?: string | null,
+  ) {
+    try {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+      });
+
+      if (!user?.discordId) {
+        return;
+      }
+
+      const guild = bot.guilds.cache.get(guildId);
+      if (!guild) {
+        return;
+      }
+
+      const member = await guild.members.fetch(user.discordId).catch(() => null);
+      if (!member) {
+        return;
+      }
+
+      let logChannelMention = "the instigation log channel";
+      if (instigationLogChannelId) {
+        logChannelMention = `<#${instigationLogChannelId}>`;
+      }
+
+      const embed = new EmbedBuilder()
+        .setTitle("📋 AOC Squad Split Reminder")
+        .setDescription(
+          `A host just moved you from your AOC squad to a normal patrol squad.\n\n` +
+          `If you just ***leaded*** your AOC instigation, please remember to make a log in ${logChannelMention}.`,
+        )
+        .setColor(Colors.Orange)
+        .setFooter({ text: "S.H.I.E.L.D. Bot - Attendance System" })
+        .setTimestamp();
+
+      try {
+        await member.user.send({ embeds: [embed] });
+        loggers.bot.info(`Sent AOC split reminder DM to ${member.user.tag}`);
+      } catch (dmError: unknown) {
+        // If DM fails (user has DMs disabled, etc.), log but don't throw
+        loggers.bot.warn(`Failed to send AOC split reminder DM to ${user.discordId}`, dmError);
+      }
+    } catch (err) {
+      loggers.bot.error("sendAOCSplitReminderDM error", err);
     }
   }
 
