@@ -19,7 +19,7 @@ import { loggers } from "../../utility/logger.js";
 export class RooftopCommands {
   private githubPublisher = new GitHubPublisher();
 
-  @Slash({ description: "Force update rooftop files on GitHub" })
+  @Slash({ name: "force-update", description: "Force update rooftop files on GitHub" })
   async forceUpdate(interaction: CommandInteraction): Promise<void> {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
