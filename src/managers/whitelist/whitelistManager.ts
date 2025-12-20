@@ -236,6 +236,68 @@ export class WhitelistManager {
   }
 
   /**
+   * Check if any of the updated users have rooftop permissions
+   */
+  private async checkForRooftopPermissionChanges(
+    discordIds: string[],
+  ): Promise<boolean> {
+    try {
+      const rooftopPermissions = [
+        "rooftop_announce",
+        "rooftop_bouncer",
+        "rooftop_staff",
+        "rooftop_vip",
+        "rooftop_vipplus",
+      ];
+
+      const entries = await prisma.whitelistEntry.findMany({
+        where: {
+          user: {
+            discordId: {
+              in: discordIds,
+            },
+          },
+        },
+        select: {
+          roleAssignments: {
+            where: {
+              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+            },
+            select: {
+              role: {
+                select: {
+                  permissions: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      for (const entry of entries) {
+        for (const assignment of entry.roleAssignments) {
+          if (assignment.role.permissions) {
+            const permissionList = assignment.role.permissions
+              .split(",")
+              .map((p: string) => p.trim());
+            if (
+              rooftopPermissions.some((rooftopPerm) =>
+                permissionList.includes(rooftopPerm),
+              )
+            ) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    } catch (error) {
+      loggers.bot.warn("Error checking for rooftop permission changes", error);
+      return false;
+    }
+  }
+
+  /**
    * Process all pending batched updates
    */
   private async processBatchedUpdates(commitMessage?: string): Promise<void> {
@@ -270,6 +332,19 @@ export class WhitelistManager {
 
       // Publish with content change check
       await this.publishWhitelist(message, false);
+
+      // Check if any rooftop permissions were updated and publish rooftop files if needed
+      const hasRooftopChanges = await this.checkForRooftopPermissionChanges(users);
+      if (hasRooftopChanges) {
+        loggers.bot.info("Rooftop permissions changed, updating rooftop files");
+        try {
+          await this.githubPublisher.updateRepositoryWithRooftopFiles(
+            `chore(rooftop): update rooftop files after whitelist change`,
+          );
+        } catch (error) {
+          loggers.bot.error("Error updating rooftop files", error);
+        }
+      }
     } catch (error) {
       loggers.bot.error('Error processing batched updates', error);
     }
