@@ -15,6 +15,21 @@ import {
 import { prisma } from "../../main.js";
 import { loggers } from "../../utility/logger.js";
 
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 type TrackedUser = {
   userId: string;
   channelId: string;
@@ -476,6 +491,42 @@ export class PatrolTimerManager {
     return base;
   }
 
+  async getUserTotalForYear(
+    guildId: string,
+    userId: string,
+    year: number,
+  ) {
+    // Get all monthly records for this user in this year
+    const rows = await prisma.voicePatrolMonthlyTime.findMany({
+      where: { guildId, userId, year },
+      select: { totalMs: true, month: true },
+    });
+    
+    let total = 0;
+    for (const row of rows) {
+      total += Number(row.totalMs);
+    }
+
+    // Add live delta for current month if user is currently tracked and not paused
+    const now = new Date();
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth() + 1;
+    if (year === currentYear && !this.isUserPaused(guildId, userId)) {
+      const guildMap = this.tracked.get(guildId);
+      const tu = guildMap?.get(userId);
+      if (tu) {
+        const monthStart = new Date(
+          Date.UTC(year, currentMonth - 1, 1, 0, 0, 0, 0),
+        ).getTime();
+        const startMs = Math.max(tu.startedAt.getTime(), monthStart);
+        const delta = Math.max(0, Date.now() - startMs);
+        total += delta;
+      }
+    }
+    
+    return total;
+  }
+
   async getTopForChannel(guild: Guild, channelId: string) {
     // Get members in this voice channel
     const members = guild.members.cache.filter(
@@ -879,11 +930,37 @@ export class PatrolTimerManager {
 
       const durationStr = this.formatDuration(durationMs);
 
+      // Get monthly, yearly, and overall totals
+      const now = new Date();
+      const currentYear = now.getUTCFullYear();
+      const currentMonth = now.getUTCMonth() + 1;
+      const monthlyTotal = await this.getUserTotalForMonth(
+        guild.id,
+        member.id,
+        currentYear,
+        currentMonth,
+      );
+      const yearlyTotal = await this.getUserTotalForYear(
+        guild.id,
+        member.id,
+        currentYear,
+      );
+      const overallTotal = await this.getUserTotal(guild.id, member.id);
+
+      const monthlyStr = this.formatDuration(monthlyTotal);
+      const yearlyStr = this.formatDuration(yearlyTotal);
+      const overallStr = this.formatDuration(overallTotal);
+
       // Create embed
       const embed = new EmbedBuilder()
         .setTitle("✅ Patrol Session Completed")
         .setDescription(
           `Your patrol session has ended.\n\n**Duration:** ${durationStr}\n**Channel:** ${channelName}`,
+        )
+        .addFields(
+          { name: `${MONTH_NAMES[currentMonth - 1]} ${currentYear}`, value: monthlyStr, inline: true },
+          { name: `This Year (${currentYear})`, value: yearlyStr, inline: true },
+          { name: "All-Time Total", value: overallStr, inline: true },
         )
         .setColor(Colors.Green)
         .setFooter({ text: "S.H.I.E.L.D. Bot - Patrol System" })
@@ -947,6 +1024,27 @@ export class PatrolTimerManager {
 
       const durationStr = this.formatDuration(durationMs);
 
+      // Get monthly, yearly, and overall totals
+      const now = new Date();
+      const currentYear = now.getUTCFullYear();
+      const currentMonth = now.getUTCMonth() + 1;
+      const monthlyTotal = await this.getUserTotalForMonth(
+        guildId,
+        userId,
+        currentYear,
+        currentMonth,
+      );
+      const yearlyTotal = await this.getUserTotalForYear(
+        guildId,
+        userId,
+        currentYear,
+      );
+      const overallTotal = await this.getUserTotal(guildId, userId);
+
+      const monthlyStr = this.formatDuration(monthlyTotal);
+      const yearlyStr = this.formatDuration(yearlyTotal);
+      const overallStr = this.formatDuration(overallTotal);
+
       // Create log embed
       const embed = new EmbedBuilder()
         .setTitle("📊 Patrol Session Completed")
@@ -954,6 +1052,9 @@ export class PatrolTimerManager {
           { name: "User", value: `<@${userId}>`, inline: true },
           { name: "Duration", value: durationStr, inline: true },
           { name: "Channel", value: channelName, inline: true },
+          { name: `${MONTH_NAMES[currentMonth - 1]} ${currentYear}`, value: monthlyStr, inline: true },
+          { name: `This Year (${currentYear})`, value: yearlyStr, inline: true },
+          { name: "All-Time Total", value: overallStr, inline: true },
         )
         .setColor(Colors.Blue)
         .setFooter({ text: "S.H.I.E.L.D. Bot - Patrol System" })
