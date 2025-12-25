@@ -48,7 +48,7 @@ A comprehensive Discord bot built with Discord.js v14 and DiscordX framework, fe
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/Codixer/shield-bot.git
+git clone https://github.com/Xeravax/shield-bot.git
 cd shield-bot
 ```
 
@@ -394,7 +394,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 👥 Authors
 
-- **Stefano** - [@Codixer](https://github.com/Codixer) - stefano@stefanocoding.me
+- **Stefano** - [@Xeravax](https://github.com/Xeravax) - stefano@stefanocoding.me
 
 ## 🙏 Acknowledgments
 
@@ -405,7 +405,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📞 Support
 
-For support, issues, or feature requests, please open an issue on the [GitHub repository](https://github.com/Codixer/shield-bot/issues).
+For support, issues, or feature requests, please open an issue on the [GitHub repository](https://github.com/Xeravax/shield-bot/issues).
 
 ## ⚠️ Disclaimer
 

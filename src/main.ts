@@ -78,7 +78,7 @@ bot.once("clientReady", async () => {
     loggers.bot.info("|                      |                          |");
     loggers.bot.info("|                      |                          |");
     loggers.bot.info("|                      | stefano@stefanocoding.me |");
-    loggers.bot.info("|                      |         Codixer          |");
+    loggers.bot.info("|                      |         Xeravax          |");
     loggers.bot.info("|                      |                          |");
     loggers.bot.info("###################################################");
 
