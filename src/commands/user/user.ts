@@ -1,4 +1,4 @@
-import { Discord, Slash, SlashGroup, SlashOption, Guard } from "discordx";
+import { Discord, Slash, SlashGroup, SlashOption, Guard, SlashChoice } from "discordx";
 import {
   ApplicationCommandOptionType,
   CommandInteraction,
@@ -6,6 +6,8 @@ import {
   User,
   Role,
   EmbedBuilder,
+  PermissionFlagsBits,
+  GuildMember,
 } from "discord.js";
 import { Pagination } from "@discordx/pagination";
 import {
@@ -194,6 +196,13 @@ export class UserCommands {
 
       const pagination = new Pagination(interaction, pages, {
         time: 120_000,
+        onTimeout: async () => {
+          try {
+            await interaction.deleteReply();
+          } catch (_error: unknown) {
+            // ignore
+          }
+        },
       });
 
       await pagination.send();
@@ -208,6 +217,239 @@ export class UserCommands {
       } else {
         await interaction.reply({
           content: `❌ Failed to list members: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    }
+  }
+
+  @Slash({
+    name: "role",
+    description: "Manage user roles (status, cancel, or assign roles)",
+  })
+  @Guard(StaffGuard)
+  async role(
+    @SlashChoice({ name: "Status", value: "status" })
+    @SlashChoice({ name: "Cancel", value: "cancel" })
+    @SlashChoice({ name: "In", value: "in" })
+    @SlashOption({
+      name: "action",
+      description: "Action to perform",
+      type: ApplicationCommandOptionType.String,
+      required: true,
+    })
+    action: string,
+    @SlashOption({
+      name: "role",
+      description: "Role to assign (required for 'in' action)",
+      type: ApplicationCommandOptionType.Role,
+      required: false,
+    })
+    role: Role | null,
+    @SlashOption({
+      name: "user",
+      description: "Target user (optional for 'in' action, ignored if unroled is true)",
+      type: ApplicationCommandOptionType.User,
+      required: false,
+    })
+    user: User | null,
+    @SlashOption({
+      name: "unroled",
+      description: "Assign to all users without any roles (for 'in' action)",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    unroled: boolean | null,
+    interaction: CommandInteraction,
+  ): Promise<void> {
+    try {
+      if (!interaction.guild) {
+        await interaction.reply({
+          content: "❌ This command can only be used in a server.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+      // Handle status action
+      if (action === "status") {
+        // List all roles in the server
+        const guild = interaction.guild;
+        const allRoles = Array.from(
+          guild.roles.cache
+            .filter((r) => r.id !== guild.id)
+            .values(),
+        ).sort((a, b) => b.position - a.position);
+
+        if (allRoles.length === 0) {
+          await interaction.editReply({
+            content: "❌ No roles found in this server.",
+          });
+          return;
+        }
+
+        const roleList = allRoles
+          .map((r, index) => {
+            const memberCount = r.members.size;
+            return `**${index + 1}.** <@&${r.id}> (${r.name}) - ${memberCount} member${memberCount !== 1 ? "s" : ""}`;
+          })
+          .join("\n");
+
+        const embed = new EmbedBuilder()
+          .setTitle("Server Roles Status")
+          .setDescription(roleList)
+          .setColor(0x0099ff)
+          .setTimestamp();
+
+        await interaction.editReply({ embeds: [embed] });
+        return;
+      }
+
+      // Handle cancel action
+      if (action === "cancel") {
+        await interaction.editReply({
+          content: "✅ Operation cancelled.",
+        });
+        return;
+      }
+
+      // Handle "in" action (assign role)
+      if (action === "in") {
+        if (!role) {
+          await interaction.editReply({
+            content: "❌ Role is required for the 'in' action.",
+          });
+          return;
+        }
+
+        // Check if bot has permission to manage roles
+        const botUser = interaction.client.user;
+        if (!botUser) {
+          await interaction.editReply({
+            content: "❌ Unable to get bot user information.",
+          });
+          return;
+        }
+        const botMember = await interaction.guild.members.fetch(botUser.id);
+        if (
+          !botMember.permissions.has(PermissionFlagsBits.ManageRoles) ||
+          !interaction.guild.members.me?.permissions.has(
+            PermissionFlagsBits.ManageRoles,
+          )
+        ) {
+          await interaction.editReply({
+            content:
+              "❌ I don't have permission to manage roles. Please contact a server administrator.",
+          });
+          return;
+        }
+
+        // Check if role is manageable
+        const botHighestRole = botMember.roles.highest;
+        if (botHighestRole.comparePositionTo(role) <= 0) {
+          await interaction.editReply({
+            content:
+              "❌ I cannot manage this role because it is higher than or equal to my highest role.",
+          });
+          return;
+        }
+
+        let membersToAssign: GuildMember[] = [];
+
+        // Check if unroled flag is set or a user was provided
+        if (unroled === true) {
+          // Get all members without any roles (only @everyone)
+          const allMembers = await interaction.guild.members.fetch();
+          membersToAssign = Array.from(
+            allMembers.filter(
+              (member) =>
+                member.roles.cache.filter((r) => r.id !== member.guild.id)
+                  .size === 0,
+            ).values(),
+          );
+        } else if (user) {
+          // Get the specific user
+          const member = await interaction.guild.members.fetch(user.id);
+          if (member.roles.cache.has(role.id)) {
+            await interaction.editReply({
+              content: `❌ <@${user.id}> already has the role <@&${role.id}>.`,
+            });
+            return;
+          }
+          membersToAssign = [member];
+        } else {
+          await interaction.editReply({
+            content:
+              "❌ You must either set 'unroled' to true or provide a user.",
+          });
+          return;
+        }
+
+        if (membersToAssign.length === 0) {
+          await interaction.editReply({
+            content: "❌ No members found to assign the role to.",
+          });
+          return;
+        }
+
+        // Assign role to all target members
+        let successCount = 0;
+        let failCount = 0;
+        const errors: string[] = [];
+
+        for (const member of membersToAssign) {
+          try {
+            // Skip if already has the role
+            if (member.roles.cache.has(role.id)) {
+              continue;
+            }
+
+            await member.roles.add(
+              role,
+              `Role assigned via /user role command by ${interaction.user.tag}`,
+            );
+            successCount++;
+          } catch (error: unknown) {
+            failCount++;
+            const errorMsg =
+              error instanceof Error ? error.message : "Unknown error";
+            errors.push(`<@${member.id}>: ${errorMsg}`);
+            loggers.bot.error(`Error assigning role to ${member.id}`, error);
+          }
+        }
+
+        let resultMessage = `✅ Assigned role <@&${role.id}> to ${successCount} member${successCount !== 1 ? "s" : ""}.`;
+        if (failCount > 0) {
+          resultMessage += `\n❌ Failed to assign to ${failCount} member${failCount !== 1 ? "s" : ""}.`;
+          if (errors.length > 0 && errors.length <= 5) {
+            resultMessage += "\n" + errors.join("\n");
+          }
+        }
+
+        await interaction.editReply({
+          content: resultMessage,
+        });
+        return;
+      }
+
+      await interaction.editReply({
+        content: "❌ Invalid action specified.",
+      });
+    } catch (error: unknown) {
+      loggers.bot.error("Error in role command", error);
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({
+          content: `❌ An error occurred: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+        });
+      } else {
+        await interaction.reply({
+          content: `❌ An error occurred: ${
             error instanceof Error ? error.message : "Unknown error"
           }`,
           flags: MessageFlags.Ephemeral,
