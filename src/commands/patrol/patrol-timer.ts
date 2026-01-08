@@ -549,8 +549,39 @@ export class PatrolTimerCommands {
     } else {
       // Get time for specific month/year (similar to existing user command)
       const now = new Date();
-      const y = year ? parseInt(year) : now.getUTCFullYear();
-      const m = month ? parseInt(month) : now.getUTCMonth() + 1;
+      const currentYear = now.getUTCFullYear();
+      const currentMonth = now.getUTCMonth() + 1; // 1-12
+      
+      let y: number;
+      let m: number;
+      
+      if (year) {
+        // Year is explicitly provided
+        y = parseInt(year);
+        m = month ? parseInt(month) : currentMonth;
+      } else if (month) {
+        // Month is provided but not year - intelligently determine year
+        m = parseInt(month);
+        if (m >= 1 && m <= 12) {
+          // If specified month has already passed or is current month, use current year
+          // If specified month is yet to come, use previous year
+          if (m <= currentMonth) {
+            y = currentYear;
+          } else {
+            y = currentYear - 1;
+          }
+        } else {
+          await interaction.reply({
+            content: "Invalid month.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+      } else {
+        // Neither year nor month provided - use current month/year
+        y = currentYear;
+        m = currentMonth;
+      }
 
       if (month && !(m >= 1 && m <= 12)) {
         await interaction.reply({
