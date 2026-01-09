@@ -36,6 +36,11 @@ type TrackedUser = {
   startedAt: Date;
 };
 
+type TopUserResult = {
+  userId: string;
+  totalMs: bigint | number;
+};
+
 export class PatrolTimerManager {
   private client: Client;
   // guildId => Map<userId, TrackedUser>
@@ -414,7 +419,7 @@ export class PatrolTimerManager {
     year: number,
     month: number,
     limit?: number,
-  ) {
+  ): Promise<Array<TopUserResult>> {
     const rows = await prisma.voicePatrolMonthlyTime.findMany({
       where: { guildId, year, month },
       orderBy: { totalMs: "desc" },
@@ -427,7 +432,11 @@ export class PatrolTimerManager {
     if (!isCurrentMonth) {
       const limited =
         limit && limit > 0 ? rows.slice(0, Math.min(limit, 1000)) : rows;
-      return limited;
+      // Convert Prisma rows to consistent shape
+      return limited.map((r) => ({
+        userId: r.userId,
+        totalMs: r.totalMs,
+      }));
     }
 
     const monthStart = new Date(
@@ -455,6 +464,65 @@ export class PatrolTimerManager {
       .sort((a, b) => b.totalMs - a.totalMs);
     const limited =
       limit && limit > 0 ? arr.slice(0, Math.min(limit, 1000)) : arr;
+    return limited.map((r) => ({
+      userId: r.userId,
+      totalMs: BigInt(Math.max(0, Math.floor(r.totalMs))),
+    }));
+  }
+
+  async getTopByYear(
+    guildId: string,
+    year: number,
+    limit?: number,
+  ): Promise<Array<TopUserResult>> {
+    // Get all monthly records for this year
+    const rows = await prisma.voicePatrolMonthlyTime.findMany({
+      where: { guildId, year },
+      orderBy: { totalMs: "desc" },
+      take: undefined,
+    });
+
+    // Aggregate by user (sum across all months in the year)
+    const byUser: Record<string, number> = {};
+    for (const r of rows) {
+      byUser[r.userId] = (byUser[r.userId] ?? 0) + Number(r.totalMs);
+    }
+
+    // Merge live delta if querying the current UTC year
+    const now = new Date();
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth() + 1;
+    const isCurrentYear = currentYear === year;
+
+    if (isCurrentYear) {
+      const guildMap = this.tracked.get(guildId);
+      if (guildMap) {
+        const monthStart = new Date(
+          Date.UTC(year, currentMonth - 1, 1, 0, 0, 0, 0),
+        ).getTime();
+        const nowMs = now.getTime();
+        
+        for (const tu of guildMap.values()) {
+          // Only add delta if user is not paused
+          if (!this.isUserPaused(guildId, tu.userId)) {
+            const startMs = Math.max(tu.startedAt.getTime(), monthStart);
+            const delta = Math.max(0, nowMs - startMs);
+            if (delta > 0) {
+              byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;
+            }
+          }
+        }
+      }
+    }
+
+    // To array and sort desc
+    const arr = Object.entries(byUser)
+      .map(([userId, totalMs]) => ({ userId, totalMs }))
+      .sort((a, b) => b.totalMs - a.totalMs);
+
+    const limited =
+      limit && limit > 0 ? arr.slice(0, Math.min(limit, 1000)) : arr;
+
     return limited.map((r) => ({
       userId: r.userId,
       totalMs: BigInt(Math.max(0, Math.floor(r.totalMs))),
