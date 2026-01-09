@@ -72,7 +72,7 @@ export class SettingsPatrolTopChannelCommand {
       });
 
       await interaction.reply({
-        content: `✅ Patrol top channel has been set to <#${channel.id}>. Weekly top posts will be sent every Sunday at 3AM UTC+1.`,
+        content: `✅ Patrol top channel has been set to <#${channel.id}>. Weekly top posts will be sent every Sunday at 3AM UTC.`,
         flags: MessageFlags.Ephemeral,
       });
     } catch (error: unknown) {

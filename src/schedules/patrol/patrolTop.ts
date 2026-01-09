@@ -1,4 +1,4 @@
-import { Client, TextChannel } from "discord.js";
+import { Client } from "discord.js";
 import * as cron from "node-cron";
 import { loggers } from "../../utility/logger.js";
 import { prisma, patrolTimer } from "../../main.js";
@@ -64,8 +64,8 @@ export async function postPatrolTop(client: Client): Promise<void> {
           continue;
         }
 
-        if (!(channel instanceof TextChannel)) {
-          loggers.schedules.warn(`Channel ${settings.patrolTopChannelId} is not a text channel`);
+        if (!channel.isTextBased()) {
+          loggers.schedules.warn(`Channel ${settings.patrolTopChannelId} is not a text-based channel`);
           continue;
         }
 
