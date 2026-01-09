@@ -98,8 +98,15 @@ export class PatrolTimerCommands {
     @SlashChoice({ name: "1000", value: "1000" })
     limit: string | undefined,
     @SlashOption({
+      name: "all-time",
+      description: "Show all-time totals instead of a specific time period",
+      type: ApplicationCommandOptionType.Boolean,
+      required: false,
+    })
+    allTime: boolean = false,
+    @SlashOption({
       name: "year",
-      description: "Year",
+      description: "Year (only used if all-time is false)",
       type: ApplicationCommandOptionType.String,
       required: false,
       autocomplete: function (
@@ -112,7 +119,7 @@ export class PatrolTimerCommands {
     year: string | undefined,
     @SlashOption({
       name: "month",
-      description: "Month",
+      description: "Month (only used if all-time is false, leave empty for entire year)",
       type: ApplicationCommandOptionType.String,
       required: false,
       autocomplete: function (
@@ -143,6 +150,8 @@ export class PatrolTimerCommands {
     const member = interaction.member as GuildMember;
     const now = new Date();
     let rows: Array<{ userId: string; totalMs: bigint | number }>;
+    let timeDescription: string | undefined;
+    
     if (here) {
       const channelId = member.voice?.channelId;
       if (!channelId) {
@@ -160,15 +169,86 @@ export class PatrolTimerCommands {
         return;
       }
       rows = await patrolTimer.getTopForChannel(interaction.guild, channelId);
-    } else {
-      const y = year ? parseInt(year) : now.getUTCFullYear();
-      const m = month ? parseInt(month) : now.getUTCMonth() + 1;
-      rows = await (patrolTimer as { getTopByMonth: (guildId: string, year: number, month: number, limit?: number) => Promise<Array<{ userId: string; totalMs: bigint | number }>> }).getTopByMonth(
+    } else if (allTime) {
+      // Get all-time top users
+      rows = await patrolTimer.getTop(
         interaction.guildId,
-        y,
-        m,
         limit ? parseInt(limit) : undefined,
       );
+      timeDescription = "all-time";
+    } else {
+      const currentYear = now.getUTCFullYear();
+      const currentMonth = now.getUTCMonth() + 1; // 1-12
+      
+      let y: number;
+      let m: number | undefined;
+      
+      if (year) {
+        // Year is explicitly provided
+        y = parseInt(year);
+        // Validate year is not NaN
+        if (isNaN(y)) {
+          await interaction.reply({
+            content: "Invalid year.",
+            flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+          });
+          return;
+        }
+        if (month) {
+          m = parseInt(month);
+          // Validate month if provided
+          if (isNaN(m) || m < 1 || m > 12) {
+            await interaction.reply({
+              content: "Invalid month. Must be between 1 and 12.",
+              flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+            });
+            return;
+          }
+        } else {
+          m = undefined;
+        }
+      } else if (month) {
+        // Month is provided but not year - intelligently determine year
+        m = parseInt(month);
+        // Validate month is not NaN and is within valid range
+        if (isNaN(m) || m < 1 || m > 12) {
+          await interaction.reply({
+            content: "Invalid month. Must be between 1 and 12.",
+            flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+          });
+          return;
+        }
+        // If specified month has already passed or is current month, use current year
+        // If specified month is yet to come, use previous year
+        if (m <= currentMonth) {
+          y = currentYear;
+        } else {
+          y = currentYear - 1;
+        }
+      } else {
+        // Neither year nor month provided - use current month/year
+        y = currentYear;
+        m = currentMonth;
+      }
+      
+      // If month is provided (or defaulted), query by month. Otherwise, query by year.
+      if (m !== undefined) {
+        rows = await (patrolTimer as { getTopByMonth: (guildId: string, year: number, month: number, limit?: number) => Promise<Array<{ userId: string; totalMs: bigint | number }>> }).getTopByMonth(
+          interaction.guildId,
+          y,
+          m,
+          limit ? parseInt(limit) : undefined,
+        );
+        timeDescription = `${MONTH_NAMES[m - 1]} ${y}`;
+      } else {
+        // Year only - get entire year
+        rows = await (patrolTimer as { getTopByYear: (guildId: string, year: number, limit?: number) => Promise<Array<{ userId: string; totalMs: bigint | number }>> }).getTopByYear(
+          interaction.guildId,
+          y,
+          limit ? parseInt(limit) : undefined,
+        );
+        timeDescription = `${y}`;
+      }
     }
     if (rows.length === 0) {
       await interaction.reply({
@@ -181,8 +261,9 @@ export class PatrolTimerCommands {
       (r: { userId: string; totalMs: bigint | number }, idx: number) =>
         `${idx + 1}. <@${r.userId}> — ${msToReadable(Number(r.totalMs))}`,
     );
+    const header = timeDescription ? `**Top users for ${timeDescription}:**\n` : "";
     await interaction.reply({
-      content: lines.join("\n"),
+      content: header + lines.join("\n"),
       flags: ephemeral ? MessageFlags.Ephemeral : undefined,
     });
   }
@@ -406,16 +487,54 @@ export class PatrolTimerCommands {
 
       // Determine year and month
       const now = new Date();
-      const targetYear = year ? parseInt(year) : now.getUTCFullYear();
-      const targetMonth = month ? parseInt(month) : now.getUTCMonth() + 1;
-
-      // Validate month
-      if (month && !(targetMonth >= 1 && targetMonth <= 12)) {
-        await interaction.reply({
-          content: "❌ Invalid month. Must be between 1 and 12.",
-          flags: MessageFlags.Ephemeral,
-        });
-        return;
+      const currentYear = now.getUTCFullYear();
+      const currentMonth = now.getUTCMonth() + 1; // 1-12
+      
+      let targetYear: number;
+      let targetMonth: number;
+      
+      if (year) {
+        // Year is explicitly provided
+        targetYear = parseInt(year);
+        // Validate year is not NaN
+        if (isNaN(targetYear)) {
+          await interaction.reply({
+            content: "❌ Invalid year.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        targetMonth = month ? parseInt(month) : currentMonth;
+        // Validate month if provided
+        if (month && (isNaN(targetMonth) || targetMonth < 1 || targetMonth > 12)) {
+          await interaction.reply({
+            content: "❌ Invalid month. Must be between 1 and 12.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+      } else if (month) {
+        // Month is provided but not year - intelligently determine year
+        targetMonth = parseInt(month);
+        // Validate month is not NaN and is within valid range
+        if (isNaN(targetMonth) || targetMonth < 1 || targetMonth > 12) {
+          await interaction.reply({
+            content: "❌ Invalid month. Must be between 1 and 12.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+        // If specified month has already passed or is current month, use current year
+        // If specified month is yet to come, use previous year
+        if (targetMonth <= currentMonth) {
+          targetYear = currentYear;
+        } else {
+          targetYear = currentYear - 1;
+        }
+      } else {
+        // Neither year nor month provided - use current month/year
+        targetYear = currentYear;
+        targetMonth = currentMonth;
       }
 
       await patrolTimer.adjustUserTime(interaction.guildId, user.id, totalMs, targetYear, targetMonth);
