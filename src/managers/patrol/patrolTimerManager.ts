@@ -36,6 +36,11 @@ type TrackedUser = {
   startedAt: Date;
 };
 
+type TopUserResult = {
+  userId: string;
+  totalMs: bigint | number;
+};
+
 export class PatrolTimerManager {
   private client: Client;
   // guildId => Map<userId, TrackedUser>
@@ -414,7 +419,7 @@ export class PatrolTimerManager {
     year: number,
     month: number,
     limit?: number,
-  ) {
+  ): Promise<Array<TopUserResult>> {
     const rows = await prisma.voicePatrolMonthlyTime.findMany({
       where: { guildId, year, month },
       orderBy: { totalMs: "desc" },
@@ -427,7 +432,11 @@ export class PatrolTimerManager {
     if (!isCurrentMonth) {
       const limited =
         limit && limit > 0 ? rows.slice(0, Math.min(limit, 1000)) : rows;
-      return limited;
+      // Convert Prisma rows to consistent shape
+      return limited.map((r) => ({
+        userId: r.userId,
+        totalMs: r.totalMs,
+      }));
     }
 
     const monthStart = new Date(
@@ -465,7 +474,7 @@ export class PatrolTimerManager {
     guildId: string,
     year: number,
     limit?: number,
-  ) {
+  ): Promise<Array<TopUserResult>> {
     // Get all monthly records for this year
     const rows = await prisma.voicePatrolMonthlyTime.findMany({
       where: { guildId, year },

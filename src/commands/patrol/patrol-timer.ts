@@ -180,60 +180,21 @@ export class PatrolTimerCommands {
       const currentYear = now.getUTCFullYear();
       const currentMonth = now.getUTCMonth() + 1; // 1-12
       
-      let y: number;
-      let m: number | undefined;
-      
-      if (year) {
-        // Year is explicitly provided
-        y = parseInt(year);
-        // Validate year is not NaN
-        if (isNaN(y)) {
-          await interaction.reply({
-            content: "Invalid year.",
-            flags: ephemeral ? MessageFlags.Ephemeral : undefined,
-          });
-          return;
-        }
-        if (month) {
-          m = parseInt(month);
-          // Validate month if provided
-          if (isNaN(m) || m < 1 || m > 12) {
-            await interaction.reply({
-              content: "Invalid month. Must be between 1 and 12.",
-              flags: ephemeral ? MessageFlags.Ephemeral : undefined,
-            });
-            return;
-          }
-        } else {
-          m = undefined;
-        }
-      } else if (month) {
-        // Month is provided but not year - intelligently determine year
-        m = parseInt(month);
-        // Validate month is not NaN and is within valid range
-        if (isNaN(m) || m < 1 || m > 12) {
-          await interaction.reply({
-            content: "Invalid month. Must be between 1 and 12.",
-            flags: ephemeral ? MessageFlags.Ephemeral : undefined,
-          });
-          return;
-        }
-        // If specified month has already passed or is current month, use current year
-        // If specified month is yet to come, use previous year
-        if (m <= currentMonth) {
-          y = currentYear;
-        } else {
-          y = currentYear - 1;
-        }
-      } else {
-        // Neither year nor month provided - use current month/year
-        y = currentYear;
-        m = currentMonth;
+      const parsed = parseYearMonth(year, month, currentYear, currentMonth, true);
+      if (!parsed.valid || parsed.year === undefined) {
+        await interaction.reply({
+          content: parsed.error ?? "Invalid year or month.",
+          flags: ephemeral ? MessageFlags.Ephemeral : undefined,
+        });
+        return;
       }
+
+      const y = parsed.year;
+      const m = parsed.month;
       
       // If month is provided (or defaulted), query by month. Otherwise, query by year.
       if (m !== undefined) {
-        rows = await (patrolTimer as { getTopByMonth: (guildId: string, year: number, month: number, limit?: number) => Promise<Array<{ userId: string; totalMs: bigint | number }>> }).getTopByMonth(
+        rows = await patrolTimer.getTopByMonth(
           interaction.guildId,
           y,
           m,
@@ -242,7 +203,7 @@ export class PatrolTimerCommands {
         timeDescription = `${MONTH_NAMES[m - 1]} ${y}`;
       } else {
         // Year only - get entire year
-        rows = await (patrolTimer as { getTopByYear: (guildId: string, year: number, limit?: number) => Promise<Array<{ userId: string; totalMs: bigint | number }>> }).getTopByYear(
+        rows = await patrolTimer.getTopByYear(
           interaction.guildId,
           y,
           limit ? parseInt(limit) : undefined,
@@ -490,52 +451,17 @@ export class PatrolTimerCommands {
       const currentYear = now.getUTCFullYear();
       const currentMonth = now.getUTCMonth() + 1; // 1-12
       
-      let targetYear: number;
-      let targetMonth: number;
-      
-      if (year) {
-        // Year is explicitly provided
-        targetYear = parseInt(year);
-        // Validate year is not NaN
-        if (isNaN(targetYear)) {
-          await interaction.reply({
-            content: "❌ Invalid year.",
-            flags: MessageFlags.Ephemeral,
-          });
-          return;
-        }
-        targetMonth = month ? parseInt(month) : currentMonth;
-        // Validate month if provided
-        if (month && (isNaN(targetMonth) || targetMonth < 1 || targetMonth > 12)) {
-          await interaction.reply({
-            content: "❌ Invalid month. Must be between 1 and 12.",
-            flags: MessageFlags.Ephemeral,
-          });
-          return;
-        }
-      } else if (month) {
-        // Month is provided but not year - intelligently determine year
-        targetMonth = parseInt(month);
-        // Validate month is not NaN and is within valid range
-        if (isNaN(targetMonth) || targetMonth < 1 || targetMonth > 12) {
-          await interaction.reply({
-            content: "❌ Invalid month. Must be between 1 and 12.",
-            flags: MessageFlags.Ephemeral,
-          });
-          return;
-        }
-        // If specified month has already passed or is current month, use current year
-        // If specified month is yet to come, use previous year
-        if (targetMonth <= currentMonth) {
-          targetYear = currentYear;
-        } else {
-          targetYear = currentYear - 1;
-        }
-      } else {
-        // Neither year nor month provided - use current month/year
-        targetYear = currentYear;
-        targetMonth = currentMonth;
+      const parsed = parseYearMonth(year, month, currentYear, currentMonth, false);
+      if (!parsed.valid || parsed.year === undefined || parsed.month === undefined) {
+        await interaction.reply({
+          content: `❌ ${parsed.error ?? "Invalid year or month."}`,
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
       }
+
+      const targetYear = parsed.year;
+      const targetMonth = parsed.month;
 
       await patrolTimer.adjustUserTime(interaction.guildId, user.id, totalMs, targetYear, targetMonth);
 
@@ -671,44 +597,17 @@ export class PatrolTimerCommands {
       const currentYear = now.getUTCFullYear();
       const currentMonth = now.getUTCMonth() + 1; // 1-12
       
-      let y: number;
-      let m: number;
-      
-      if (year) {
-        // Year is explicitly provided
-        y = parseInt(year);
-        m = month ? parseInt(month) : currentMonth;
-      } else if (month) {
-        // Month is provided but not year - intelligently determine year
-        m = parseInt(month);
-        if (m >= 1 && m <= 12) {
-          // If specified month has already passed or is current month, use current year
-          // If specified month is yet to come, use previous year
-          if (m <= currentMonth) {
-            y = currentYear;
-          } else {
-            y = currentYear - 1;
-          }
-        } else {
-          await interaction.reply({
-            content: "Invalid month.",
-            flags: MessageFlags.Ephemeral,
-          });
-          return;
-        }
-      } else {
-        // Neither year nor month provided - use current month/year
-        y = currentYear;
-        m = currentMonth;
-      }
-
-      if (month && !(m >= 1 && m <= 12)) {
+      const parsed = parseYearMonth(year, month, currentYear, currentMonth, false);
+      if (!parsed.valid || parsed.year === undefined || parsed.month === undefined) {
         await interaction.reply({
-          content: "Invalid month.",
+          content: parsed.error ?? "Invalid year or month.",
           flags: MessageFlags.Ephemeral,
         });
         return;
       }
+
+      const y = parsed.year;
+      const m = parsed.month;
 
       total = await patrolTimer.getUserTotalForMonth(
         interaction.guildId,
@@ -972,4 +871,60 @@ function parseTimeString(input: string): { valid: boolean; milliseconds: number 
   const milliseconds = totalSeconds * 1000 * (isNegative ? -1 : 1);
   
   return { valid: true, milliseconds };
+}
+
+/**
+ * Parse and validate year/month parameters with smart inference logic.
+ * @param yearStr - Year as string (optional)
+ * @param monthStr - Month as string (optional)
+ * @param currentYear - Current year for defaults/inference
+ * @param currentMonth - Current month (1-12) for defaults/inference
+ * @param allowYearOnly - If true, allows month to be undefined when year is provided (for year-only queries)
+ * @returns Object with valid flag, parsed values, and error message if invalid
+ */
+function parseYearMonth(
+  yearStr: string | undefined,
+  monthStr: string | undefined,
+  currentYear: number,
+  currentMonth: number,
+  allowYearOnly: boolean = false,
+): { valid: boolean; year?: number; month?: number; error?: string } {
+  if (yearStr) {
+    // Year is explicitly provided
+    const parsedYear = parseInt(yearStr);
+    if (isNaN(parsedYear)) {
+      return { valid: false, error: "Invalid year." };
+    }
+
+    if (monthStr) {
+      // Both year and month provided
+      const parsedMonth = parseInt(monthStr);
+      if (isNaN(parsedMonth) || parsedMonth < 1 || parsedMonth > 12) {
+        return { valid: false, error: "Invalid month. Must be between 1 and 12." };
+      }
+      return { valid: true, year: parsedYear, month: parsedMonth };
+    } else {
+      // Year provided but no month
+      if (allowYearOnly) {
+        // Allow year-only queries (month undefined)
+        return { valid: true, year: parsedYear, month: undefined };
+      } else {
+        // Default to current month when year is provided but month is not
+        return { valid: true, year: parsedYear, month: currentMonth };
+      }
+    }
+  } else if (monthStr) {
+    // Month is provided but not year - intelligently determine year
+    const parsedMonth = parseInt(monthStr);
+    if (isNaN(parsedMonth) || parsedMonth < 1 || parsedMonth > 12) {
+      return { valid: false, error: "Invalid month. Must be between 1 and 12." };
+    }
+    // If specified month has already passed or is current month, use current year
+    // If specified month is yet to come, use previous year
+    const inferredYear = parsedMonth <= currentMonth ? currentYear : currentYear - 1;
+    return { valid: true, year: inferredYear, month: parsedMonth };
+  } else {
+    // Neither year nor month provided - use current month/year
+    return { valid: true, year: currentYear, month: currentMonth };
+  }
 }
