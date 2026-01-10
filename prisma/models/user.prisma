@@ -5,7 +5,6 @@ model User {
   cohostAttendanceEvents AttendanceEvent[]        @relation("CohostAttendanceEvent")
   hostAttendanceEvents   AttendanceEvent[]        @relation("HostAttendanceEvent")
   attendanceStaff        AttendanceStaff[]
-  friendLocationConsents FriendLocationConsent[]
   squadMemberships       SquadMember[]
   vrchatAccounts         VRChatAccount[]
   whitelistEntry         WhitelistEntry?

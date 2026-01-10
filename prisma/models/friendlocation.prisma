@@ -1,9 +1,0 @@
-model FriendLocation {
-  id           Int      @id @default(autoincrement())
-  vrcUserId    String   @unique
-  location     String
-  worldId      String?
-  travelingTo  String?
-  eventTime    DateTime @default(now())
-  senderUserId String?
-}
