@@ -4,6 +4,21 @@ import { loggers } from "../../utility/logger.js";
 import { prisma, patrolTimer } from "../../main.js";
 
 
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
 /**
  * Convert milliseconds to readable format (e.g., "2d 5h 30m 15s")
  */
@@ -27,6 +42,13 @@ function msToReadable(ms: number): string {
 export async function postPatrolTop(client: Client): Promise<void> {
   try {
     loggers.schedules.info("Starting patrol top posting job...");
+
+    // Get current UTC year and month
+    const now = new Date();
+    const currentYear = now.getUTCFullYear();
+    const currentMonth = now.getUTCMonth() + 1; // getUTCMonth() returns 0-11, we need 1-12
+
+    loggers.schedules.info(`Posting patrol top for ${MONTH_NAMES[currentMonth - 1]} ${currentYear}`);
 
     // Get all guilds with patrolTopChannelId configured
     const guildSettings = await prisma.guildSettings.findMany({
@@ -69,12 +91,17 @@ export async function postPatrolTop(client: Client): Promise<void> {
           continue;
         }
 
-        // Get top users (all-time, limit 25)
-        const rows = await patrolTimer.getTop(settings.guildId, 25);
+        // Get top users for current month (limit 25)
+        const rows = await patrolTimer.getTopByMonth(
+          settings.guildId,
+          currentYear,
+          currentMonth,
+          25,
+        );
 
         if (rows.length === 0) {
-          loggers.schedules.info(`No patrol data found for guild ${settings.guildId}`);
-          await channel.send("**Weekly Patrol Top**\nNo data available.");
+          loggers.schedules.info(`No patrol data found for guild ${settings.guildId} for ${MONTH_NAMES[currentMonth - 1]} ${currentYear}`);
+          await channel.send(`**Weekly Patrol Top (${MONTH_NAMES[currentMonth - 1]} ${currentYear})**\nNo data available.`);
           continue;
         }
 
@@ -82,7 +109,7 @@ export async function postPatrolTop(client: Client): Promise<void> {
         const lines = rows.map(
           (r, idx) => `${idx + 1}. <@${r.userId}> — ${msToReadable(Number(r.totalMs))}`,
         );
-        const header = "**Weekly Patrol Top (All-Time):**\n";
+        const header = `**Weekly Patrol Top (${MONTH_NAMES[currentMonth - 1]} ${currentYear}):**\n`;
         const content = header + lines.join("\n");
 
         // Post the message
