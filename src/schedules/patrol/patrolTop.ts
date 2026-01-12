@@ -96,12 +96,12 @@ export async function postPatrolTop(client: Client): Promise<void> {
           settings.guildId,
           currentYear,
           currentMonth,
-          25,
+          50,
         );
 
         if (rows.length === 0) {
-          loggers.schedules.info(`No monthly patrol data found for guild ${settings.guildId} for ${MONTH_NAMES[currentMonth - 1]} ${currentYear}`);
-          await channel.send(`**Monthly Patrol Top (${MONTH_NAMES[currentMonth - 1]} ${currentYear})**\nNo data available.`);
+          loggers.schedules.info(`No patrol data found for guild ${settings.guildId} for ${MONTH_NAMES[currentMonth - 1]} ${currentYear}`);
+          await channel.send(`**Weekly Patrol Top (${MONTH_NAMES[currentMonth - 1]} ${currentYear})**\nNo data available.`);
           continue;
         }
 
@@ -109,7 +109,7 @@ export async function postPatrolTop(client: Client): Promise<void> {
         const lines = rows.map(
           (r, idx) => `${idx + 1}. <@${r.userId}> — ${msToReadable(Number(r.totalMs))}`,
         );
-        const header = `**Monthly Patrol Top (${MONTH_NAMES[currentMonth - 1]} ${currentYear}):**\n`;
+        const header = `**Weekly Patrol Top (${MONTH_NAMES[currentMonth - 1]} ${currentYear}):**\n`;
         const content = header + lines.join("\n");
 
         // Post the message

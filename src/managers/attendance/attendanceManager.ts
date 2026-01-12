@@ -192,7 +192,7 @@ export class AttendanceManager {
       const embed = new EmbedBuilder()
         .setTitle("📋 AOC Squad Split Reminder")
         .setDescription(
-          `You from your AOC squad to a normal patrol squad.\n` +
+          `You just went from your AOC squad to a normal patrol squad.\n` +
           `If you just ***leaded*** the AOC instigation, please remember to make a log in ${logChannelMention}.`,
         )
         .setColor(Colors.Orange)
