@@ -91,14 +91,13 @@ export async function postPatrolTop(client: Client): Promise<void> {
           continue;
         }
 
-        // Get top users for current month (limit 25)
+        // Get top users for current month (limit 50)
         const rows = await patrolTimer.getTopByMonth(
           settings.guildId,
           currentYear,
           currentMonth,
           50,
         );
-
         if (rows.length === 0) {
           loggers.schedules.info(`No patrol data found for guild ${settings.guildId} for ${MONTH_NAMES[currentMonth - 1]} ${currentYear}`);
           await channel.send(`**Weekly Patrol Top (${MONTH_NAMES[currentMonth - 1]} ${currentYear})**\nNo data available.`);
