@@ -175,9 +175,9 @@ export class WhitelistCommands {
             );
             
             // Queue a single batched update after processing all members
-            if (accessUpdated > 0) {
+            if (accessUpdated > 0 && interaction.guildId) {
               const msg = `Role mapping removed for ${discordRole.name}`;
-              whitelistManager.queueBatchedUpdate('bulk-role-removal', msg);
+              whitelistManager.queueBatchedUpdate('bulk-role-removal', msg, interaction.guildId);
             }
           }
         } else {
@@ -315,9 +315,9 @@ export class WhitelistCommands {
         }
         
         // Queue a single batched update after processing all members
-        if (membersWithRole.size > 0) {
+        if (membersWithRole.size > 0 && interaction.guildId) {
           const msg = `Role mapping updated for ${discordRole.name}: ${permissionList.join(", ")}`;
-          whitelistManager.queueBatchedUpdate('bulk-role-setup', msg);
+          whitelistManager.queueBatchedUpdate('bulk-role-setup', msg, interaction.guildId);
         }
       }
     } catch (error: unknown) {
@@ -1148,7 +1148,8 @@ export class WhitelistCommands {
         if (accessGranted > 0 || accessRevoked > 0 || cleanedCount > 0) {
           try {
             const msg = `Bulk validation: ${accessGranted} granted, ${accessRevoked} revoked, ${cleanedCount} expired cleaned`;
-            whitelistManager.queueBatchedUpdate('bulk-validation', msg);
+            const guildId = interaction.guildId || undefined;
+            whitelistManager.queueBatchedUpdate('bulk-validation', msg, guildId);
             loggers.bot.info(
               `Queued GitHub repository update after bulk validation`,
             );

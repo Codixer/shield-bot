@@ -7,109 +7,7 @@ const whitelistManager = new WhitelistManager();
 
 @Router()
 export class WhitelistAPI {
-  // Get encoded whitelist (for VRChat clients) - backward compatible endpoint
-  @Get("/api/vrchat/whitelist/encoded")
-  async getEncodedWhitelistDefault(ctx: Context) {
-    try {
-      const defaultGuildId = "813926536457224212";
-      const encodedWhitelist =
-        await whitelistManager.generateEncodedWhitelist(defaultGuildId);
-      const etag = crypto.createHash("sha256").update(encodedWhitelist).digest("hex");
-      const lastModified = whitelistManager.lastUpdateTimestamp
-        ? new Date(whitelistManager.lastUpdateTimestamp).toUTCString()
-        : undefined;
-
-      if (
-        ctx.headers["if-none-match"] === etag ||
-        (lastModified && ctx.headers["if-modified-since"] === lastModified)
-      ) {
-        ctx.status = 304;
-        return;
-      }
-      ctx.set("Cache-Control", "public, max-age=86400");
-      ctx.set("ETag", etag);
-      if (lastModified) {ctx.set("Last-Modified", lastModified);}
-      ctx.body = {
-        success: true,
-        data: encodedWhitelist,
-      };
-    } catch (error: unknown) {
-      ctx.status = 500;
-      ctx.body = {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error occurred",
-      };
-    }
-  }
-
-  // Get encoded whitelist (for VRChat clients) - guild-specific
-  @Get("/api/vrchat/:guildId/whitelist/encoded")
-  async getEncodedWhitelist(ctx: Context) {
-    try {
-      const guildId = ctx.params.guildId;
-      const encodedWhitelist = await whitelistManager.generateEncodedWhitelist(guildId);
-      const etag = crypto.createHash("sha256").update(encodedWhitelist).digest("hex");
-      const lastModified = whitelistManager.lastUpdateTimestamp
-        ? new Date(whitelistManager.lastUpdateTimestamp).toUTCString()
-        : undefined;
-
-      if (
-        ctx.headers["if-none-match"] === etag ||
-        (lastModified && ctx.headers["if-modified-since"] === lastModified)
-      ) {
-        ctx.status = 304;
-        return;
-      }
-      ctx.set("Cache-Control", "public, max-age=86400");
-      ctx.set("ETag", etag);
-      if (lastModified) {ctx.set("Last-Modified", lastModified);}
-      ctx.body = {
-        success: true,
-        data: encodedWhitelist,
-      };
-    } catch (error: unknown) {
-      ctx.status = 500;
-      ctx.body = {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error occurred",
-      };
-    }
-  }
-
-  // Get raw whitelist content - backward compatible endpoint
-  @Get("/api/vrchat/whitelist/raw")
-  async getRawWhitelistDefault(ctx: Context) {
-    try {
-      const defaultGuildId = "813926536457224212";
-      const content = await whitelistManager.generateWhitelistContent(defaultGuildId);
-      const etag = crypto.createHash("sha256").update(content).digest("hex");
-      const lastModified = whitelistManager.lastUpdateTimestamp
-        ? new Date(whitelistManager.lastUpdateTimestamp).toUTCString()
-        : undefined;
-
-      if (
-        ctx.headers["if-none-match"] === etag ||
-        (lastModified && ctx.headers["if-modified-since"] === lastModified)
-      ) {
-        ctx.status = 304;
-        return;
-      }
-      ctx.set("Cache-Control", "public, max-age=86400");
-      ctx.set("ETag", etag);
-      if (lastModified) {ctx.set("Last-Modified", lastModified);}
-      ctx.body = {
-        success: true,
-        data: content,
-      };
-    } catch (error: unknown) {
-      ctx.status = 500;
-      ctx.body = {
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error occurred",
-      };
-    }
-  }
-
+ 
   // Get raw whitelist content - guild-specific
   @Get("/api/vrchat/:guildId/whitelist/raw")
   async getRawWhitelist(ctx: Context) {
@@ -148,15 +46,11 @@ export class WhitelistAPI {
   @Get("/api/vrchat/whitelist/stats")
   async getStatisticsDefault(ctx: Context) {
     try {
-      const defaultGuildId = "813926536457224212";
       const stats = await whitelistManager.getStatistics();
 
       ctx.body = {
         success: true,
-        data: {
-          ...stats,
-          guildId: defaultGuildId,
-        },
+        data: stats,
       };
     } catch (error: unknown) {
       ctx.status = 500;

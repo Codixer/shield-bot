@@ -12,7 +12,7 @@ model WhitelistEntry {
 
 model WhitelistRole {
   id              Int                       @id @default(autoincrement())
-  guildId         String                    @default("813926536457224212") // Guild this role belongs to
+  guildId         String                    // Guild this role belongs to
   permissions     String? // Comma-separated VRChat permissions (e.g., "station,avatar,truavatar")
   discordRoleId   String? // Optional Discord role binding
   isDefault       Boolean                   @default(false)

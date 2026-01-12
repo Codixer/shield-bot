@@ -285,7 +285,6 @@ export class DiscordSync {
       );
       return;
     }
-    const fallbackGuildId = "813926536457224212";
     try {
       // Find the Discord member across guilds
       let member: unknown = null;
@@ -297,25 +296,6 @@ export class DiscordSync {
           } catch {
             // Not in this guild; continue searching
           }
-        }
-      }
-
-      // Fallback: explicitly fetch the primary guild if member still not found
-      if (!member) {
-        try {
-          const fallbackGuild = await guildManager.fetch(fallbackGuildId) as { members: { fetch: (_id: string) => Promise<unknown> } } | null;
-          if (fallbackGuild) {
-            try {
-              member = await fallbackGuild.members.fetch(discordId);
-            } catch {
-              // Member not in fallback guild
-            }
-          }
-        } catch (fetchError) {
-          loggers.bot.warn(
-            `Failed to fetch fallback guild ${fallbackGuildId}`,
-            fetchError,
-          );
         }
       }
 

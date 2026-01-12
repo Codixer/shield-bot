@@ -169,110 +169,69 @@ export class WhitelistManager {
     branch?: string;
     reason?: string;
   }> {
-    // Use the first affected guild's settings, or the provided guildId
-    const settingsGuildId = guildId || (affectedGuildIds && affectedGuildIds.length > 0 ? affectedGuildIds[0] : undefined);
+    // Determine which guild's settings to use and which guild to filter content by
+    // Priority: provided guildId > first affected guild
+    const targetGuildId = guildId || (affectedGuildIds && affectedGuildIds.length > 0 ? affectedGuildIds[0] : undefined);
 
-    // Generate content to check if it changed
-    const currentContent = await this.generation.generateWhitelistContent();
+    // Generate content filtered by the specific guild
+    const currentContent = await this.generation.generateWhitelistContent(targetGuildId);
 
     // Skip update if content hasn't changed (unless forced)
-    if (!force && this.lastPublishedContent !== null && currentContent === this.lastPublishedContent) {
+    // Note: Content change check only works reliably when no guildId is provided (global whitelist)
+    // For guild-specific updates, we always publish to ensure the correct guild's repository is updated
+    if (!force && !targetGuildId && this.lastPublishedContent !== null && currentContent === this.lastPublishedContent) {
       loggers.bot.debug('Content unchanged, skipping GitHub update');
       return { updated: false, reason: 'Content unchanged' };
     }
 
+    // Generate both encoded and decoded content filtered by the specific guild
     const [encodedData, decodedData] = await Promise.all([
-      this.generation.generateEncodedWhitelist(settingsGuildId),
-      this.generation.generateWhitelistContent(),
+      this.generation.generateEncodedWhitelist(targetGuildId),
+      this.generation.generateWhitelistContent(targetGuildId),
     ]);
     const result = await this.githubPublisher.updateRepositoryWithWhitelist(
       encodedData,
       decodedData,
       commitMessage,
-      settingsGuildId,
+      targetGuildId,
     );
 
     // Store the published content for future comparisons
+    // Only store if it's a global update (no guildId), not for guild-specific updates
     if (result.updated) {
-      this.lastPublishedContent = currentContent;
+      if (!targetGuildId) {
+        this.lastPublishedContent = currentContent;
+      }
       this._lastUpdateTimestamp = Date.now();
-      // Purge Cloudflare cache for affected guilds' whitelist URLs
+      // Purge Cloudflare cache for the specific guild's whitelist URLs
       const zoneId = process.env.CLOUDFLARE_ZONE_ID ?? "";
       const apiToken = process.env.CLOUDFLARE_API_TOKEN ?? "";
       
-      if (zoneId && apiToken) {
+      if (zoneId && apiToken && targetGuildId) {
         try {
-          // Determine which guilds to purge cache for
-          let targetGuildIds: string[] = [];
-          
-          if (guildId) {
-            // Validate that the specific guild has whitelist role mappings
-            const hasWhitelistRoles = await prisma.whitelistRole.findFirst({
-              where: { guildId },
-            });
-            if (hasWhitelistRoles) {
-              targetGuildIds = [guildId];
-            } else {
-              loggers.bot.debug(`Guild ${guildId} has no whitelist roles configured, skipping cache purge`);
-              return result;
-            }
-          } else if (affectedGuildIds && affectedGuildIds.length > 0) {
-            // Validate that all affected guild IDs have whitelist role mappings
-            const guildsWithWhitelistRoles = await prisma.whitelistRole.findMany({
-              where: {
-                guildId: {
-                  in: affectedGuildIds,
-                },
-              },
-              select: {
-                guildId: true,
-              },
-              distinct: ['guildId'],
-            });
-            
-            const validGuildIds = new Set(
-              guildsWithWhitelistRoles
-                .map((r: { guildId: string | null }) => r.guildId)
-                .filter((id: string | null): id is string => id !== null)
-            );
-            
-            targetGuildIds = affectedGuildIds.filter(gid => validGuildIds.has(gid));
-            
-            if (targetGuildIds.length === 0) {
-              loggers.bot.debug('No valid guilds with whitelist roles found in affected guilds, skipping cache purge');
-              return result;
-            }
-          } else {
-            // Fallback: find all guilds that have whitelist role mappings
-            const allRoles = await prisma.whitelistRole.findMany({
-              select: { guildId: true },
-              distinct: ['guildId'],
-            });
-            targetGuildIds = allRoles
-              .map((role: { guildId: string | null }) => role.guildId)
-              .filter((id: string | null): id is string => id !== null);
-            
-            // Only use default if no guilds found at all (edge case)
-            if (targetGuildIds.length === 0) {
-              loggers.bot.warn('No guilds with whitelist roles found, skipping cache purge');
-              return result;
-            }
-          }
-          
-          for (const gid of targetGuildIds) {
+          // Validate that the specific guild has whitelist role mappings
+          const hasWhitelistRoles = await prisma.whitelistRole.findFirst({
+            where: { guildId: targetGuildId },
+          });
+          if (hasWhitelistRoles) {
             const urls = [
-              `https://api.vrcshield.com/api/vrchat/${gid}/whitelist/encoded`,
-              `https://api.vrcshield.com/api/vrchat/${gid}/whitelist/raw`,
-              `https://api.vrcshield.com/api/vrchat/whitelist/encoded`
+              `https://api.vrcshield.com/api/vrchat/${targetGuildId}/whitelist/encoded`,
+              `https://api.vrcshield.com/api/vrchat/${targetGuildId}/whitelist/raw`,
             ];
             await purgeCloudflareCache(zoneId, apiToken, urls);
-            loggers.bot.info(`Purged Cloudflare cache for guild ${gid}`);
+            loggers.bot.info(`Purged Cloudflare cache for guild ${targetGuildId}`);
+          } else {
+            loggers.bot.debug(`Guild ${targetGuildId} has no whitelist roles configured, skipping cache purge`);
           }
         } catch (err) {
-          loggers.bot.warn(`Cloudflare purge failed`, err);
+          loggers.bot.warn(`Cloudflare purge failed for guild ${targetGuildId}`, err);
         }
       } else {
-        loggers.bot.debug(`Cloudflare cache purge skipped - missing zone ID or API token`);
+        if (!targetGuildId) {
+          loggers.bot.debug(`No target guild ID specified, skipping cache purge`);
+        } else {
+          loggers.bot.debug(`Cloudflare cache purge skipped - missing zone ID or API token`);
+        }
       }
     }
     return result;
@@ -485,23 +444,41 @@ export class WhitelistManager {
         finalAffectedGuildIds = finalAffectedGuildIds.filter(gid => validGuildIds.has(gid));
       }
 
-      // Use the first affected guild's settings for publishing
-      const settingsGuildId = finalAffectedGuildIds.length > 0 ? finalAffectedGuildIds[0] : undefined;
-
-      // Publish with content change check, passing affected guild IDs
-      await this.publishWhitelist(message, false, undefined, finalAffectedGuildIds.length > 0 ? finalAffectedGuildIds : undefined);
+      // Publish separately for each affected guild to ensure guild-specific updates
+      // Each guild should have its own whitelist repository update with guild-filtered content
+      if (finalAffectedGuildIds.length === 0) {
+        // No valid guilds with whitelist roles, skip publishing
+        loggers.bot.debug('No valid guilds with whitelist roles found, skipping publish');
+      } else if (finalAffectedGuildIds.length === 1) {
+        // Single guild affected - publish for that specific guild
+        const targetGuildId = finalAffectedGuildIds[0];
+        await this.publishWhitelist(message, false, targetGuildId);
+      } else {
+        // Multiple guilds affected - publish separately for each guild
+        loggers.bot.info(`Multiple guilds affected (${finalAffectedGuildIds.length}), publishing separately for each`);
+        for (const gid of finalAffectedGuildIds) {
+          try {
+            await this.publishWhitelist(message, false, gid);
+          } catch (error) {
+            loggers.bot.error(`Failed to publish whitelist for guild ${gid}`, error);
+          }
+        }
+      }
 
       // Check if any rooftop permissions were updated and publish rooftop files if needed
-      const hasRooftopChanges = await this.checkForRooftopPermissionChanges(users);
-      if (hasRooftopChanges) {
-        loggers.bot.info("Rooftop permissions changed, updating rooftop files");
-        try {
-          await this.githubPublisher.updateRepositoryWithRooftopFiles(
-            `chore(rooftop): update rooftop files after whitelist change`,
-            settingsGuildId,
-          );
-        } catch (error) {
-          loggers.bot.error("Error updating rooftop files", error);
+      // Use the first affected guild's settings for rooftop files (since they're typically shared)
+      if (finalAffectedGuildIds.length > 0) {
+        const hasRooftopChanges = await this.checkForRooftopPermissionChanges(users);
+        if (hasRooftopChanges) {
+          loggers.bot.info("Rooftop permissions changed, updating rooftop files");
+          try {
+            await this.githubPublisher.updateRepositoryWithRooftopFiles(
+              `chore(rooftop): update rooftop files after whitelist change`,
+              finalAffectedGuildIds[0],
+            );
+          } catch (error) {
+            loggers.bot.error("Error updating rooftop files", error);
+          }
         }
       }
     } catch (error) {
