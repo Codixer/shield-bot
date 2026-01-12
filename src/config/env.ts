@@ -39,6 +39,9 @@ const envSchema = z.object({
   // Whitelist Configuration (Optional)
   WHITELIST_XOR_KEY: z.string().optional(),
 
+  // Encryption Configuration (Required for encrypted database fields)
+  ENCRYPTION_KEY: z.string().min(32, "ENCRYPTION_KEY must be at least 32 characters").optional(),
+
   // Cloudflare Configuration (Optional)
   CLOUDFLARE_ZONE_ID: z.string().optional(),
   CLOUDFLARE_API_TOKEN: z.string().optional(),

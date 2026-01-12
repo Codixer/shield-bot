@@ -1,4 +1,7 @@
 import { prisma } from "../../main.js";
+import { decrypt } from "../../utility/encryption.js";
+import { getEnv } from "../../config/env.js";
+import { loggers } from "../../utility/logger.js";
 
 /**
  * GitHub publishing operations for whitelist
@@ -26,8 +29,22 @@ export class GitHubPublisher {
         settings?.whitelistGitHubOwner &&
         settings?.whitelistGitHubRepo
       ) {
+        // Decrypt the token if it's encrypted
+        const encryptionKey = getEnv().ENCRYPTION_KEY;
+        let decryptedToken = settings.whitelistGitHubToken;
+        if (encryptionKey) {
+          try {
+            decryptedToken = await decrypt(settings.whitelistGitHubToken, encryptionKey);
+          } catch (error) {
+            // If decryption fails, assume it's plaintext (backward compatibility)
+            // Note: We'll log this but continue with the plaintext value
+            // In production, you may want to handle this differently
+            loggers.bot.warn("Failed to decrypt GitHub token, assuming plaintext", error);
+          }
+        }
+
         return {
-          token: settings.whitelistGitHubToken,
+          token: decryptedToken,
           owner: settings.whitelistGitHubOwner,
           repo: settings.whitelistGitHubRepo,
           branch: settings.whitelistGitHubBranch || "main",

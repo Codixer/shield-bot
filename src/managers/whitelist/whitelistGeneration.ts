@@ -1,6 +1,8 @@
 import { getUserById } from "../../utility/vrchat.js";
 import { prisma } from "../../main.js";
 import { loggers } from "../../utility/logger.js";
+import { decrypt } from "../../utility/encryption.js";
+import { getEnv } from "../../config/env.js";
 
 /**
  * Whitelist content generation and encoding
@@ -205,6 +207,7 @@ export class WhitelistGeneration {
   /**
    * XOR encode the content using the configured key (matching PowerShell script)
    * Reads key from database (if guildId provided) or falls back to environment variable
+   * @throws Error if no XOR key is configured
    */
   private async xorEncode(content: string, guildId?: string): Promise<string> {
     let xorKey: string | null = null;
@@ -215,12 +218,35 @@ export class WhitelistGeneration {
         where: { guildId },
         select: { whitelistXorKey: true },
       });
-      xorKey = settings?.whitelistXorKey || null;
+      if (settings?.whitelistXorKey) {
+        // Decrypt the key if it's encrypted
+        const encryptionKey = getEnv().ENCRYPTION_KEY;
+        if (encryptionKey) {
+          try {
+            xorKey = await decrypt(settings.whitelistXorKey, encryptionKey);
+          } catch (error) {
+            // If decryption fails, assume it's plaintext (backward compatibility)
+            loggers.bot.warn("Failed to decrypt XOR key, assuming plaintext", error);
+            xorKey = settings.whitelistXorKey;
+          }
+        } else {
+          xorKey = settings.whitelistXorKey;
+        }
+      }
     }
 
-    // Fall back to environment variable or default
+    // Fall back to environment variable
     if (!xorKey) {
-      xorKey = process.env.WHITELIST_XOR_KEY || "SHIELD_WHITELIST_KEY_9302025";
+      xorKey = process.env.WHITELIST_XOR_KEY || null;
+    }
+
+    // Fail-safe: throw error if no key is configured
+    if (!xorKey) {
+      const errorMessage = guildId
+        ? `whitelist XOR key not configured for guild ${guildId} and WHITELIST_XOR_KEY environment variable is missing`
+        : "WHITELIST_XOR_KEY environment variable is not set";
+      loggers.bot.error(errorMessage);
+      throw new Error(errorMessage);
     }
 
     // Normalize line endings to LF only (\n), but KEEP them

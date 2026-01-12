@@ -9,6 +9,30 @@ import {
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
 import { loggers } from "../../../utility/logger.js";
+import { encrypt, decrypt } from "../../../utility/encryption.js";
+import { getEnv } from "../../../config/env.js";
+
+/**
+ * Safely mask a token or key to prevent exposure
+ * @param value The token/key to mask
+ * @returns A masked version of the value
+ */
+function safeMaskToken(value: string): string {
+  const length = value.length;
+  
+  if (length >= 12) {
+    // For tokens >= 12 chars, use the standard 8 + "..." + 4 scheme
+    return value.slice(0, 8) + "..." + value.slice(-4);
+  } else if (length >= 4) {
+    // For tokens 4-11 chars, show first 1-2 and last 1-2 chars
+    const prefix = length >= 6 ? 2 : 1;
+    const suffix = length >= 6 ? 2 : 1;
+    return value.slice(0, prefix) + "..." + value.slice(-suffix);
+  } else {
+    // For extremely short values (1-3 chars), fully redact
+    return "***";
+  }
+}
 
 @Discord()
 @SlashGroup({ name: "whitelist", description: "Whitelist settings", root: "settings" })
@@ -52,7 +76,19 @@ export class WhitelistGitHubSettingsCommand {
           return;
         }
 
-        const masked = settings.whitelistGitHubToken.slice(0, 8) + "..." + settings.whitelistGitHubToken.slice(-4);
+        // Decrypt the token for masking (handles both encrypted and plaintext)
+        const encryptionKey = getEnv().ENCRYPTION_KEY;
+        let decryptedToken = settings.whitelistGitHubToken;
+        if (encryptionKey) {
+          try {
+            decryptedToken = await decrypt(settings.whitelistGitHubToken, encryptionKey);
+          } catch (error) {
+            // If decryption fails, assume it's plaintext (backward compatibility)
+            loggers.bot.warn("Failed to decrypt GitHub token, assuming plaintext", error);
+          }
+        }
+
+        const masked = safeMaskToken(decryptedToken);
         await interaction.reply({
           content: `ℹ️ GitHub token is currently set (masked: \`${masked}\`)`,
           flags: MessageFlags.Ephemeral,
@@ -60,15 +96,31 @@ export class WhitelistGitHubSettingsCommand {
         return;
       }
 
+      // Encrypt the token before storing
+      const encryptionKey = getEnv().ENCRYPTION_KEY;
+      let tokenToStore = token;
+      if (encryptionKey) {
+        try {
+          tokenToStore = await encrypt(token, encryptionKey);
+        } catch (error) {
+          loggers.bot.error("Failed to encrypt GitHub token", error);
+          await interaction.reply({
+            content: "❌ Failed to encrypt token. Please check ENCRYPTION_KEY configuration.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+      }
+
       // Update the setting
       await prisma.guildSettings.upsert({
         where: { guildId: interaction.guildId },
         update: {
-          whitelistGitHubToken: token,
+          whitelistGitHubToken: tokenToStore,
         },
         create: {
           guildId: interaction.guildId,
-          whitelistGitHubToken: token,
+          whitelistGitHubToken: tokenToStore,
         },
       });
 
@@ -340,7 +392,19 @@ export class WhitelistGitHubSettingsCommand {
           return;
         }
 
-        const masked = settings.whitelistXorKey.slice(0, 8) + "..." + settings.whitelistXorKey.slice(-4);
+        // Decrypt the key for masking (handles both encrypted and plaintext)
+        const encryptionKey = getEnv().ENCRYPTION_KEY;
+        let decryptedKey = settings.whitelistXorKey;
+        if (encryptionKey) {
+          try {
+            decryptedKey = await decrypt(settings.whitelistXorKey, encryptionKey);
+          } catch (error) {
+            // If decryption fails, assume it's plaintext (backward compatibility)
+            loggers.bot.warn("Failed to decrypt XOR key, assuming plaintext", error);
+          }
+        }
+
+        const masked = safeMaskToken(decryptedKey);
         await interaction.reply({
           content: `ℹ️ XOR key is currently set (masked: \`${masked}\`)`,
           flags: MessageFlags.Ephemeral,
@@ -348,15 +412,31 @@ export class WhitelistGitHubSettingsCommand {
         return;
       }
 
+      // Encrypt the key before storing
+      const encryptionKey = getEnv().ENCRYPTION_KEY;
+      let keyToStore = key;
+      if (encryptionKey) {
+        try {
+          keyToStore = await encrypt(key, encryptionKey);
+        } catch (error) {
+          loggers.bot.error("Failed to encrypt XOR key", error);
+          await interaction.reply({
+            content: "❌ Failed to encrypt key. Please check ENCRYPTION_KEY configuration.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+      }
+
       // Update the setting
       await prisma.guildSettings.upsert({
         where: { guildId: interaction.guildId },
         update: {
-          whitelistXorKey: key,
+          whitelistXorKey: keyToStore,
         },
         create: {
           guildId: interaction.guildId,
-          whitelistXorKey: key,
+          whitelistXorKey: keyToStore,
         },
       });
 
@@ -391,17 +471,41 @@ export class WhitelistGitHubSettingsCommand {
         where: { guildId: interaction.guildId },
       });
 
-      const token = settings?.whitelistGitHubToken
-        ? settings.whitelistGitHubToken.slice(0, 8) + "..." + settings.whitelistGitHubToken.slice(-4)
-        : "Not set";
+      // Decrypt tokens/keys for masking (handles both encrypted and plaintext)
+      const encryptionKey = getEnv().ENCRYPTION_KEY;
+      let token = "Not set";
+      if (settings?.whitelistGitHubToken) {
+        let decryptedToken = settings.whitelistGitHubToken;
+        if (encryptionKey) {
+          try {
+            decryptedToken = await decrypt(settings.whitelistGitHubToken, encryptionKey);
+          } catch (error) {
+            // If decryption fails, assume it's plaintext (backward compatibility)
+            loggers.bot.warn("Failed to decrypt GitHub token in view, assuming plaintext", error);
+          }
+        }
+        token = safeMaskToken(decryptedToken);
+      }
+
+      let xorKey = "Not set (using default)";
+      if (settings?.whitelistXorKey) {
+        let decryptedKey = settings.whitelistXorKey;
+        if (encryptionKey) {
+          try {
+            decryptedKey = await decrypt(settings.whitelistXorKey, encryptionKey);
+          } catch (error) {
+            // If decryption fails, assume it's plaintext (backward compatibility)
+            loggers.bot.warn("Failed to decrypt XOR key in view, assuming plaintext", error);
+          }
+        }
+        xorKey = safeMaskToken(decryptedKey);
+      }
+
       const owner = settings?.whitelistGitHubOwner || "Not set";
       const repo = settings?.whitelistGitHubRepo || "Not set";
       const branch = settings?.whitelistGitHubBranch || "main (default)";
       const encodedPath = settings?.whitelistGitHubEncodedPath || "whitelist.encoded.txt (default)";
       const decodedPath = settings?.whitelistGitHubDecodedPath || "whitelist.txt (default)";
-      const xorKey = settings?.whitelistXorKey
-        ? settings.whitelistXorKey.slice(0, 8) + "..." + settings.whitelistXorKey.slice(-4)
-        : "Not set (using default)";
 
       const embed = new EmbedBuilder()
         .setTitle("🔧 Whitelist GitHub Settings")
