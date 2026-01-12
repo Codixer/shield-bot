@@ -22,6 +22,7 @@ export default [
   },
   {
     files: ["**/*.ts", "**/*.tsx"],
+    ignores: ["scripts/**/*.ts"],
     languageOptions: {
       parser: tsparser,
       parserOptions: {
@@ -61,6 +62,59 @@ export default [
       
       // General code quality
       "no-console": "off", // We use our own logger, but console is still used in some places
+      "prefer-const": "warn",
+      "no-var": "error",
+      "eqeqeq": ["warn", "always"],
+      "curly": ["warn", "all"],
+      
+      // Best practices
+      "no-throw-literal": "warn",
+      "prefer-promise-reject-errors": "warn",
+      "no-useless-catch": "error",
+      "no-empty": "error",
+    },
+  },
+  {
+    files: ["scripts/**/*.ts"],
+    languageOptions: {
+      parser: tsparser,
+      parserOptions: {
+        ecmaVersion: "latest",
+        sourceType: "module",
+        // No project option for scripts - they're not in tsconfig.json
+      },
+      globals: {
+        console: "readonly",
+        process: "readonly",
+        Buffer: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
+        setInterval: "readonly",
+        clearInterval: "readonly",
+        fetch: "readonly",
+        NodeJS: "readonly",
+      },
+    },
+    plugins: {
+      "@typescript-eslint": tseslint,
+    },
+    rules: {
+      // TypeScript specific rules (without type-aware rules)
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+        },
+      ],
+      "no-unused-vars": "off",
+      "@typescript-eslint/explicit-function-return-type": "off",
+      "@typescript-eslint/no-non-null-assertion": "warn",
+      
+      // General code quality
+      "no-console": "off",
       "prefer-const": "warn",
       "no-var": "error",
       "eqeqeq": ["warn", "always"],

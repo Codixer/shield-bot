@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { PrismaClient } from "../src/generated/prisma/client.js";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
-import { validateEnv, getEnv } from "../src/config/env.js";
+import { validateEnv } from "../src/config/env.js";
 import { loggers } from "../src/utility/logger.js";
 
 /**
@@ -28,7 +28,7 @@ async function main() {
     // Validate environment variables
     try {
       validateEnv();
-    } catch (error) {
+    } catch (_error) {
       console.error("⚠️  Environment validation failed. Continuing anyway...");
     }
 
