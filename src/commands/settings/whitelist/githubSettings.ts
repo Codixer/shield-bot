@@ -40,17 +40,17 @@ function safeMaskToken(value: string): string {
 @Guard(StaffGuard)
 export class WhitelistGitHubSettingsCommand {
   @Slash({
-    name: "gh-token",
-    description: "Set the GitHub token for whitelist repository updates",
+    name: "gh-app-id",
+    description: "Set the GitHub App ID for whitelist repository updates",
   })
-  async setGitHubToken(
+  async setGitHubAppId(
     @SlashOption({
-      name: "token",
-      description: "GitHub personal access token",
+      name: "app_id",
+      description: "GitHub App ID (numeric)",
       type: ApplicationCommandOptionType.String,
       required: false,
     })
-    token: string | undefined,
+    appId: string | undefined,
     interaction: CommandInteraction,
   ): Promise<void> {
     try {
@@ -62,50 +62,132 @@ export class WhitelistGitHubSettingsCommand {
         return;
       }
 
-      if (!token) {
-        // Show current setting (masked)
+      if (!appId) {
+        // Show current setting
         const settings = await prisma.guildSettings.findUnique({
           where: { guildId: interaction.guildId },
         });
 
-        if (!settings?.whitelistGitHubToken) {
+        if (!settings?.whitelistGitHubAppId) {
           await interaction.reply({
-            content: "ℹ️ No GitHub token is currently configured.",
+            content: "ℹ️ No GitHub App ID is currently configured.",
             flags: MessageFlags.Ephemeral,
           });
           return;
         }
 
-        // Decrypt the token for masking (handles both encrypted and plaintext)
-        const encryptionKey = getEnv().ENCRYPTION_KEY;
-        let decryptedToken = settings.whitelistGitHubToken;
-        if (encryptionKey) {
-          try {
-            decryptedToken = await decrypt(settings.whitelistGitHubToken, encryptionKey);
-          } catch (error) {
-            // If decryption fails, assume it's plaintext (backward compatibility)
-            loggers.bot.warn("Failed to decrypt GitHub token, assuming plaintext", error);
-          }
-        }
-
-        const masked = safeMaskToken(decryptedToken);
         await interaction.reply({
-          content: `ℹ️ GitHub token is currently set (masked: \`${masked}\`)`,
+          content: `ℹ️ GitHub App ID is currently set to \`${settings.whitelistGitHubAppId}\``,
           flags: MessageFlags.Ephemeral,
         });
         return;
       }
 
-      // Encrypt the token before storing
+      // Update the setting
+      await prisma.guildSettings.upsert({
+        where: { guildId: interaction.guildId },
+        update: {
+          whitelistGitHubAppId: appId,
+        },
+        create: {
+          guildId: interaction.guildId,
+          whitelistGitHubAppId: appId,
+        },
+      });
+
+      await interaction.reply({
+        content: "✅ GitHub App ID has been set.",
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch (error: unknown) {
+      loggers.bot.error("Error setting GitHub App ID", error);
+      await interaction.reply({
+        content: `❌ Failed to set GitHub App ID: ${error instanceof Error ? error.message : "Unknown error"}`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+  }
+
+  @Slash({
+    name: "gh-app-key",
+    description: "Set the GitHub App private key (PEM format) for whitelist repository updates",
+  })
+  async setGitHubAppKey(
+    @SlashOption({
+      name: "private_key",
+      description: "GitHub App private key in PEM format (full key including headers)",
+      type: ApplicationCommandOptionType.String,
+      required: false,
+    })
+    privateKey: string | undefined,
+    interaction: CommandInteraction,
+  ): Promise<void> {
+    try {
+      if (!interaction.guildId) {
+        await interaction.reply({
+          content: "❌ This command can only be used in a server.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
+      if (!privateKey) {
+        // Show current setting (masked)
+        const settings = await prisma.guildSettings.findUnique({
+          where: { guildId: interaction.guildId },
+        });
+
+        if (!settings?.whitelistGitHubAppPrivateKey) {
+          await interaction.reply({
+            content: "ℹ️ No GitHub App private key is currently configured.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+
+        // Decrypt the key for masking (handles both encrypted and plaintext)
+        const encryptionKey = getEnv().ENCRYPTION_KEY;
+        let decryptedKey = settings.whitelistGitHubAppPrivateKey;
+        if (encryptionKey) {
+          try {
+            decryptedKey = await decrypt(settings.whitelistGitHubAppPrivateKey, encryptionKey);
+          } catch (error) {
+            // If decryption fails, assume it's plaintext (backward compatibility)
+            loggers.bot.warn("Failed to decrypt GitHub App private key, assuming plaintext", error);
+          }
+        }
+
+        // For PEM keys, show a simple masked version (first and last few chars)
+        const masked = decryptedKey.length > 50
+          ? decryptedKey.slice(0, 30) + "..." + decryptedKey.slice(-20)
+          : "***";
+
+        await interaction.reply({
+          content: `ℹ️ GitHub App private key is currently set (masked: \`${masked}\`)`,
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
+      // Validate that it looks like a PEM key
+      if (!privateKey.includes("BEGIN") || !privateKey.includes("PRIVATE KEY")) {
+        await interaction.reply({
+          content: "❌ Invalid private key format. Please provide a valid PEM format key (including BEGIN/END headers).",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
+      // Encrypt the key before storing
       const encryptionKey = getEnv().ENCRYPTION_KEY;
-      let tokenToStore = token;
+      let keyToStore = privateKey;
       if (encryptionKey) {
         try {
-          tokenToStore = await encrypt(token, encryptionKey);
+          keyToStore = await encrypt(privateKey, encryptionKey);
         } catch (error) {
-          loggers.bot.error("Failed to encrypt GitHub token", error);
+          loggers.bot.error("Failed to encrypt GitHub App private key", error);
           await interaction.reply({
-            content: "❌ Failed to encrypt token. Please check ENCRYPTION_KEY configuration.",
+            content: "❌ Failed to encrypt private key. Please check ENCRYPTION_KEY configuration.",
             flags: MessageFlags.Ephemeral,
           });
           return;
@@ -116,22 +198,91 @@ export class WhitelistGitHubSettingsCommand {
       await prisma.guildSettings.upsert({
         where: { guildId: interaction.guildId },
         update: {
-          whitelistGitHubToken: tokenToStore,
+          whitelistGitHubAppPrivateKey: keyToStore,
         },
         create: {
           guildId: interaction.guildId,
-          whitelistGitHubToken: tokenToStore,
+          whitelistGitHubAppPrivateKey: keyToStore,
         },
       });
 
       await interaction.reply({
-        content: "✅ GitHub token has been set.",
+        content: "✅ GitHub App private key has been set.",
         flags: MessageFlags.Ephemeral,
       });
     } catch (error: unknown) {
-      loggers.bot.error("Error setting GitHub token", error);
+      loggers.bot.error("Error setting GitHub App private key", error);
       await interaction.reply({
-        content: `❌ Failed to set GitHub token: ${error instanceof Error ? error.message : "Unknown error"}`,
+        content: `❌ Failed to set GitHub App private key: ${error instanceof Error ? error.message : "Unknown error"}`,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+  }
+
+  @Slash({
+    name: "gh-installation-id",
+    description: "Set the GitHub App installation ID for whitelist repository updates",
+  })
+  async setGitHubInstallationId(
+    @SlashOption({
+      name: "installation_id",
+      description: "GitHub App installation ID (numeric)",
+      type: ApplicationCommandOptionType.String,
+      required: false,
+    })
+    installationId: string | undefined,
+    interaction: CommandInteraction,
+  ): Promise<void> {
+    try {
+      if (!interaction.guildId) {
+        await interaction.reply({
+          content: "❌ This command can only be used in a server.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
+      if (!installationId) {
+        // Show current setting
+        const settings = await prisma.guildSettings.findUnique({
+          where: { guildId: interaction.guildId },
+        });
+
+        if (!settings?.whitelistGitHubInstallationId) {
+          await interaction.reply({
+            content: "ℹ️ No GitHub App installation ID is currently configured.",
+            flags: MessageFlags.Ephemeral,
+          });
+          return;
+        }
+
+        await interaction.reply({
+          content: `ℹ️ GitHub App installation ID is currently set to \`${settings.whitelistGitHubInstallationId}\``,
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+
+      // Update the setting
+      await prisma.guildSettings.upsert({
+        where: { guildId: interaction.guildId },
+        update: {
+          whitelistGitHubInstallationId: installationId,
+        },
+        create: {
+          guildId: interaction.guildId,
+          whitelistGitHubInstallationId: installationId,
+        },
+      });
+
+      await interaction.reply({
+        content: "✅ GitHub App installation ID has been set.",
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch (error: unknown) {
+      loggers.bot.error("Error setting GitHub App installation ID", error);
+      await interaction.reply({
+        content: `❌ Failed to set GitHub App installation ID: ${error instanceof Error ? error.message : "Unknown error"}`,
         flags: MessageFlags.Ephemeral,
       });
     }
@@ -479,21 +630,29 @@ export class WhitelistGitHubSettingsCommand {
         where: { guildId: interaction.guildId },
       });
 
-      // Decrypt tokens/keys for masking (handles both encrypted and plaintext)
+      // Decrypt keys for masking (handles both encrypted and plaintext)
       const encryptionKey = getEnv().ENCRYPTION_KEY;
-      let token = "Not set";
-      if (settings?.whitelistGitHubToken) {
-        let decryptedToken = settings.whitelistGitHubToken;
+
+      const appId = settings?.whitelistGitHubAppId || "Not set";
+      
+      let appPrivateKey = "Not set";
+      if (settings?.whitelistGitHubAppPrivateKey) {
+        let decryptedKey = settings.whitelistGitHubAppPrivateKey;
         if (encryptionKey) {
           try {
-            decryptedToken = await decrypt(settings.whitelistGitHubToken, encryptionKey);
+            decryptedKey = await decrypt(settings.whitelistGitHubAppPrivateKey, encryptionKey);
           } catch (error) {
             // If decryption fails, assume it's plaintext (backward compatibility)
-            loggers.bot.warn("Failed to decrypt GitHub token in view, assuming plaintext", error);
+            loggers.bot.warn("Failed to decrypt GitHub App private key in view, assuming plaintext", error);
           }
         }
-        token = safeMaskToken(decryptedToken);
+        // Mask the private key (show first and last few chars)
+        appPrivateKey = decryptedKey.length > 50
+          ? decryptedKey.slice(0, 30) + "..." + decryptedKey.slice(-20)
+          : "***";
       }
+
+      const installationId = settings?.whitelistGitHubInstallationId || "Not set";
 
       let xorKey = "Not set (using default)";
       if (settings?.whitelistXorKey) {
@@ -519,7 +678,9 @@ export class WhitelistGitHubSettingsCommand {
         .setTitle("🔧 Whitelist GitHub Settings")
         .setColor(Colors.Blue)
         .addFields(
-          { name: "GitHub Token", value: `\`${token}\``, inline: true },
+          { name: "GitHub App ID", value: `\`${appId}\``, inline: true },
+          { name: "App Private Key", value: `\`${appPrivateKey}\``, inline: true },
+          { name: "Installation ID", value: `\`${installationId}\``, inline: true },
           { name: "Repository", value: `${owner}/${repo}`, inline: true },
           { name: "Branch", value: `\`${branch}\``, inline: true },
           { name: "Encoded Path", value: `\`${encodedPath}\``, inline: true },

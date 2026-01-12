@@ -47,7 +47,13 @@ const envSchema = z.object({
   CLOUDFLARE_API_TOKEN: z.string().optional(),
 
   // GitHub Configuration (Optional - for whitelist backup)
+  // DEPRECATED: Use GitHub App authentication instead (GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_APP_INSTALLATION_ID)
   GITHUB_TOKEN: z.string().optional(),
+  // GitHub App Configuration (Optional - recommended over GITHUB_TOKEN)
+  GITHUB_APP_ID: z.string().optional(),
+  GITHUB_APP_PRIVATE_KEY: z.string().optional(), // Full PEM key (can contain newlines)
+  GITHUB_APP_INSTALLATION_ID: z.string().optional(),
+  // GitHub Repository Configuration (Optional)
   GITHUB_REPO_OWNER: z.string().optional(),
   GITHUB_REPO_NAME: z.string().optional(),
   GITHUB_REPO_BRANCH: z.string().default("main"),

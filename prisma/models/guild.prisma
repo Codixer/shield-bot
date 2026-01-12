@@ -20,7 +20,10 @@ model GuildSettings {
   devGuardRoleIds            Json? // Array of role IDs for dev guards
   // Whitelist settings
   whitelistLogChannelId      String? // Channel ID for whitelist verification and modification logs
-  whitelistGitHubToken       String? // GitHub token for whitelist repository updates
+  whitelistGitHubToken       String? // DEPRECATED: GitHub token for whitelist repository updates (use GitHub App instead)
+  whitelistGitHubAppId       String? // GitHub App ID
+  whitelistGitHubAppPrivateKey String? // Encrypted GitHub App private key (PEM format)
+  whitelistGitHubInstallationId String? // GitHub App installation ID
   whitelistGitHubOwner       String? // GitHub repository owner
   whitelistGitHubRepo        String? // GitHub repository name
   whitelistGitHubBranch      String? // GitHub repository branch (default: main)

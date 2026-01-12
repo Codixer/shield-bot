@@ -2,6 +2,7 @@ import { prisma } from "../../main.js";
 import { decrypt } from "../../utility/encryption.js";
 import { getEnv } from "../../config/env.js";
 import { loggers } from "../../utility/logger.js";
+import { getCachedInstallationToken } from "../../utility/githubApp.js";
 
 /**
  * GitHub publishing operations for whitelist
@@ -9,6 +10,7 @@ import { loggers } from "../../utility/logger.js";
 export class GitHubPublisher {
   /**
    * Get GitHub settings for a guild, falling back to environment variables
+   * Returns installation token for GitHub App authentication
    */
   private async getGitHubSettings(guildId?: string): Promise<{
     token: string;
@@ -18,6 +20,15 @@ export class GitHubPublisher {
     encodedFilePath: string;
     decodedFilePath: string;
   }> {
+    let appId: string | null = null;
+    let privateKey: string | null = null;
+    let installationId: string | null = null;
+    let owner: string | null = null;
+    let repo: string | null = null;
+    let branch: string | null = null;
+    let encodedFilePath: string | null = null;
+    let decodedFilePath: string | null = null;
+
     // Try to get settings from database if guildId is provided
     if (guildId) {
       const settings = await prisma.guildSettings.findUnique({
@@ -25,47 +36,57 @@ export class GitHubPublisher {
       });
 
       if (
-        settings?.whitelistGitHubToken &&
+        settings?.whitelistGitHubAppId &&
+        settings?.whitelistGitHubAppPrivateKey &&
+        settings?.whitelistGitHubInstallationId &&
         settings?.whitelistGitHubOwner &&
         settings?.whitelistGitHubRepo
       ) {
-        // Decrypt the token if it's encrypted
+        appId = settings.whitelistGitHubAppId;
+        installationId = settings.whitelistGitHubInstallationId;
+        owner = settings.whitelistGitHubOwner;
+        repo = settings.whitelistGitHubRepo;
+        branch = settings.whitelistGitHubBranch || "main";
+        encodedFilePath = settings.whitelistGitHubEncodedPath || "whitelist.encoded.txt";
+        decodedFilePath = settings.whitelistGitHubDecodedPath || "whitelist.txt";
+
+        // Decrypt the private key if it's encrypted
         const encryptionKey = getEnv().ENCRYPTION_KEY;
-        let decryptedToken = settings.whitelistGitHubToken;
+        let decryptedKey = settings.whitelistGitHubAppPrivateKey;
         if (encryptionKey) {
           try {
-            decryptedToken = await decrypt(settings.whitelistGitHubToken, encryptionKey);
+            decryptedKey = await decrypt(settings.whitelistGitHubAppPrivateKey, encryptionKey);
           } catch (error) {
             // If decryption fails, assume it's plaintext (backward compatibility)
-            // Note: We'll log this but continue with the plaintext value
-            // In production, you may want to handle this differently
-            loggers.bot.warn("Failed to decrypt GitHub token, assuming plaintext", error);
+            loggers.bot.warn("Failed to decrypt GitHub App private key, assuming plaintext", error);
           }
         }
-
-        return {
-          token: decryptedToken,
-          owner: settings.whitelistGitHubOwner,
-          repo: settings.whitelistGitHubRepo,
-          branch: settings.whitelistGitHubBranch || "main",
-          encodedFilePath: settings.whitelistGitHubEncodedPath || "whitelist.encoded.txt",
-          decodedFilePath: settings.whitelistGitHubDecodedPath || "whitelist.txt",
-        };
+        privateKey = decryptedKey;
       }
     }
 
     // Fall back to environment variables
-    const token = process.env.GITHUB_TOKEN;
-    const owner = process.env.GITHUB_REPO_OWNER;
-    const repo = process.env.GITHUB_REPO_NAME;
-    const branch = process.env.GITHUB_REPO_BRANCH || "main";
-    const encodedFilePath =
-      process.env.GITHUB_REPO_ENCODED_FILE_PATH || "whitelist.encoded.txt";
-    const decodedFilePath =
-      process.env.GITHUB_REPO_DECODED_FILE_PATH || "whitelist.txt";
+    if (!appId || !privateKey || !installationId) {
+      const env = getEnv();
+      appId = appId || env.GITHUB_APP_ID || null;
+      privateKey = privateKey || env.GITHUB_APP_PRIVATE_KEY || null;
+      installationId = installationId || env.GITHUB_APP_INSTALLATION_ID || null;
+      owner = owner || env.GITHUB_REPO_OWNER || null;
+      repo = repo || env.GITHUB_REPO_NAME || null;
+      branch = branch || env.GITHUB_REPO_BRANCH || "main";
+      encodedFilePath = encodedFilePath || env.GITHUB_REPO_ENCODED_FILE_PATH || "whitelist.encoded.txt";
+      decodedFilePath = decodedFilePath || env.GITHUB_REPO_DECODED_FILE_PATH || "whitelist.txt";
+    }
 
-    if (!token) {
-      throw new Error("GITHUB_TOKEN not configured (neither in database nor environment)");
+    // Validate required fields
+    if (!appId) {
+      throw new Error("GitHub App ID not configured (neither in database nor environment)");
+    }
+    if (!privateKey) {
+      throw new Error("GitHub App private key not configured (neither in database nor environment)");
+    }
+    if (!installationId) {
+      throw new Error("GitHub App installation ID not configured (neither in database nor environment)");
     }
     if (!owner) {
       throw new Error("GITHUB_REPO_OWNER not configured (neither in database nor environment)");
@@ -74,13 +95,21 @@ export class GitHubPublisher {
       throw new Error("GITHUB_REPO_NAME not configured (neither in database nor environment)");
     }
 
+    // Get installation token (cached and auto-refreshed)
+    const token = await getCachedInstallationToken(appId, privateKey, installationId);
+
+    // Ensure branch, encodedFilePath, and decodedFilePath are never null
+    const finalBranch = branch || "main";
+    const finalEncodedFilePath = encodedFilePath || "whitelist.encoded.txt";
+    const finalDecodedFilePath = decodedFilePath || "whitelist.txt";
+
     return {
       token,
       owner,
       repo,
-      branch,
-      encodedFilePath,
-      decodedFilePath,
+      branch: finalBranch,
+      encodedFilePath: finalEncodedFilePath,
+      decodedFilePath: finalDecodedFilePath,
     };
   }
 
