@@ -1,4 +1,4 @@
-import { Discord, Slash, SlashOption } from "discordx";
+import { Discord, Slash, SlashOption, SlashGroup } from "discordx";
 import {
   ApplicationCommandOptionType,
   CommandInteraction,
@@ -12,6 +12,8 @@ import { Guard } from "discordx";
 import { bot, prisma } from "../../main.js";
 
 @Discord()
+@SlashGroup({ name: "dev", description: "Development and debugging commands (Bot Owner only)" })
+@SlashGroup("dev")
 @Guard(BotOwnerGuard)
 export class EvalCommand {
   // Common code snippets for autocomplete
