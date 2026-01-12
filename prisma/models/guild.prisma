@@ -1,33 +1,40 @@
 model GuildSettings {
-  id                      Int      @id @default(autoincrement())
-  guildId                 String   @unique
+  id                         Int      @id @default(autoincrement())
+  guildId                    String   @unique
   // Voice patrol settings
-  patrolChannelCategoryId String?
+  patrolChannelCategoryId    String?
   // Patrol promotion settings
-  promotionChannelId      String? // Channel ID for promotion notifications
-  promotionMinHours       Float?  @default(4) // Minimum total hours required for promotion
-  promotionRecruitRoleId  String? // Role ID that users must have to be eligible for promotion
+  promotionChannelId         String? // Channel ID for promotion notifications
+  promotionMinHours          Float?   @default(4) // Minimum total hours required for promotion
+  promotionRecruitRoleId     String? // Role ID that users must have to be eligible for promotion
   // Attendance settings
-  hostAttendanceRoleIds   Json? // Array of role IDs for host attendance
-  enrolledChannels        Json? // Array of channel IDs for attendance squads
-  aocChannelId            String? // Channel ID for AOC (Attendance Operations Center) squad
-  instigationLogChannelId String? // Channel ID for instigation logs (reminder channel for AOC leads)
+  hostAttendanceRoleIds      Json? // Array of role IDs for host attendance
+  enrolledChannels           Json? // Array of channel IDs for attendance squads
+  aocChannelId               String? // Channel ID for AOC (Attendance Operations Center) squad
+  instigationLogChannelId    String? // Channel ID for instigation logs (reminder channel for AOC leads)
   // Shield member settings
-  shieldMemberRoleIds     Json? // Array of role IDs for shield members
+  shieldMemberRoleIds        Json? // Array of role IDs for shield members
   // Staff settings
-  staffRoleIds            Json? // Array of role IDs for staff
-  trainerRoleIds          Json? // Array of role IDs for trainers
-  devGuardRoleIds         Json? // Array of role IDs for dev guards
+  staffRoleIds               Json? // Array of role IDs for staff
+  trainerRoleIds             Json? // Array of role IDs for trainers
+  devGuardRoleIds            Json? // Array of role IDs for dev guards
   // Whitelist settings
-  whitelistLogChannelId   String? // Channel ID for whitelist verification and modification logs
+  whitelistLogChannelId      String? // Channel ID for whitelist verification and modification logs
+  whitelistGitHubToken       String? // GitHub token for whitelist repository updates
+  whitelistGitHubOwner       String? // GitHub repository owner
+  whitelistGitHubRepo        String? // GitHub repository name
+  whitelistGitHubBranch      String? // GitHub repository branch (default: main)
+  whitelistGitHubEncodedPath String? // Path for encoded whitelist file (default: whitelist.encoded.txt)
+  whitelistGitHubDecodedPath String? // Path for decoded whitelist file (default: whitelist.txt)
+  whitelistXorKey            String? // XOR key for whitelist encoding
   // Patrol settings
-  patrolLogChannelId      String? // Channel ID for patrol hours and command usage logs
-  patrolTopChannelId      String? // Channel ID for weekly patrol top posts
+  patrolLogChannelId         String? // Channel ID for patrol hours and command usage logs
+  patrolTopChannelId         String? // Channel ID for weekly patrol top posts
   // VRChat instance settings
-  avatarWorldId           String? // VRChat world ID for avatar world invites (e.g., wrld_xxx)
+  avatarWorldId              String? // VRChat world ID for avatar world invites (e.g., wrld_xxx)
   // VRChat group settings
-  vrcGroupId              String? // VRChat group ID for group invites and role sync (e.g., grp_xxx)
-  botPromotionLogsChannelId String? // Channel ID for logging VRChat group promotions/demotions
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  vrcGroupId                 String? // VRChat group ID for group invites and role sync (e.g., grp_xxx)
+  botPromotionLogsChannelId  String? // Channel ID for logging VRChat group promotions/demotions
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
 }

@@ -199,15 +199,29 @@ export class WhitelistGeneration {
    */
   async generateEncodedWhitelist(guildId?: string): Promise<string> {
     const content = await this.generateWhitelistContent(guildId);
-    return this.xorEncode(content);
+    return await this.xorEncode(content, guildId);
   }
 
   /**
    * XOR encode the content using the configured key (matching PowerShell script)
+   * Reads key from database (if guildId provided) or falls back to environment variable
    */
-  private xorEncode(content: string): string {
-    const xorKey =
-      process.env.WHITELIST_XOR_KEY || "SHIELD_WHITELIST_KEY_9302025";
+  private async xorEncode(content: string, guildId?: string): Promise<string> {
+    let xorKey: string | null = null;
+
+    // Try to get key from database if guildId is provided
+    if (guildId) {
+      const settings = await prisma.guildSettings.findUnique({
+        where: { guildId },
+        select: { whitelistXorKey: true },
+      });
+      xorKey = settings?.whitelistXorKey || null;
+    }
+
+    // Fall back to environment variable or default
+    if (!xorKey) {
+      xorKey = process.env.WHITELIST_XOR_KEY || "SHIELD_WHITELIST_KEY_9302025";
+    }
 
     // Normalize line endings to LF only (\n), but KEEP them
     const normalizedContent = content.replace(/\r\n/g, "\n").trim();

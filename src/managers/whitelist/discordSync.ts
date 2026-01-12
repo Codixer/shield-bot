@@ -275,7 +275,7 @@ export class DiscordSync {
     syncUserRolesFromDiscord: (_discordId: string, _roleIds: string[], _guildId?: string) => Promise<void>,
     getUserByDiscordId: (_discordId: string) => Promise<unknown>,
     getUserWhitelistRoles: (_discordId: string) => Promise<string[]>,
-    queueBatchedUpdate: (_discordId: string, _commitMessage?: string) => void,
+    queueBatchedUpdate: (_discordId: string, _commitMessage?: string, _guildId?: string) => void,
   ): Promise<void> {
     const activeBot = (botOverride ?? bot) as { guilds?: { cache?: { values: () => IterableIterator<unknown> }; fetch: (_guildId: string) => Promise<unknown> } };
     const guildManager = activeBot?.guilds;
@@ -373,8 +373,8 @@ export class DiscordSync {
       // Note: Whitelist logging is handled by the specific callers (verification handlers, account managers)
       // to ensure the correct context and action type (verified/removed) is logged
 
-      // Queue batched update instead of immediate publish
-      queueBatchedUpdate(discordId, msg);
+      // Queue batched update instead of immediate publish, passing the guild ID
+      queueBatchedUpdate(discordId, msg, guildId);
       loggers.bot.info(
         `Queued repository update after verification for ${who}`,
       );

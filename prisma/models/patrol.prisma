@@ -48,11 +48,11 @@ model ActiveVoicePatrolSession {
 
 /// Track users who have received promotion notifications
 model VoicePatrolPromotion {
-  id          Int      @id @default(autoincrement())
-  guildId     String
-  userId      String
-  totalHours  Float
-  notifiedAt  DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  guildId    String
+  userId     String
+  totalHours Float
+  notifiedAt DateTime @default(now())
 
   @@unique([guildId, userId], map: "VoicePatrolPromotion_guild_user_unique")
   @@index([guildId], map: "VoicePatrolPromotion_guild_idx")

@@ -2,7 +2,7 @@ model Announcement {
   id        Int      @id @default(autoincrement())
   content   String
   createdAt DateTime @default(now())
-  createdBy String?  // Discord user ID
+  createdBy String? // Discord user ID
 
   @@map("announcements")
 }
@@ -11,8 +11,7 @@ model SpinTheBottleResponse {
   id        Int      @id @default(autoincrement())
   content   String
   createdAt DateTime @default(now())
-  createdBy String?  // Discord user ID
+  createdBy String? // Discord user ID
 
   @@map("spin_the_bottle_responses")
 }
-

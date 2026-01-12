@@ -14,6 +14,7 @@ import { loggers } from "../../utility/logger.js";
 export class WhitelistManager {
   // Batching mechanism for GitHub updates
   private pendingUpdates: Set<string> = new Set();
+  private affectedGuildIds: Set<string> = new Set();
   private updateTimer: NodeJS.Timeout | null = null;
   private readonly BATCH_DELAY_MS = 5000; // Wait 5 seconds after last change before updating
   private lastPublishedContent: string | null = null;
@@ -161,13 +162,16 @@ export class WhitelistManager {
    * Writes both encoded and decoded files in a single commit.
    * Now checks if content changed before publishing to avoid unnecessary commits.
    */
-  async publishWhitelist(commitMessage?: string, force: boolean = false, guildId?: string): Promise<{
+  async publishWhitelist(commitMessage?: string, force: boolean = false, guildId?: string, affectedGuildIds?: string[]): Promise<{
     updated: boolean;
     commitSha?: string;
     paths?: string[];
     branch?: string;
     reason?: string;
   }> {
+    // Use the first affected guild's settings, or the provided guildId
+    const settingsGuildId = guildId || (affectedGuildIds && affectedGuildIds.length > 0 ? affectedGuildIds[0] : undefined);
+
     // Generate content to check if it changed
     const currentContent = await this.generation.generateWhitelistContent();
 
@@ -178,27 +182,83 @@ export class WhitelistManager {
     }
 
     const [encodedData, decodedData] = await Promise.all([
-      this.generation.generateEncodedWhitelist(),
+      this.generation.generateEncodedWhitelist(settingsGuildId),
       this.generation.generateWhitelistContent(),
     ]);
-
     const result = await this.githubPublisher.updateRepositoryWithWhitelist(
       encodedData,
       decodedData,
       commitMessage,
+      settingsGuildId,
     );
 
     // Store the published content for future comparisons
     if (result.updated) {
       this.lastPublishedContent = currentContent;
       this._lastUpdateTimestamp = Date.now();
-      // Purge Cloudflare cache for this guild's whitelist URLs
+      // Purge Cloudflare cache for affected guilds' whitelist URLs
       const zoneId = process.env.CLOUDFLARE_ZONE_ID ?? "";
       const apiToken = process.env.CLOUDFLARE_API_TOKEN ?? "";
       
       if (zoneId && apiToken) {
         try {
-          const targetGuildIds = guildId ? [guildId] : ["813926536457224212"];
+          // Determine which guilds to purge cache for
+          let targetGuildIds: string[] = [];
+          
+          if (guildId) {
+            // Validate that the specific guild has whitelist role mappings
+            const hasWhitelistRoles = await prisma.whitelistRole.findFirst({
+              where: { guildId },
+            });
+            if (hasWhitelistRoles) {
+              targetGuildIds = [guildId];
+            } else {
+              loggers.bot.debug(`Guild ${guildId} has no whitelist roles configured, skipping cache purge`);
+              return result;
+            }
+          } else if (affectedGuildIds && affectedGuildIds.length > 0) {
+            // Validate that all affected guild IDs have whitelist role mappings
+            const guildsWithWhitelistRoles = await prisma.whitelistRole.findMany({
+              where: {
+                guildId: {
+                  in: affectedGuildIds,
+                },
+              },
+              select: {
+                guildId: true,
+              },
+              distinct: ['guildId'],
+            });
+            
+            const validGuildIds = new Set(
+              guildsWithWhitelistRoles
+                .map((r: { guildId: string | null }) => r.guildId)
+                .filter((id: string | null): id is string => id !== null)
+            );
+            
+            targetGuildIds = affectedGuildIds.filter(gid => validGuildIds.has(gid));
+            
+            if (targetGuildIds.length === 0) {
+              loggers.bot.debug('No valid guilds with whitelist roles found in affected guilds, skipping cache purge');
+              return result;
+            }
+          } else {
+            // Fallback: find all guilds that have whitelist role mappings
+            const allRoles = await prisma.whitelistRole.findMany({
+              select: { guildId: true },
+              distinct: ['guildId'],
+            });
+            targetGuildIds = allRoles
+              .map((role: { guildId: string | null }) => role.guildId)
+              .filter((id: string | null): id is string => id !== null);
+            
+            // Only use default if no guilds found at all (edge case)
+            if (targetGuildIds.length === 0) {
+              loggers.bot.warn('No guilds with whitelist roles found, skipping cache purge');
+              return result;
+            }
+          }
+          
           for (const gid of targetGuildIds) {
             const urls = [
               `https://api.vrcshield.com/api/vrchat/${gid}/whitelist/encoded`,
@@ -221,9 +281,17 @@ export class WhitelistManager {
   /**
    * Queue a user for batched whitelist update
    * This collects changes and publishes once after a delay
+   * @param discordId - The Discord user ID
+   * @param commitMessage - Optional commit message
+   * @param guildId - Optional guild ID that was affected by this change
    */
-  queueBatchedUpdate(discordId: string, commitMessage?: string): void {
+  queueBatchedUpdate(discordId: string, commitMessage?: string, guildId?: string): void {
     this.pendingUpdates.add(discordId);
+    
+    // Track affected guild if provided
+    if (guildId) {
+      this.affectedGuildIds.add(guildId);
+    }
 
     // Clear existing timer and start a new one
     if (this.updateTimer) {
@@ -307,7 +375,11 @@ export class WhitelistManager {
 
     const count = this.pendingUpdates.size;
     const users = Array.from(this.pendingUpdates);
+    const guildIds = Array.from(this.affectedGuildIds);
+    
+    // Clear pending updates and affected guilds
     this.pendingUpdates.clear();
+    this.affectedGuildIds.clear();
     this.updateTimer = null;
 
     loggers.bot.info(`Processing batched update for ${count} users`);
@@ -330,8 +402,94 @@ export class WhitelistManager {
         }
       }
 
-      // Publish with content change check
-      await this.publishWhitelist(message, false);
+      // Determine affected guilds from users' role assignments if not already tracked
+      let finalAffectedGuildIds = guildIds;
+      if (finalAffectedGuildIds.length === 0) {
+        // Find all guilds that have whitelist roles assigned to these users
+        const entries = await prisma.whitelistEntry.findMany({
+          where: {
+            user: {
+              discordId: {
+                in: users,
+              },
+            },
+          },
+          include: {
+            roleAssignments: {
+              include: {
+                role: {
+                  select: {
+                    guildId: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        const guildIdSet = new Set<string>();
+        for (const entry of entries) {
+          for (const assignment of entry.roleAssignments) {
+            if (assignment.role.guildId) {
+              guildIdSet.add(assignment.role.guildId);
+            }
+          }
+        }
+        finalAffectedGuildIds = Array.from(guildIdSet);
+        
+        // Only include guilds that actually have whitelist role mappings configured
+        // This prevents applying changes to guilds without whitelists
+        if (finalAffectedGuildIds.length > 0) {
+          const guildsWithWhitelistRoles = await prisma.whitelistRole.findMany({
+            where: {
+              guildId: {
+                in: finalAffectedGuildIds,
+              },
+            },
+            select: {
+              guildId: true,
+            },
+            distinct: ['guildId'],
+          });
+          
+          const validGuildIds = new Set(
+            guildsWithWhitelistRoles
+              .map((r: { guildId: string | null }) => r.guildId)
+              .filter((id: string | null): id is string => id !== null)
+          );
+          
+          // Filter to only guilds that have whitelist roles configured
+          finalAffectedGuildIds = finalAffectedGuildIds.filter(gid => validGuildIds.has(gid));
+        }
+      } else {
+        // Validate that tracked guild IDs actually have whitelist role mappings
+        const guildsWithWhitelistRoles = await prisma.whitelistRole.findMany({
+          where: {
+            guildId: {
+              in: finalAffectedGuildIds,
+            },
+          },
+          select: {
+            guildId: true,
+          },
+          distinct: ['guildId'],
+        });
+        
+        const validGuildIds = new Set(
+          guildsWithWhitelistRoles
+            .map((r: { guildId: string | null }) => r.guildId)
+            .filter((id: string | null): id is string => id !== null)
+        );
+        
+        // Filter to only guilds that have whitelist roles configured
+        finalAffectedGuildIds = finalAffectedGuildIds.filter(gid => validGuildIds.has(gid));
+      }
+
+      // Use the first affected guild's settings for publishing
+      const settingsGuildId = finalAffectedGuildIds.length > 0 ? finalAffectedGuildIds[0] : undefined;
+
+      // Publish with content change check, passing affected guild IDs
+      await this.publishWhitelist(message, false, undefined, finalAffectedGuildIds.length > 0 ? finalAffectedGuildIds : undefined);
 
       // Check if any rooftop permissions were updated and publish rooftop files if needed
       const hasRooftopChanges = await this.checkForRooftopPermissionChanges(users);
@@ -340,6 +498,7 @@ export class WhitelistManager {
         try {
           await this.githubPublisher.updateRepositoryWithRooftopFiles(
             `chore(rooftop): update rooftop files after whitelist change`,
+            settingsGuildId,
           );
         } catch (error) {
           loggers.bot.error("Error updating rooftop files", error);
@@ -383,7 +542,7 @@ export class WhitelistManager {
       (discordId, roleIds, guildId) => this.syncUserRolesFromDiscord(discordId, roleIds, guildId),
       (discordId) => this.userOps.getUserByDiscordId(discordId),
       (discordId) => this.userOps.getUserWhitelistRoles(discordId),
-      (discordId, commitMessage) => this.queueBatchedUpdate(discordId, commitMessage),
+      (discordId, commitMessage, guildId) => this.queueBatchedUpdate(discordId, commitMessage, guildId),
     );
   }
 

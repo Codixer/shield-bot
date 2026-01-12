@@ -5,24 +5,39 @@ import { prisma } from "../../main.js";
  */
 export class GitHubPublisher {
   /**
-   * Update a GitHub repository with BOTH encoded and decoded whitelist files in a single commit.
-   * Uses the low-level Git data API per the provided guide.
-   * Required env vars: GITHUB_TOKEN, GITHUB_REPO_OWNER, GITHUB_REPO_NAME
-   * Optional env vars:
-   *   - GITHUB_REPO_BRANCH (default: 'main')
-   *   - GITHUB_REPO_ENCODED_FILE_PATH (default: 'whitelist.encoded.txt')
-   *   - GITHUB_REPO_DECODED_FILE_PATH (default: 'whitelist.txt')
+   * Get GitHub settings for a guild, falling back to environment variables
    */
-  async updateRepositoryWithWhitelist(
-    encodedData: string,
-    decodedData: string,
-    commitMessage?: string,
-  ): Promise<{
-    updated: boolean;
-    commitSha?: string;
-    paths?: string[];
-    branch?: string;
+  private async getGitHubSettings(guildId?: string): Promise<{
+    token: string;
+    owner: string;
+    repo: string;
+    branch: string;
+    encodedFilePath: string;
+    decodedFilePath: string;
   }> {
+    // Try to get settings from database if guildId is provided
+    if (guildId) {
+      const settings = await prisma.guildSettings.findUnique({
+        where: { guildId },
+      });
+
+      if (
+        settings?.whitelistGitHubToken &&
+        settings?.whitelistGitHubOwner &&
+        settings?.whitelistGitHubRepo
+      ) {
+        return {
+          token: settings.whitelistGitHubToken,
+          owner: settings.whitelistGitHubOwner,
+          repo: settings.whitelistGitHubRepo,
+          branch: settings.whitelistGitHubBranch || "main",
+          encodedFilePath: settings.whitelistGitHubEncodedPath || "whitelist.encoded.txt",
+          decodedFilePath: settings.whitelistGitHubDecodedPath || "whitelist.txt",
+        };
+      }
+    }
+
+    // Fall back to environment variables
     const token = process.env.GITHUB_TOKEN;
     const owner = process.env.GITHUB_REPO_OWNER;
     const repo = process.env.GITHUB_REPO_NAME;
@@ -32,12 +47,44 @@ export class GitHubPublisher {
     const decodedFilePath =
       process.env.GITHUB_REPO_DECODED_FILE_PATH || "whitelist.txt";
 
-    if (!token)
-      {throw new Error("GITHUB_TOKEN environment variable is required");}
-    if (!owner)
-      {throw new Error("GITHUB_REPO_OWNER environment variable is required");}
-    if (!repo)
-      {throw new Error("GITHUB_REPO_NAME environment variable is required");}
+    if (!token) {
+      throw new Error("GITHUB_TOKEN not configured (neither in database nor environment)");
+    }
+    if (!owner) {
+      throw new Error("GITHUB_REPO_OWNER not configured (neither in database nor environment)");
+    }
+    if (!repo) {
+      throw new Error("GITHUB_REPO_NAME not configured (neither in database nor environment)");
+    }
+
+    return {
+      token,
+      owner,
+      repo,
+      branch,
+      encodedFilePath,
+      decodedFilePath,
+    };
+  }
+
+  /**
+   * Update a GitHub repository with BOTH encoded and decoded whitelist files in a single commit.
+   * Uses the low-level Git data API per the provided guide.
+   * Reads settings from database (if guildId provided) or falls back to environment variables.
+   */
+  async updateRepositoryWithWhitelist(
+    encodedData: string,
+    decodedData: string,
+    commitMessage?: string,
+    guildId?: string,
+  ): Promise<{
+    updated: boolean;
+    commitSha?: string;
+    paths?: string[];
+    branch?: string;
+  }> {
+    const { token, owner, repo, branch, encodedFilePath, decodedFilePath } =
+      await this.getGitHubSettings(guildId);
 
     const apiBase = `https://api.github.com`;
 
@@ -325,29 +372,18 @@ export class GitHubPublisher {
 
   /**
    * Update GitHub repository with all rooftop files in a single commit.
-   * Required env vars: GITHUB_TOKEN, GITHUB_REPO_OWNER, GITHUB_REPO_NAME
-   * Optional env vars:
-   *   - GITHUB_REPO_BRANCH (default: 'main')
+   * Reads settings from database (if guildId provided) or falls back to environment variables.
    */
   async updateRepositoryWithRooftopFiles(
     commitMessage?: string,
+    guildId?: string,
   ): Promise<{
     updated: boolean;
     commitSha?: string;
     paths?: string[];
     branch?: string;
   }> {
-    const token = process.env.GITHUB_TOKEN;
-    const owner = process.env.GITHUB_REPO_OWNER;
-    const repo = process.env.GITHUB_REPO_NAME;
-    const branch = process.env.GITHUB_REPO_BRANCH || "main";
-
-    if (!token)
-      {throw new Error("GITHUB_TOKEN environment variable is required");}
-    if (!owner)
-      {throw new Error("GITHUB_REPO_OWNER environment variable is required");}
-    if (!repo)
-      {throw new Error("GITHUB_REPO_NAME environment variable is required");}
+    const { token, owner, repo, branch } = await this.getGitHubSettings(guildId);
 
     const apiBase = `https://api.github.com`;
 

@@ -180,9 +180,9 @@ export class WhitelistRoleSync {
         const permsForMsg =
           action === "removed" ? new Set<string>() : expectedPermissions;
         
-        // Queue for batched update instead of immediate publish
+        // Queue for batched update instead of immediate publish, passing the guild ID
         const msg = this.buildCommitMessage(username, action, permsForMsg);
-        whitelistManager.queueBatchedUpdate(newMember.id, msg);
+        whitelistManager.queueBatchedUpdate(newMember.id, msg, newMember.guild.id);
         loggers.bot.info(
           `Queued GitHub repository update after role change for ${newMember.displayName}`,
         );
@@ -263,9 +263,9 @@ export class WhitelistRoleSync {
         // Determine permissions user now should have
         const { permissions } = await this.getExpectedFromDiscordRoles(roleIds);
         
-        // Queue for batched update instead of immediate publish
+        // Queue for batched update instead of immediate publish, passing the guild ID
         const msg = this.buildCommitMessage(username, "added", permissions);
-        whitelistManager.queueBatchedUpdate(member.id, msg);
+        whitelistManager.queueBatchedUpdate(member.id, msg, member.guild.id);
         loggers.bot.info(
           `Queued GitHub repository update after new member ${member.displayName} joined`,
         );
@@ -331,9 +331,9 @@ export class WhitelistRoleSync {
         try {
           const username = memberName;
           
-          // Queue for batched update instead of immediate publish
+          // Queue for batched update instead of immediate publish, passing the guild ID
           const msg = `${username} was removed with the roles none`;
-          whitelistManager.queueBatchedUpdate(member.id, msg);
+          whitelistManager.queueBatchedUpdate(member.id, msg, member.guild.id);
           loggers.bot.info(
             `Queued GitHub repository update after ${memberName} left server`,
           );
@@ -398,9 +398,9 @@ export class WhitelistRoleSync {
       try {
         const username = userName;
         
-        // Queue for batched update instead of immediate publish
+        // Queue for batched update instead of immediate publish, passing the guild ID
         const msg = `${username} was removed with the roles none`;
-        whitelistManager.queueBatchedUpdate(user.id, msg);
+        whitelistManager.queueBatchedUpdate(user.id, msg, ban.guild.id);
         loggers.bot.info(
           `Queued GitHub repository update after ${userName} was banned`,
         );
