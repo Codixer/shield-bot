@@ -37,7 +37,11 @@ function msToReadable(ms: number): string {
 }
 
 /**
- * Post patrol top to all configured channels
+ * Post the monthly patrol top to each guild channel configured to receive it.
+ *
+ * For every guild that has `patrolTopChannelId` set, fetches the top patrol totals for the current UTC month (up to 50 entries) and sends a formatted ranking message to the configured text channel. If no patrol data exists for a guild for the month, sends a message stating that no data is available.
+ *
+ * @param client - The Discord client used to access guilds and channels
  */
 export async function postPatrolTop(client: Client): Promise<void> {
   try {
@@ -155,4 +159,3 @@ export function stopPatrolTopSchedule(job: cron.ScheduledTask | null): void {
     loggers.schedules.info("Patrol top schedule stopped.");
   }
 }
-
