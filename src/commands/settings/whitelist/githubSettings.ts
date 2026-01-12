@@ -192,8 +192,12 @@ export class WhitelistGitHubSettingsCommand {
 
       // Update the settings
       const updateData: { whitelistGitHubOwner?: string; whitelistGitHubRepo?: string } = {};
-      if (owner !== undefined) updateData.whitelistGitHubOwner = owner;
-      if (repo !== undefined) updateData.whitelistGitHubRepo = repo;
+      if (owner !== undefined) {
+        updateData.whitelistGitHubOwner = owner;
+      }
+      if (repo !== undefined) {
+        updateData.whitelistGitHubRepo = repo;
+      }
 
       await prisma.guildSettings.upsert({
         where: { guildId: interaction.guildId },
@@ -328,8 +332,12 @@ export class WhitelistGitHubSettingsCommand {
 
       // Update the settings
       const updateData: { whitelistGitHubEncodedPath?: string; whitelistGitHubDecodedPath?: string } = {};
-      if (encoded !== undefined) updateData.whitelistGitHubEncodedPath = encoded;
-      if (decoded !== undefined) updateData.whitelistGitHubDecodedPath = decoded;
+      if (encoded !== undefined) {
+        updateData.whitelistGitHubEncodedPath = encoded;
+      }
+      if (decoded !== undefined) {
+        updateData.whitelistGitHubDecodedPath = decoded;
+      }
 
       await prisma.guildSettings.upsert({
         where: { guildId: interaction.guildId },
