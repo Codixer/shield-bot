@@ -102,6 +102,18 @@ export class EvalCommand {
 
       // Execute the code
       // Using Function constructor for better isolation
+      // Check for import/export statements - they're not supported in Function constructor
+      // These are syntax, not runtime expressions, so they can't be used in Function()
+      // Note: Dynamic import() calls are allowed, but import/export statements are not
+      const hasImportExportStatement = /(?:^|\n|\r|;)\s*(?:import\s+.*\s+from\s+['"]|export\s+)/m.test(code);
+      if (hasImportExportStatement) {
+        throw new Error(
+          "ES6 import/export statements are not supported in eval. " +
+          "Use dynamic imports instead: `const module = await import('module-name');` " +
+          "or use the provided 'import' function in the context."
+        );
+      }
+      
       // Check if code uses await - if so, wrap in async function
       const hasAwait = code.includes("await");
       const hasReturn = code.includes("return");

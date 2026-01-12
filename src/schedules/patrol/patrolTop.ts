@@ -43,12 +43,17 @@ export async function postPatrolTop(client: Client): Promise<void> {
   try {
     loggers.schedules.info("Starting patrol top posting job...");
 
-    // Get current UTC year and month
+    // Get current UTC year, month, and week
     const now = new Date();
     const currentYear = now.getUTCFullYear();
     const currentMonth = now.getUTCMonth() + 1; // getUTCMonth() returns 0-11, we need 1-12
+    const currentDay = now.getUTCDate();
+    const currentWeek = Math.ceil(currentDay / 7);
+    
+    // Format week: "week 1" for week 1, "w2", "w3", etc. for others
+    const weekLabel = currentWeek === 1 ? "week 1" : `w${currentWeek}`;
 
-    loggers.schedules.info(`Posting patrol top for ${MONTH_NAMES[currentMonth - 1]} ${currentYear}`);
+    loggers.schedules.info(`Posting patrol top for ${MONTH_NAMES[currentMonth - 1]} ${currentYear}, ${weekLabel}`);
 
     // Get all guilds with patrolTopChannelId configured
     const guildSettings = await prisma.guildSettings.findMany({
@@ -99,8 +104,8 @@ export async function postPatrolTop(client: Client): Promise<void> {
           50,
         );
         if (rows.length === 0) {
-          loggers.schedules.info(`No patrol data found for guild ${settings.guildId} for ${MONTH_NAMES[currentMonth - 1]} ${currentYear}`);
-          await channel.send(`**Weekly Patrol Top (${MONTH_NAMES[currentMonth - 1]} ${currentYear})**\nNo data available.`);
+          loggers.schedules.info(`No patrol data found for guild ${settings.guildId} for ${MONTH_NAMES[currentMonth - 1]} ${currentYear}, ${weekLabel}`);
+          await channel.send(`**Weekly Patrol Top (${MONTH_NAMES[currentMonth - 1]} ${currentYear}, ${weekLabel})**\nNo data available.`);
           continue;
         }
 
@@ -108,7 +113,7 @@ export async function postPatrolTop(client: Client): Promise<void> {
         const lines = rows.map(
           (r, idx) => `${idx + 1}. <@${r.userId}> — ${msToReadable(Number(r.totalMs))}`,
         );
-        const header = `**Weekly Patrol Top (${MONTH_NAMES[currentMonth - 1]} ${currentYear}):**\n`;
+        const header = `**Weekly Patrol Top (${MONTH_NAMES[currentMonth - 1]} ${currentYear}, ${weekLabel}):**\n`;
         const content = header + lines.join("\n");
 
         // Post the message
