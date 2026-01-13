@@ -288,8 +288,8 @@ export class VRCStaffAccountManagerButtonHandler {
               });
             }
           } catch (logError) {
-            console.warn(
-              `[Staff Account Manager] Failed to send whitelist log for ${targetDiscordId}:`,
+            loggers.bot.warn(
+              `Failed to send whitelist log for ${targetDiscordId}`,
               logError,
             );
           }

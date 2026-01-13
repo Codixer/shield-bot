@@ -241,6 +241,16 @@ export class VRCAccountManagerButtonHandler {
     guildId: string,
   ) {
     try {
+      // Get roles and account type before deletion for logging
+      const discordId = interaction.user.id;
+      let rolesBeforeDelete: string[] = [];
+      const accountTypeBeforeDelete = vrcAccount.accountType;
+      try {
+        rolesBeforeDelete = await getUserWhitelistRoles(discordId, guildId);
+      } catch (_error) {
+        // Ignore errors when fetching roles before delete
+      }
+
       // Try to unfriend the user from VRChat
       try {
         await unfriendUser(vrcUserId);
@@ -256,16 +266,6 @@ export class VRCAccountManagerButtonHandler {
       await prisma.vRChatAccount.delete({
         where: { id: vrcAccount.id },
       });
-
-      // Get roles and account type before whitelist update for logging
-      const discordId = interaction.user.id;
-      let rolesBeforeDelete: string[] = [];
-      const accountTypeBeforeDelete = vrcAccount.accountType;
-      try {
-        rolesBeforeDelete = await getUserWhitelistRoles(discordId, guildId);
-      } catch (_error) {
-        // Ignore errors when fetching roles before delete
-      }
 
       // Send confirmation to user
       const confirmationMessage = `✅ VRChat account has been deleted${accountTypeBeforeDelete === "MAIN" ? " (was MAIN account)" : ""}.`;
@@ -304,8 +304,8 @@ export class VRCAccountManagerButtonHandler {
               });
             }
           } catch (logError) {
-            console.warn(
-              `[Account Manager] Failed to send whitelist log for ${discordId}:`,
+            loggers.bot.warn(
+              `Failed to send whitelist log for ${discordId}`,
               logError,
             );
           }
