@@ -199,12 +199,21 @@ export class VRCAccountManagerButtonHandler {
           );
         }
       }
+
+      // Only update UI and send success confirmation if whitelist sync succeeded
+      await this.updateAccountManagerMessage(interaction);
+
+      // Send confirmation after UI update
+      await interaction.followUp({
+        content: "✅ Account has been set to ALT.",
+        flags: MessageFlags.Ephemeral,
+      });
     } catch (error) {
       loggers.bot.error(
         `Failed to sync whitelist for ${discordId}`,
         error,
       );
-      // Send error feedback to user
+      // Send error feedback to user and return early
       if (interaction.replied || interaction.deferred) {
         await interaction.followUp({
           content: "❌ Failed to update whitelist. The account type was changed, but whitelist sync failed.",
@@ -216,15 +225,8 @@ export class VRCAccountManagerButtonHandler {
           flags: MessageFlags.Ephemeral,
         });
       }
+      return;
     }
-
-    await this.updateAccountManagerMessage(interaction);
-
-    // Send confirmation after UI update
-    await interaction.followUp({
-      content: "✅ Account has been set to ALT.",
-      flags: MessageFlags.Ephemeral,
-    });
   }
 
   private async handleDelete(
