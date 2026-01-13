@@ -80,7 +80,7 @@ export class WhitelistAPI {
   async getStatistics(ctx: Context) {
     try {
       const guildId = ctx.params.guildId;
-      const stats = await whitelistManager.getStatistics();
+      const stats = await whitelistManager.getStatistics(guildId);
 
       ctx.body = {
         success: true,

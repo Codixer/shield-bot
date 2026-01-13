@@ -142,18 +142,25 @@ function escapeMarkdown(text: string): string {
 }
 
 /**
- * Get user's whitelist roles from database
+ * Get user's whitelist roles from database for a specific guild
  */
 export async function getUserWhitelistRoles(
   discordId: string,
+  guildId: string,
 ): Promise<string[]> {
   try {
     const user = await prisma.user.findUnique({
       where: { discordId },
       include: {
-        whitelistEntry: {
+        whitelistEntries: {
+          where: { guildId },
           include: {
             roleAssignments: {
+              where: {
+                role: {
+                  guildId: guildId,
+                },
+              },
               include: {
                 role: true,
               },
@@ -163,22 +170,24 @@ export async function getUserWhitelistRoles(
       },
     });
 
-    // Extract VRChat roles from description field (comma-separated)
+    // Extract VRChat roles from permissions field (comma-separated)
     const roles = new Set<string>();
-    for (const assignment of user?.whitelistEntry?.roleAssignments || []) {
-      if (assignment.role.permissions) {
-        for (const role of String(assignment.role.permissions)
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)) {
-          roles.add(role);
+    for (const entry of user?.whitelistEntries || []) {
+      for (const assignment of entry.roleAssignments || []) {
+        if (assignment.role.permissions) {
+          for (const role of String(assignment.role.permissions)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)) {
+            roles.add(role);
+          }
         }
       }
     }
     return Array.from(roles).sort();
   } catch (error) {
     loggers.bot.error(
-      `Failed to get whitelist roles for ${discordId}`,
+      `Failed to get whitelist roles for ${discordId} in guild ${guildId}`,
       error,
     );
     return [];

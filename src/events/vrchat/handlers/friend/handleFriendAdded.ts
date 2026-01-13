@@ -85,8 +85,8 @@ export async function handleFriendAdd(content: unknown) {
         loggers.vrchat.debug(`VRChat account for Discord user: ${user.discordId}`);
         try {
             // For verified accounts, sync and publish with roles
-            if (vrchatUsername) { // If username was fetched, it was verified
-                await whitelistManager.syncAndPublishAfterVerification(user.discordId, undefined, verificationGuildId ?? undefined);
+            if (vrchatUsername && verificationGuildId) { // If username was fetched, it was verified
+                await whitelistManager.syncAndPublishAfterVerification(user.discordId, undefined, verificationGuildId);
                 
                 // Send whitelist verification log to the guild where verification was started
                 if (bot && bot.guilds && vrcAccount.verificationGuildId) {
@@ -102,7 +102,7 @@ export async function handleFriendAdd(content: unknown) {
                             const member = await guild.members.fetch(user.discordId).catch(() => null);
                             if (member) {
                                 const displayName = member.displayName || member.user?.username || user.discordId;
-                                const whitelistRoles = await getUserWhitelistRoles(user.discordId);
+                                const whitelistRoles = await getUserWhitelistRoles(user.discordId, verificationGuildId);
                                 
                                 await sendWhitelistLog(bot, guild.id, {
                                     discordId: user.discordId,
@@ -119,9 +119,9 @@ export async function handleFriendAdd(content: unknown) {
                         loggers.vrchat.warn(`Failed to send whitelist log for ${user.discordId}`, logError);
                     }
                 }
-            } else {
+            } else if (verificationGuildId) {
                 // For unverified binding, ensure basic access and sync if eligible
-                await whitelistManager.ensureUnverifiedAccountAccess(user.discordId, verificationGuildId ?? undefined);
+                await whitelistManager.ensureUnverifiedAccountAccess(user.discordId, verificationGuildId);
             }
         } catch (e) {
             loggers.vrchat.warn(`Failed to update whitelist for user ${user.discordId}`, e);

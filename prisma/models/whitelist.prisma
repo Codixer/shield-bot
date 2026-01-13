@@ -1,12 +1,16 @@
 model WhitelistEntry {
   id              Int                       @id @default(autoincrement())
-  userId          Int                       @unique // Link to existing User model
+  userId          Int                       // Link to existing User model
+  guildId         String                    // Guild this entry belongs to
   createdAt       DateTime                  @default(now())
   updatedAt       DateTime                  @updatedAt
   roleAssignments WhitelistRoleAssignment[]
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  @@unique([userId, guildId])
+  @@index([guildId])
+  @@index([userId, guildId])
   @@map("whitelist_entries")
 }
 

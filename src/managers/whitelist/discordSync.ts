@@ -12,8 +12,8 @@ export class DiscordSync {
   async syncUserRolesFromDiscord(
     discordId: string,
     discordRoleIds: string[],
-    guildId?: string,
-    removeUserFromWhitelistIfNoRoles?: (_discordId: string) => Promise<void>,
+    guildId: string,
+    removeUserFromWhitelistIfNoRoles?: (_discordId: string, _guildId: string) => Promise<void>,
   ): Promise<void> {
     // Ensure user exists in database first
     const user = await prisma.user.findUnique({ 
@@ -38,64 +38,68 @@ export class DiscordSync {
     if (!hasVerifiedAccount) {
       // User is not verified, remove from whitelist if present
       if (removeUserFromWhitelistIfNoRoles) {
-        await removeUserFromWhitelistIfNoRoles(discordId);
+        await removeUserFromWhitelistIfNoRoles(discordId, guildId);
       }
       loggers.bot.info(
-        `User ${discordId} has no verified VRChat accounts - removed from whitelist`,
+        `User ${discordId} has no verified VRChat accounts - removed from whitelist in guild ${guildId}`,
       );
       return;
     }
 
-    // Get mapped roles for the user's Discord roles
-    const mappedRoles = await prisma.whitelistRole.findMany({
+    // Get mapped roles for the user's Discord roles, filtered by guild
+    const validMappedRoles = await prisma.whitelistRole.findMany({
       where: {
         discordRoleId: {
           in: discordRoleIds,
         },
+        guildId: guildId,
       },
     });
-
-    // Filter mapped roles by guild if guildId is provided
-    let validMappedRoles = mappedRoles;
-    if (guildId) {
-      validMappedRoles = mappedRoles.filter((role: { guildId: string | null }) => role.guildId === guildId);
-      
-      if (validMappedRoles.length < mappedRoles.length) {
-        const invalidCount = mappedRoles.length - validMappedRoles.length;
-        loggers.bot.debug(
-          `User ${discordId} has ${invalidCount} role(s) from other guilds - filtering them out`,
-        );
-      }
-    }
 
     if (validMappedRoles.length === 0) {
       // User has no qualifying roles, remove from whitelist if present
       if (removeUserFromWhitelistIfNoRoles) {
-        await removeUserFromWhitelistIfNoRoles(discordId);
+        await removeUserFromWhitelistIfNoRoles(discordId, guildId);
       }
       loggers.bot.info(
-        `User ${discordId} has no qualifying Discord roles - removed from whitelist`,
+        `User ${discordId} has no qualifying Discord roles in guild ${guildId} - removed from whitelist`,
       );
       return;
     }
 
-    // Ensure user has whitelist entry
+    // Ensure user has whitelist entry for this guild
     await prisma.whitelistEntry.upsert({
-      where: { userId: user.id },
+      where: { 
+        userId_guildId: {
+          userId: user.id,
+          guildId: guildId,
+        },
+      },
       update: {},
-      create: { userId: user.id },
+      create: { userId: user.id, guildId: guildId },
     });
 
     const whitelistEntry = await prisma.whitelistEntry.findUnique({
-      where: { userId: user.id },
+      where: { 
+        userId_guildId: {
+          userId: user.id,
+          guildId: guildId,
+        },
+      },
       include: {
-        roleAssignments: true,
+        roleAssignments: {
+          where: {
+            role: {
+              guildId: guildId,
+            },
+          },
+        },
       },
     });
 
     // Get current role assignments
     if (!whitelistEntry) {
-      loggers.bot.warn(`Whitelist entry not found for user ${discordId}`);
+      loggers.bot.warn(`Whitelist entry not found for user ${discordId} in guild ${guildId}`);
       return;
     }
     const existingAssignments = whitelistEntry.roleAssignments || [];
@@ -137,7 +141,7 @@ export class DiscordSync {
     }
 
     loggers.bot.info(
-      `User ${discordId} synced with ${validMappedRoles.length} role(s) and permissions: [${Array.from(allPermissions).join(", ")}]`,
+      `User ${discordId} synced in guild ${guildId} with ${validMappedRoles.length} role(s) and permissions: [${Array.from(allPermissions).join(", ")}]`,
     );
   }
 
@@ -179,25 +183,28 @@ export class DiscordSync {
       return; // No unverified accounts
     }
 
-    // Ensure user has whitelist entry for basic access
-    await prisma.whitelistEntry.upsert({
-      where: { userId: user.id },
-      update: {},
-      create: { userId: user.id },
-    });
-
-    loggers.bot.info(
-      `Granted basic access to unverified account for user ${discordId}`,
-    );
-
-    // Now check if user has eligible Discord roles for full sync and publish
-    // guildId is required - only sync for the specific guild provided
+    // Ensure user has whitelist entry for basic access in this guild
     if (!guildId) {
       loggers.bot.warn(
-        `No guildId provided for unverified account sync of user ${discordId}; skipping full sync`,
+        `No guildId provided for unverified account access of user ${discordId}; skipping`,
       );
       return;
     }
+
+    await prisma.whitelistEntry.upsert({
+      where: { 
+        userId_guildId: {
+          userId: user.id,
+          guildId: guildId,
+        },
+      },
+      update: {},
+      create: { userId: user.id, guildId: guildId },
+    });
+
+    loggers.bot.info(
+      `Granted basic access to unverified account for user ${discordId} in guild ${guildId}`,
+    );
 
     try {
       // Fetch the member from the specified guild only
@@ -257,9 +264,9 @@ export class DiscordSync {
     discordId: string,
     botOverride: unknown,
     getDiscordRoleMappings: (_guildId?: string) => Promise<unknown[]>,
-    syncUserRolesFromDiscord: (_discordId: string, _roleIds: string[], _guildId?: string) => Promise<void>,
-    getUserByDiscordId: (_discordId: string) => Promise<unknown>,
-    getUserWhitelistRoles: (_discordId: string) => Promise<string[]>,
+    syncUserRolesFromDiscord: (_discordId: string, _roleIds: string[], _guildId: string) => Promise<void>,
+    getUserByDiscordId: (_discordId: string, _guildId: string) => Promise<unknown>,
+    getUserWhitelistRoles: (_discordId: string, _guildId: string) => Promise<string[]>,
     queueBatchedUpdate: (_discordId: string, _commitMessage?: string, _guildId?: string) => void,
     guildId?: string,
   ): Promise<void> {
@@ -325,8 +332,8 @@ export class DiscordSync {
       await syncUserRolesFromDiscord(discordId, roleIds, guildId);
 
       // Get VRChat account info and whitelist roles for logging (currently unused but kept for future use)
-      void await getUserByDiscordId(discordId);
-      void await getUserWhitelistRoles(discordId);
+      void await getUserByDiscordId(discordId, guildId);
+      void await getUserWhitelistRoles(discordId, guildId);
 
       // Build permissions list from mapping permissions
       const permSet = new Set<string>();

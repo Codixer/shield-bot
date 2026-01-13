@@ -137,14 +137,17 @@ export class VRCStaffAccountManagerButtonHandler {
     });
 
     // Update whitelist after status change
+    if (!interaction.guildId) {
+      return;
+    }
     try {
-      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, undefined, interaction.guildId ?? undefined);
+      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, undefined, interaction.guildId);
       
       // Send whitelist log for status change
       if (interaction.guild) {
         try {
           const targetUser = await interaction.client.users.fetch(targetDiscordId);
-          const roles = await getUserWhitelistRoles(targetDiscordId);
+          const roles = await getUserWhitelistRoles(targetDiscordId, interaction.guildId);
           await sendWhitelistLog(interaction.client, interaction.guild.id, {
             discordId: targetDiscordId,
             displayName: targetUser.displayName || targetUser.username,
@@ -184,14 +187,17 @@ export class VRCStaffAccountManagerButtonHandler {
     });
 
     // Update whitelist after status change
+    if (!interaction.guildId) {
+      return;
+    }
     try {
-      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, undefined, interaction.guildId ?? undefined);
+      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, undefined, interaction.guildId);
       
       // Send whitelist log for status change
       if (interaction.guild) {
         try {
           const targetUser = await interaction.client.users.fetch(targetDiscordId);
-          const roles = await getUserWhitelistRoles(targetDiscordId);
+          const roles = await getUserWhitelistRoles(targetDiscordId, interaction.guildId);
           await sendWhitelistLog(interaction.client, interaction.guild.id, {
             discordId: targetDiscordId,
             displayName: targetUser.displayName || targetUser.username,
@@ -243,22 +249,25 @@ export class VRCStaffAccountManagerButtonHandler {
 
 
       // Get roles and account type before whitelist update for logging
+      if (!interaction.guildId) {
+        return;
+      }
       let rolesBeforeDelete: string[] = [];
       const accountTypeBeforeDelete = vrcAccount.accountType;
       try {
-        rolesBeforeDelete = await getUserWhitelistRoles(targetDiscordId);
+        rolesBeforeDelete = await getUserWhitelistRoles(targetDiscordId, interaction.guildId);
       } catch (_error) {
         // Ignore errors when fetching roles before delete
       }
 
       // Update whitelist after account deletion
       try {
-        await whitelistManager.syncAndPublishAfterVerification(targetDiscordId);
+        await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, undefined, interaction.guildId);
         
         // Send whitelist log - check if user still has roles after deletion
         if (interaction.guild) {
           try {
-            const rolesAfterDelete = await getUserWhitelistRoles(targetDiscordId);
+            const rolesAfterDelete = await getUserWhitelistRoles(targetDiscordId, interaction.guildId);
             const wasActuallyRemoved = rolesAfterDelete.length === 0 && rolesBeforeDelete.length > 0;
             
             // Only log if they actually lost whitelist access or still have it with different roles

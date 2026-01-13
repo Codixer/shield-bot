@@ -9,12 +9,13 @@ export class WhitelistUserOperations {
   /**
    * Get a user from the database by Discord ID
    */
-  async getUserByDiscordId(discordId: string) {
+  async getUserByDiscordId(discordId: string, guildId: string) {
     return await prisma.user.findUnique({
       where: { discordId },
       include: {
         vrchatAccounts: true,
-        whitelistEntry: {
+        whitelistEntries: {
+          where: { guildId },
           include: {
             roleAssignments: {
               include: {
@@ -30,7 +31,7 @@ export class WhitelistUserOperations {
   /**
    * Get a user from the database by VRChat User ID
    */
-  async getUserByVrcUserId(vrcUserId: string) {
+  async getUserByVrcUserId(vrcUserId: string, guildId: string) {
     return await prisma.user.findFirst({
       where: {
         vrchatAccounts: {
@@ -41,7 +42,8 @@ export class WhitelistUserOperations {
       },
       include: {
         vrchatAccounts: true,
-        whitelistEntry: {
+        whitelistEntries: {
+          where: { guildId },
           include: {
             roleAssignments: {
               include: {
@@ -57,7 +59,7 @@ export class WhitelistUserOperations {
   /**
    * Add a user to the whitelist by Discord ID
    */
-  async addUserByDiscordId(discordId: string): Promise<unknown> {
+  async addUserByDiscordId(discordId: string, guildId: string): Promise<unknown> {
     const user = await prisma.user.findUnique({ where: { discordId } });
     if (!user) {
       throw new Error(
@@ -65,17 +67,22 @@ export class WhitelistUserOperations {
       );
     }
 
-    // Check if already whitelisted
+    // Check if already whitelisted in this guild
     const existing = await prisma.whitelistEntry.findUnique({
-      where: { userId: user.id },
+      where: { 
+        userId_guildId: {
+          userId: user.id,
+          guildId: guildId,
+        },
+      },
     });
 
     if (existing) {
-      throw new Error("User is already whitelisted.");
+      throw new Error("User is already whitelisted in this guild.");
     }
 
     return await prisma.whitelistEntry.create({
-      data: { userId: user.id },
+      data: { userId: user.id, guildId: guildId },
       include: {
         user: {
           include: {
@@ -89,7 +96,7 @@ export class WhitelistUserOperations {
   /**
    * Add a user to the whitelist by VRChat username
    */
-  async addUserByVrcUsername(vrchatUsername: string): Promise<unknown> {
+  async addUserByVrcUsername(vrchatUsername: string, guildId: string): Promise<unknown> {
     try {
       const searchResults = await searchUsers({ search: vrchatUsername, n: 1 });
 
@@ -116,7 +123,7 @@ export class WhitelistUserOperations {
         );
       }
 
-      return await this.addUserByDiscordId(user.discordId);
+      return await this.addUserByDiscordId(user.discordId, guildId);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(
@@ -128,13 +135,18 @@ export class WhitelistUserOperations {
   /**
    * Remove a user from the whitelist by Discord ID
    */
-  async removeUserByDiscordId(discordId: string): Promise<boolean> {
+  async removeUserByDiscordId(discordId: string, guildId: string): Promise<boolean> {
     try {
       const user = await prisma.user.findUnique({ where: { discordId } });
       if (!user) {return false;}
 
       await prisma.whitelistEntry.delete({
-        where: { userId: user.id },
+        where: { 
+          userId_guildId: {
+            userId: user.id,
+            guildId: guildId,
+          },
+        },
       });
       return true;
     } catch (_error) {
@@ -145,66 +157,78 @@ export class WhitelistUserOperations {
   /**
    * Remove a user from the whitelist by VRChat User ID
    */
-  async removeUserByVrcUserId(vrcUserId: string): Promise<boolean> {
-    const user = await this.getUserByVrcUserId(vrcUserId);
+  async removeUserByVrcUserId(vrcUserId: string, guildId: string): Promise<boolean> {
+    const user = await this.getUserByVrcUserId(vrcUserId, guildId);
     if (!user) {return false;}
 
-    return await this.removeUserByDiscordId(user.discordId);
+    return await this.removeUserByDiscordId(user.discordId, guildId);
   }
 
   /**
    * Add user by VRChat User ID (alias for API compatibility)
    */
-  async addUserByVrcUserId(vrcUserId: string): Promise<unknown> {
-    const user = await this.getUserByVrcUserId(vrcUserId);
+  async addUserByVrcUserId(vrcUserId: string, guildId: string): Promise<unknown> {
+    const user = await this.getUserByVrcUserId(vrcUserId, guildId);
     if (!user) {
       throw new Error(
         "User not found in database. User must be verified first.",
       );
     }
-    return await this.addUserByDiscordId(user.discordId);
+    return await this.addUserByDiscordId(user.discordId, guildId);
   }
 
   /**
    * Remove user from whitelist if they have no qualifying roles
-   * This function ensures complete removal of whitelist access
+   * This function ensures complete removal of whitelist access for a specific guild
    */
-  async removeUserFromWhitelistIfNoRoles(discordId: string): Promise<void> {
-    const user = await this.getUserByDiscordId(discordId);
-    if (!user || !user.whitelistEntry) {
+  async removeUserFromWhitelistIfNoRoles(discordId: string, guildId: string): Promise<void> {
+    const user = await this.getUserByDiscordId(discordId, guildId);
+    if (!user || !user.whitelistEntries || user.whitelistEntries.length === 0) {
       loggers.bot.debug(
-        `User ${discordId} not found or has no whitelist entry - nothing to remove`,
+        `User ${discordId} not found or has no whitelist entry for guild ${guildId} - nothing to remove`,
       );
       return;
     }
 
+    const whitelistEntry = user.whitelistEntries[0];
     // Get current role assignments for logging
-    const currentAssignments = user.whitelistEntry.roleAssignments || [];
+    const currentAssignments = whitelistEntry.roleAssignments || [];
     const roleIds = currentAssignments.map(
       (assignment: { role: { discordRoleId: string | null; id: number } }) => assignment.role.discordRoleId || String(assignment.role.id),
     );
 
     // Remove whitelist entry (this will cascade delete role assignments)
     await prisma.whitelistEntry.delete({
-      where: { userId: user.id },
+      where: { 
+        userId_guildId: {
+          userId: user.id,
+          guildId: guildId,
+        },
+      },
     });
 
     loggers.bot.info(
-      `Removed user ${discordId} from whitelist - had roles: [${roleIds.join(", ")}]`,
+      `Removed user ${discordId} from whitelist in guild ${guildId} - had roles: [${roleIds.join(", ")}]`,
     );
   }
 
   /**
-   * Get user's whitelist roles
+   * Get user's whitelist roles for a specific guild
    */
-  async getUserWhitelistRoles(discordId: string): Promise<string[]> {
+  async getUserWhitelistRoles(discordId: string, guildId: string): Promise<string[]> {
     try {
       const user = await prisma.user.findUnique({
         where: { discordId },
         include: {
-          whitelistEntry: {
+          whitelistEntries: {
+            where: { guildId },
             include: {
               roleAssignments: {
+                where: {
+                  role: {
+                    guildId: guildId,
+                  },
+                },
                 include: {
                   role: true,
                 },
@@ -216,20 +240,22 @@ export class WhitelistUserOperations {
 
       // Extract VRChat roles from permissions field (comma-separated)
       const roles = new Set<string>();
-      for (const assignment of user?.whitelistEntry?.roleAssignments || []) {
-        if (assignment.role.permissions) {
-          for (const role of String(assignment.role.permissions)
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)) {
-            roles.add(role);
+      for (const entry of user?.whitelistEntries || []) {
+        for (const assignment of entry.roleAssignments || []) {
+          if (assignment.role.permissions) {
+            for (const role of String(assignment.role.permissions)
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)) {
+              roles.add(role);
+            }
           }
         }
       }
       return Array.from(roles).sort();
     } catch (error) {
       loggers.bot.error(
-        `Failed to get whitelist roles for ${discordId}`,
+        `Failed to get whitelist roles for ${discordId} in guild ${guildId}`,
         error,
       );
       return [];

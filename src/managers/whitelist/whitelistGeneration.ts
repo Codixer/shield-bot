@@ -9,12 +9,15 @@ import { getEnv } from "../../config/env.js";
  */
 export class WhitelistGeneration {
   /**
-   * Get all users in the whitelist, optionally filtered by guild
+   * Get all users in the whitelist, filtered by guild
    * Optimized to reduce N+1 queries by batching username updates
    */
-  async getWhitelistUsers(guildId?: string): Promise<unknown[]> {
-    // Use select to only fetch needed fields, and filter accounts in the query
+  async getWhitelistUsers(guildId: string): Promise<unknown[]> {
+    // Use select to only fetch needed fields, and filter entries by guildId
     const entries = await prisma.whitelistEntry.findMany({
+      where: {
+        guildId: guildId,
+      },
       select: {
         createdAt: true,
         user: {
@@ -39,11 +42,9 @@ export class WhitelistGeneration {
         roleAssignments: {
           where: {
             OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-            ...(guildId && {
-              role: {
-                guildId,
-              },
-            }),
+            role: {
+              guildId: guildId,
+            },
           },
           select: {
             role: {
@@ -178,9 +179,9 @@ export class WhitelistGeneration {
   }
 
   /**
-   * Generate raw whitelist content, optionally filtered by guild
+   * Generate raw whitelist content, filtered by guild
    */
-  async generateWhitelistContent(guildId?: string): Promise<string> {
+  async generateWhitelistContent(guildId: string): Promise<string> {
     const users = await this.getWhitelistUsers(guildId);
 
     if (users.length === 0) {
@@ -197,9 +198,9 @@ export class WhitelistGeneration {
   }
 
   /**
-   * Generate encoded whitelist for PowerShell consumption, optionally filtered by guild
+   * Generate encoded whitelist for PowerShell consumption, filtered by guild
    */
-  async generateEncodedWhitelist(guildId?: string): Promise<string> {
+  async generateEncodedWhitelist(guildId: string): Promise<string> {
     const content = await this.generateWhitelistContent(guildId);
     return await this.xorEncode(content, guildId);
   }
