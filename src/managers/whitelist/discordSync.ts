@@ -276,7 +276,7 @@ export class DiscordSync {
     getUserByDiscordId: (_discordId: string) => Promise<unknown>,
     getUserWhitelistRoles: (_discordId: string) => Promise<string[]>,
     queueBatchedUpdate: (_discordId: string, _commitMessage?: string, _guildId?: string) => void,
-    preferredGuildId?: string,
+    guildId?: string,
   ): Promise<void> {
     const activeBot = (botOverride ?? bot) as { guilds?: { cache?: { values: () => IterableIterator<unknown> }; fetch: (_guildId: string) => Promise<unknown> } };
     const guildManager = activeBot?.guilds;
@@ -287,47 +287,45 @@ export class DiscordSync {
       return;
     }
     try {
-      // Find the Discord member
-      let member: unknown = null;
-      let finalGuildId: string | undefined = preferredGuildId;
-
-      // If preferredGuildId is provided, try to fetch from that guild first
-      if (preferredGuildId) {
-        try {
-          const preferredGuild = await guildManager.fetch(preferredGuildId) as { members: { fetch: (_id: string) => Promise<unknown> } } | null;
-          if (preferredGuild) {
-            try {
-              member = await preferredGuild.members.fetch(discordId);
-            } catch {
-              // Member not in preferred guild; will fall back to searching all guilds
-            }
-          }
-        } catch {
-          // Failed to fetch preferred guild; will fall back to searching all guilds
-        }
+      // guildId is required - only sync for the specific guild provided
+      if (!guildId) {
+        loggers.bot.warn(
+          `No guildId provided for whitelist sync of user ${discordId}; skipping sync`,
+        );
+        return;
       }
 
-      // If member not found yet, search across all guilds
-      if (!member && guildManager.cache) {
-        for (const guild of guildManager.cache.values()) {
-          try {
-            member = await (guild as { members: { fetch: (_id: string) => Promise<unknown> } }).members.fetch(discordId);
-            if (member) {
-              // If we didn't have a preferredGuildId, use the guild where we found the member
-              if (!finalGuildId) {
-                finalGuildId = (member as { guild: { id: string } }).guild.id;
-              }
-              break;
-            }
-          } catch {
-            // Not in this guild; continue searching
-          }
+      // Fetch the member from the specified guild only
+      let member: unknown = null;
+      try {
+        const targetGuild = await guildManager.fetch(guildId) as { members: { fetch: (_id: string) => Promise<unknown> } } | null;
+        if (!targetGuild) {
+          loggers.bot.warn(
+            `Failed to fetch guild ${guildId} for whitelist sync of user ${discordId}`,
+          );
+          return;
         }
+
+        try {
+          member = await targetGuild.members.fetch(discordId);
+        } catch (memberError) {
+          loggers.bot.debug(
+            `Discord user ${discordId} not found in guild ${guildId}; skipping whitelist sync`,
+            memberError,
+          );
+          return;
+        }
+      } catch (guildError) {
+        loggers.bot.warn(
+          `Failed to fetch guild ${guildId} for whitelist sync of user ${discordId}`,
+          guildError,
+        );
+        return;
       }
 
       if (!member) {
         loggers.bot.debug(
-          `Discord user ${discordId} not found in any guild; skipping whitelist sync`,
+          `Discord user ${discordId} not found in guild ${guildId}; skipping whitelist sync`,
         );
         return;
       }
@@ -335,28 +333,26 @@ export class DiscordSync {
       const roleIds: string[] = (member as { roles: { cache: { map: (_fn: (_role: unknown) => string) => string[] } } }).roles.cache.map((_role: unknown) => (_role as { id: string }).id);
       if (!roleIds.length) {
         loggers.bot.debug(
-          `Discord user ${discordId} has no roles; skipping whitelist sync`,
+          `Discord user ${discordId} has no roles in guild ${guildId}; skipping whitelist sync`,
         );
         return;
       }
 
       // Determine if user has eligible mapped roles and collect permissions for commit message
-      const mappings = await getDiscordRoleMappings(finalGuildId);
+      // Use the provided guildId for syncing
+      const mappings = await getDiscordRoleMappings(guildId);
       const eligible = mappings.filter(
         (m: unknown) => (m as { discordRoleId?: string }).discordRoleId && roleIds.includes((m as { discordRoleId: string }).discordRoleId),
       );
       if (eligible.length === 0) {
         loggers.bot.debug(
-          `Discord user ${discordId} has no eligible mapped roles; skipping whitelist sync`,
+          `Discord user ${discordId} has no eligible mapped roles in guild ${guildId}; skipping whitelist sync`,
         );
         return;
       }
 
-      // Sync whitelist role assignments
-      if (!finalGuildId) {
-        finalGuildId = (member as { guild: { id: string } }).guild.id;
-      }
-      await syncUserRolesFromDiscord(discordId, roleIds, finalGuildId);
+      // Sync whitelist role assignments using the provided guildId
+      await syncUserRolesFromDiscord(discordId, roleIds, guildId);
 
       // Get VRChat account info and whitelist roles for logging (currently unused but kept for future use)
       void await getUserByDiscordId(discordId);
@@ -382,7 +378,7 @@ export class DiscordSync {
       // to ensure the correct context and action type (verified/removed) is logged
 
       // Queue batched update instead of immediate publish, passing the guild ID
-      queueBatchedUpdate(discordId, msg, finalGuildId);
+      queueBatchedUpdate(discordId, msg, guildId);
       loggers.bot.info(
         `Queued repository update after verification for ${who}`,
       );
