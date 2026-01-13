@@ -199,19 +199,6 @@ export class VRCAccountManagerButtonHandler {
           );
         }
       }
-
-      // Send confirmation to user
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
-          content: "✅ Account has been set to ALT.",
-          flags: MessageFlags.Ephemeral,
-        });
-      } else {
-        await interaction.reply({
-          content: "✅ Account has been set to ALT.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
     } catch (error) {
       loggers.bot.error(
         `Failed to sync whitelist for ${discordId}`,
@@ -232,6 +219,12 @@ export class VRCAccountManagerButtonHandler {
     }
 
     await this.updateAccountManagerMessage(interaction);
+
+    // Send confirmation after UI update
+    await interaction.followUp({
+      content: "✅ Account has been set to ALT.",
+      flags: MessageFlags.Ephemeral,
+    });
   }
 
   private async handleDelete(
