@@ -201,36 +201,21 @@ export class DiscordSync {
 
     try {
       // Fetch the member from the specified guild only
-      let member: unknown = null;
-      try {
-        const targetGuild = await bot.guilds.fetch(guildId).catch(() => null);
-        if (!targetGuild) {
-          loggers.bot.warn(
-            `Failed to fetch guild ${guildId} for unverified account sync of user ${discordId}`,
-          );
-          return;
-        }
-
-        try {
-          member = await targetGuild.members.fetch(discordId);
-        } catch (memberError) {
-          loggers.bot.debug(
-            `Discord user ${discordId} not found in guild ${guildId}; skipping full sync`,
-            memberError,
-          );
-          return;
-        }
-      } catch (guildError) {
+      const targetGuild = await bot.guilds.fetch(guildId).catch(() => null);
+      if (!targetGuild) {
         loggers.bot.warn(
           `Failed to fetch guild ${guildId} for unverified account sync of user ${discordId}`,
-          guildError,
         );
         return;
       }
 
-      if (!member) {
+      let member: unknown = null;
+      try {
+        member = await targetGuild.members.fetch(discordId);
+      } catch (memberError) {
         loggers.bot.debug(
           `Discord user ${discordId} not found in guild ${guildId}; skipping full sync`,
+          memberError,
         );
         return;
       }
@@ -296,36 +281,21 @@ export class DiscordSync {
       }
 
       // Fetch the member from the specified guild only
-      let member: unknown = null;
-      try {
-        const targetGuild = await guildManager.fetch(guildId) as { members: { fetch: (_id: string) => Promise<unknown> } } | null;
-        if (!targetGuild) {
-          loggers.bot.warn(
-            `Failed to fetch guild ${guildId} for whitelist sync of user ${discordId}`,
-          );
-          return;
-        }
-
-        try {
-          member = await targetGuild.members.fetch(discordId);
-        } catch (memberError) {
-          loggers.bot.debug(
-            `Discord user ${discordId} not found in guild ${guildId}; skipping whitelist sync`,
-            memberError,
-          );
-          return;
-        }
-      } catch (guildError) {
+      const targetGuild = await guildManager.fetch(guildId).catch(() => null) as { members: { fetch: (_id: string) => Promise<unknown> } } | null;
+      if (!targetGuild) {
         loggers.bot.warn(
           `Failed to fetch guild ${guildId} for whitelist sync of user ${discordId}`,
-          guildError,
         );
         return;
       }
 
-      if (!member) {
+      let member: unknown = null;
+      try {
+        member = await targetGuild.members.fetch(discordId);
+      } catch (memberError) {
         loggers.bot.debug(
           `Discord user ${discordId} not found in guild ${guildId}; skipping whitelist sync`,
+          memberError,
         );
         return;
       }
