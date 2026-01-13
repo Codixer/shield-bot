@@ -170,17 +170,10 @@ export class VRCAccountManagerButtonHandler {
         error,
       );
       // Send error feedback to user and return early
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
-          content: "❌ Failed to update whitelist. The account type was changed, but whitelist sync failed.",
-          flags: MessageFlags.Ephemeral,
-        });
-      } else {
-        await interaction.reply({
-          content: "❌ Failed to update whitelist. The account type was changed, but whitelist sync failed.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
+      await interaction.followUp({
+        content: "❌ Failed to update whitelist. The account type was changed, but whitelist sync failed.",
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
   }
@@ -240,17 +233,10 @@ export class VRCAccountManagerButtonHandler {
         error,
       );
       // Send error feedback to user and return early
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
-          content: "❌ Failed to update whitelist. The account type was changed, but whitelist sync failed.",
-          flags: MessageFlags.Ephemeral,
-        });
-      } else {
-        await interaction.reply({
-          content: "❌ Failed to update whitelist. The account type was changed, but whitelist sync failed.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
+      await interaction.followUp({
+        content: "❌ Failed to update whitelist. The account type was changed, but whitelist sync failed.",
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
   }
@@ -338,17 +324,10 @@ export class VRCAccountManagerButtonHandler {
     } catch (error) {
       loggers.bot.error("Error deleting VRChat account", error);
       const errorMessage = "❌ An error occurred while deleting the account. The account may have been partially removed.";
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
-          content: errorMessage,
-          flags: MessageFlags.Ephemeral,
-        });
-      } else {
-        await interaction.reply({
-          content: errorMessage,
-          flags: MessageFlags.Ephemeral,
-        });
-      }
+      await interaction.followUp({
+        content: errorMessage,
+        flags: MessageFlags.Ephemeral,
+      });
     }
   }
 
