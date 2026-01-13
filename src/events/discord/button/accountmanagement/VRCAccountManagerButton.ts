@@ -306,11 +306,18 @@ export class VRCAccountManagerButtonHandler {
       });
     } catch (error) {
       loggers.bot.error("Error deleting VRChat account", error);
-      await interaction.reply({
-        content:
-          "❌ An error occurred while deleting the account. The account may have been partially removed.",
-        flags: MessageFlags.Ephemeral,
-      });
+      const errorMessage = "❌ An error occurred while deleting the account. The account may have been partially removed.";
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: errorMessage,
+          flags: MessageFlags.Ephemeral,
+        });
+      } else {
+        await interaction.reply({
+          content: errorMessage,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
     }
   }
 
