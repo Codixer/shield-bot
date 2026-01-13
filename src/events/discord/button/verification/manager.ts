@@ -121,7 +121,7 @@ export class VRChatVerifyManagerButtonHandler {
 
       // Update whitelist after verification
       try {
-        await whitelistManager.syncAndPublishAfterVerification(discordId);
+        await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, interaction.guildId ?? undefined);
       } catch (error) {
         loggers.bot.error(
           `Failed to sync whitelist for ${discordId}`,
@@ -190,7 +190,7 @@ export class VRChatVerifyManagerButtonHandler {
 
       // Update whitelist after verification
       try {
-        await whitelistManager.syncAndPublishAfterVerification(discordId);
+        await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, interaction.guildId ?? undefined);
       } catch (error) {
         loggers.bot.error(
           `Failed to sync whitelist for ${discordId}`,

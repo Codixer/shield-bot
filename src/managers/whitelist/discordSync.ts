@@ -147,7 +147,7 @@ export class DiscordSync {
   async ensureUnverifiedAccountAccess(
     discordId: string,
     getDiscordRoleMappings: (_guildId?: string) => Promise<unknown[]>,
-    syncAndPublishAfterVerification: (_discordId: string, _botOverride?: unknown) => Promise<void>,
+    syncAndPublishAfterVerification: (_discordId: string, _botOverride?: unknown, _guildId?: string) => Promise<void>,
   ): Promise<void> {
     // Get user with VRChat accounts
     const user = await prisma.user.findUnique({
@@ -256,7 +256,7 @@ export class DiscordSync {
       }
 
       // Perform full sync and publish
-      await syncAndPublishAfterVerification(discordId);
+      await syncAndPublishAfterVerification(discordId, undefined, undefined);
     } catch (e) {
       loggers.bot.warn(
         `Failed to perform full sync for unverified user ${discordId}`,
@@ -276,6 +276,7 @@ export class DiscordSync {
     getUserByDiscordId: (_discordId: string) => Promise<unknown>,
     getUserWhitelistRoles: (_discordId: string) => Promise<string[]>,
     queueBatchedUpdate: (_discordId: string, _commitMessage?: string, _guildId?: string) => void,
+    preferredGuildId?: string,
   ): Promise<void> {
     const activeBot = (botOverride ?? bot) as { guilds?: { cache?: { values: () => IterableIterator<unknown> }; fetch: (_guildId: string) => Promise<unknown> } };
     const guildManager = activeBot?.guilds;
@@ -285,37 +286,42 @@ export class DiscordSync {
       );
       return;
     }
-    const fallbackGuildId = "813926536457224212";
     try {
-      // Find the Discord member across guilds
+      // Find the Discord member
       let member: unknown = null;
-      if (guildManager.cache) {
-        for (const guild of guildManager.cache.values()) {
-          try {
-            member = await (guild as { members: { fetch: (_id: string) => Promise<unknown> } }).members.fetch(discordId);
-            if (member) {break;}
-          } catch {
-            // Not in this guild; continue searching
+      let finalGuildId: string | undefined = preferredGuildId;
+
+      // If preferredGuildId is provided, try to fetch from that guild first
+      if (preferredGuildId) {
+        try {
+          const preferredGuild = await guildManager.fetch(preferredGuildId) as { members: { fetch: (_id: string) => Promise<unknown> } } | null;
+          if (preferredGuild) {
+            try {
+              member = await preferredGuild.members.fetch(discordId);
+            } catch {
+              // Member not in preferred guild; will fall back to searching all guilds
+            }
           }
+        } catch {
+          // Failed to fetch preferred guild; will fall back to searching all guilds
         }
       }
 
-      // Fallback: explicitly fetch the primary guild if member still not found
-      if (!member) {
-        try {
-          const fallbackGuild = await guildManager.fetch(fallbackGuildId) as { members: { fetch: (_id: string) => Promise<unknown> } } | null;
-          if (fallbackGuild) {
-            try {
-              member = await fallbackGuild.members.fetch(discordId);
-            } catch {
-              // Member not in fallback guild
+      // If member not found yet, search across all guilds
+      if (!member && guildManager.cache) {
+        for (const guild of guildManager.cache.values()) {
+          try {
+            member = await (guild as { members: { fetch: (_id: string) => Promise<unknown> } }).members.fetch(discordId);
+            if (member) {
+              // If we didn't have a preferredGuildId, use the guild where we found the member
+              if (!finalGuildId) {
+                finalGuildId = (member as { guild: { id: string } }).guild.id;
+              }
+              break;
             }
+          } catch {
+            // Not in this guild; continue searching
           }
-        } catch (fetchError) {
-          loggers.bot.warn(
-            `Failed to fetch fallback guild ${fallbackGuildId}`,
-            fetchError,
-          );
         }
       }
 
@@ -335,7 +341,7 @@ export class DiscordSync {
       }
 
       // Determine if user has eligible mapped roles and collect permissions for commit message
-      const mappings = await getDiscordRoleMappings();
+      const mappings = await getDiscordRoleMappings(finalGuildId);
       const eligible = mappings.filter(
         (m: unknown) => (m as { discordRoleId?: string }).discordRoleId && roleIds.includes((m as { discordRoleId: string }).discordRoleId),
       );
@@ -347,8 +353,10 @@ export class DiscordSync {
       }
 
       // Sync whitelist role assignments
-      const guildId = (member as { guild: { id: string } }).guild.id;
-      await syncUserRolesFromDiscord(discordId, roleIds, guildId);
+      if (!finalGuildId) {
+        finalGuildId = (member as { guild: { id: string } }).guild.id;
+      }
+      await syncUserRolesFromDiscord(discordId, roleIds, finalGuildId);
 
       // Get VRChat account info and whitelist roles for logging (currently unused but kept for future use)
       void await getUserByDiscordId(discordId);
@@ -374,7 +382,7 @@ export class DiscordSync {
       // to ensure the correct context and action type (verified/removed) is logged
 
       // Queue batched update instead of immediate publish, passing the guild ID
-      queueBatchedUpdate(discordId, msg, guildId);
+      queueBatchedUpdate(discordId, msg, finalGuildId);
       loggers.bot.info(
         `Queued repository update after verification for ${who}`,
       );

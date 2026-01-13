@@ -138,7 +138,7 @@ export class VRCStaffAccountManagerButtonHandler {
 
     // Update whitelist after status change
     try {
-      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId);
+      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, undefined, interaction.guildId ?? undefined);
       
       // Send whitelist log for status change
       if (interaction.guild) {
@@ -185,7 +185,7 @@ export class VRCStaffAccountManagerButtonHandler {
 
     // Update whitelist after status change
     try {
-      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId);
+      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, undefined, interaction.guildId ?? undefined);
       
       // Send whitelist log for status change
       if (interaction.guild) {

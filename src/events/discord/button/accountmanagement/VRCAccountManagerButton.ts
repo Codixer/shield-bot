@@ -121,7 +121,7 @@ export class VRCAccountManagerButtonHandler {
     // Update whitelist after status change
     const discordId = interaction.user.id;
     try {
-      await whitelistManager.syncAndPublishAfterVerification(discordId);
+      await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, interaction.guildId ?? undefined);
       
       // Send whitelist log for status change
       if (interaction.guild) {
@@ -167,7 +167,7 @@ export class VRCAccountManagerButtonHandler {
     // Update whitelist after status change
     const discordId = interaction.user.id;
     try {
-      await whitelistManager.syncAndPublishAfterVerification(discordId);
+      await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, interaction.guildId ?? undefined);
       
       // Send whitelist log for status change
       if (interaction.guild) {

@@ -30,6 +30,8 @@ export async function handleFriendAdd(content: unknown) {
     }
     // Try to update the verified field and set verification status to VERIFIED
     let vrchatUsername: string | null = null;
+    // Save verificationGuildId before clearing it (need it outside try block)
+    const verificationGuildId = vrcAccount.verificationGuildId;
     try {
         // Get VRChat username for caching
         try {
@@ -84,7 +86,7 @@ export async function handleFriendAdd(content: unknown) {
         try {
             // For verified accounts, sync and publish with roles
             if (vrchatUsername) { // If username was fetched, it was verified
-                await whitelistManager.syncAndPublishAfterVerification(user.discordId);
+                await whitelistManager.syncAndPublishAfterVerification(user.discordId, undefined, verificationGuildId ?? undefined);
                 
                 // Send whitelist verification log to the guild where verification was started
                 if (bot && bot.guilds && vrcAccount.verificationGuildId) {

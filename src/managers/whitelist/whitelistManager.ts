@@ -527,13 +527,14 @@ export class WhitelistManager {
     return this.discordSync.ensureUnverifiedAccountAccess(
       discordId,
       (guildId) => this.roleOps.getDiscordRoleMappings(guildId),
-      (discordId, botOverride) => this.syncAndPublishAfterVerification(discordId, botOverride),
+      (discordId, botOverride, guildId) => this.syncAndPublishAfterVerification(discordId, botOverride, guildId),
     );
   }
 
   async syncAndPublishAfterVerification(
     discordId: string,
     botOverride?: unknown,
+    guildId?: string,
   ): Promise<void> {
     return this.discordSync.syncAndPublishAfterVerification(
       discordId,
@@ -543,6 +544,7 @@ export class WhitelistManager {
       (discordId) => this.userOps.getUserByDiscordId(discordId),
       (discordId) => this.userOps.getUserWhitelistRoles(discordId),
       (discordId, commitMessage, guildId) => this.queueBatchedUpdate(discordId, commitMessage, guildId),
+      guildId,
     );
   }
 
