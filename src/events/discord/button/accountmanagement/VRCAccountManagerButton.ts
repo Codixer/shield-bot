@@ -108,6 +108,9 @@ export class VRCAccountManagerButtonHandler {
     vrcUserId: string,
     guildId: string,
   ) {
+    // Defer to avoid 3-second timeout during long-running operations
+    await interaction.deferUpdate();
+
     // Check if user already has a MAIN account
     const currentMain = user.vrchatAccounts.find(
       (acc: { accountType: string }) => acc.accountType === "MAIN",
@@ -152,14 +155,34 @@ export class VRCAccountManagerButtonHandler {
           );
         }
       }
+
+      // Only update UI and send success confirmation if whitelist sync succeeded
+      await this.updateAccountManagerMessage(interaction);
+
+      // Send confirmation after UI update
+      await interaction.followUp({
+        content: "✅ Account has been set to MAIN.",
+        flags: MessageFlags.Ephemeral,
+      });
     } catch (error) {
       loggers.bot.error(
         `Failed to sync whitelist for ${discordId}`,
         error,
       );
+      // Send error feedback to user and return early
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: "❌ Failed to update whitelist. The account type was changed, but whitelist sync failed.",
+          flags: MessageFlags.Ephemeral,
+        });
+      } else {
+        await interaction.reply({
+          content: "❌ Failed to update whitelist. The account type was changed, but whitelist sync failed.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+      return;
     }
-
-    await this.updateAccountManagerMessage(interaction);
   }
 
   private async handleSetAlt(
@@ -168,6 +191,9 @@ export class VRCAccountManagerButtonHandler {
     vrcUserId: string,
     guildId: string,
   ) {
+    // Defer to avoid 3-second timeout during long-running operations
+    await interaction.deferUpdate();
+
     // Set this account as ALT
     await prisma.vRChatAccount.update({
       where: { id: vrcAccount.id },
@@ -235,6 +261,9 @@ export class VRCAccountManagerButtonHandler {
     vrcUserId: string,
     guildId: string,
   ) {
+    // Defer to avoid 3-second timeout during long-running operations
+    await interaction.deferUpdate();
+
     try {
       // Get roles and account type before deletion for logging
       const discordId = interaction.user.id;
@@ -332,6 +361,9 @@ export class VRCAccountManagerButtonHandler {
       include: { vrchatAccounts: true },
     });
 
+    // Use editReply if deferred, otherwise update
+    const updateMethod = interaction.deferred ? interaction.editReply.bind(interaction) : interaction.update.bind(interaction);
+
     if (!user || !user.vrchatAccounts || user.vrchatAccounts.length === 0) {
       // Create a simple container with just text for the completion message
       const emptyContainer = new ContainerBuilder().addTextDisplayComponents(
@@ -339,7 +371,7 @@ export class VRCAccountManagerButtonHandler {
           "✅ All VRChat accounts have been unlinked.",
         ),
       );
-      await interaction.update({
+      await updateMethod({
         components: [emptyContainer],
         flags: [MessageFlags.IsComponentsV2],
       });
@@ -358,7 +390,7 @@ export class VRCAccountManagerButtonHandler {
           "✅ All verified VRChat accounts have been unlinked.",
         ),
       );
-      await interaction.update({
+      await updateMethod({
         components: [emptyContainer],
         flags: [MessageFlags.IsComponentsV2],
       });
@@ -454,7 +486,7 @@ export class VRCAccountManagerButtonHandler {
       );
     }
 
-    await interaction.update({
+    await updateMethod({
       components: [container],
     });
   }
