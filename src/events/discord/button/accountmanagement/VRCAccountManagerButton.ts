@@ -39,6 +39,14 @@ export class VRCAccountManagerButtonHandler {
       return;
     }
 
+    if (!interaction.guildId) {
+      await interaction.reply({
+        content: "❌ This command can only be used in a server.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
     try {
       // Get the user and their VRChat accounts
       const user = await prisma.user.findUnique({
@@ -69,13 +77,13 @@ export class VRCAccountManagerButtonHandler {
 
       switch (action) {
         case "main":
-          await this.handleSetMain(interaction, user, vrcAccount, vrcUserId);
+          await this.handleSetMain(interaction, user, vrcAccount, vrcUserId, interaction.guildId);
           break;
         case "alt":
-          await this.handleSetAlt(interaction, vrcAccount, vrcUserId);
+          await this.handleSetAlt(interaction, vrcAccount, vrcUserId, interaction.guildId);
           break;
         case "delete":
-          await this.handleDelete(interaction, vrcAccount, vrcUserId);
+          await this.handleDelete(interaction, vrcAccount, vrcUserId, interaction.guildId);
           break;
         default:
           await interaction.reply({
@@ -98,6 +106,7 @@ export class VRCAccountManagerButtonHandler {
     user: User & { vrchatAccounts: VRChatAccount[] },
     vrcAccount: VRChatAccount,
     vrcUserId: string,
+    guildId: string,
   ) {
     // Check if user already has a MAIN account
     const currentMain = user.vrchatAccounts.find(
@@ -120,16 +129,13 @@ export class VRCAccountManagerButtonHandler {
 
     // Update whitelist after status change
     const discordId = interaction.user.id;
-    if (!interaction.guildId) {
-      return;
-    }
     try {
-      await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, interaction.guildId);
+      await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, guildId);
       
       // Send whitelist log for status change
       if (interaction.guild) {
         try {
-          const roles = await getUserWhitelistRoles(discordId, interaction.guildId);
+          const roles = await getUserWhitelistRoles(discordId, guildId);
           await sendWhitelistLog(interaction.client, interaction.guild.id, {
             discordId,
             displayName: interaction.user.displayName || interaction.user.username,
@@ -160,6 +166,7 @@ export class VRCAccountManagerButtonHandler {
     interaction: ButtonInteraction,
     vrcAccount: VRChatAccount,
     vrcUserId: string,
+    guildId: string,
   ) {
     // Set this account as ALT
     await prisma.vRChatAccount.update({
@@ -169,16 +176,13 @@ export class VRCAccountManagerButtonHandler {
 
     // Update whitelist after status change
     const discordId = interaction.user.id;
-    if (!interaction.guildId) {
-      return;
-    }
     try {
-      await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, interaction.guildId);
+      await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, guildId);
       
       // Send whitelist log for status change
       if (interaction.guild) {
         try {
-          const roles = await getUserWhitelistRoles(discordId, interaction.guildId);
+          const roles = await getUserWhitelistRoles(discordId, guildId);
           await sendWhitelistLog(interaction.client, interaction.guild.id, {
             discordId,
             displayName: interaction.user.displayName || interaction.user.username,
@@ -195,11 +199,36 @@ export class VRCAccountManagerButtonHandler {
           );
         }
       }
+
+      // Send confirmation to user
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: "✅ Account has been set to ALT.",
+          flags: MessageFlags.Ephemeral,
+        });
+      } else {
+        await interaction.reply({
+          content: "✅ Account has been set to ALT.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
     } catch (error) {
       loggers.bot.error(
         `Failed to sync whitelist for ${discordId}`,
         error,
       );
+      // Send error feedback to user
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: "❌ Failed to update whitelist. The account type was changed, but whitelist sync failed.",
+          flags: MessageFlags.Ephemeral,
+        });
+      } else {
+        await interaction.reply({
+          content: "❌ Failed to update whitelist. The account type was changed, but whitelist sync failed.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
     }
 
     await this.updateAccountManagerMessage(interaction);
@@ -209,6 +238,7 @@ export class VRCAccountManagerButtonHandler {
     interaction: ButtonInteraction,
     vrcAccount: VRChatAccount,
     vrcUserId: string,
+    guildId: string,
   ) {
     try {
       // Try to unfriend the user from VRChat
@@ -227,28 +257,38 @@ export class VRCAccountManagerButtonHandler {
         where: { id: vrcAccount.id },
       });
 
-
       // Get roles and account type before whitelist update for logging
       const discordId = interaction.user.id;
-      if (!interaction.guildId) {
-        return;
-      }
       let rolesBeforeDelete: string[] = [];
       const accountTypeBeforeDelete = vrcAccount.accountType;
       try {
-        rolesBeforeDelete = await getUserWhitelistRoles(discordId, interaction.guildId);
+        rolesBeforeDelete = await getUserWhitelistRoles(discordId, guildId);
       } catch (_error) {
         // Ignore errors when fetching roles before delete
       }
 
+      // Send confirmation to user
+      const confirmationMessage = `✅ VRChat account has been deleted${accountTypeBeforeDelete === "MAIN" ? " (was MAIN account)" : ""}.`;
+      if (interaction.replied || interaction.deferred) {
+        await interaction.followUp({
+          content: confirmationMessage,
+          flags: MessageFlags.Ephemeral,
+        });
+      } else {
+        await interaction.reply({
+          content: confirmationMessage,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+
       // Update whitelist after account deletion
       try {
-        await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, interaction.guildId);
+        await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, guildId);
         
         // Send whitelist log - check if user still has roles after deletion
         if (interaction.guild) {
           try {
-            const rolesAfterDelete = await getUserWhitelistRoles(discordId, interaction.guildId);
+            const rolesAfterDelete = await getUserWhitelistRoles(discordId, guildId);
             const wasActuallyRemoved = rolesAfterDelete.length === 0 && rolesBeforeDelete.length > 0;
             
             // Only log if they actually lost whitelist access or still have it with different roles
