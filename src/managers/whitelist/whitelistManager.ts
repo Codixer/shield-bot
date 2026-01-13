@@ -523,11 +523,12 @@ export class WhitelistManager {
     );
   }
 
-  async ensureUnverifiedAccountAccess(discordId: string): Promise<void> {
+  async ensureUnverifiedAccountAccess(discordId: string, guildId?: string): Promise<void> {
     return this.discordSync.ensureUnverifiedAccountAccess(
       discordId,
       (guildId) => this.roleOps.getDiscordRoleMappings(guildId),
       (discordId, botOverride, guildId) => this.syncAndPublishAfterVerification(discordId, botOverride, guildId),
+      guildId,
     );
   }
 

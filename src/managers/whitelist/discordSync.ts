@@ -148,6 +148,7 @@ export class DiscordSync {
     discordId: string,
     getDiscordRoleMappings: (_guildId?: string) => Promise<unknown[]>,
     syncAndPublishAfterVerification: (_discordId: string, _botOverride?: unknown, _guildId?: string) => Promise<void>,
+    guildId?: string,
   ): Promise<void> {
     // Get user with VRChat accounts
     const user = await prisma.user.findUnique({
@@ -190,47 +191,46 @@ export class DiscordSync {
     );
 
     // Now check if user has eligible Discord roles for full sync and publish
-    try {
-      let member: unknown = null;
-      
-      // First try cache across all guilds (no API calls)
-      for (const guild of bot.guilds.cache.values()) {
-        member = guild.members.cache.get(discordId);
-        if (member) {break;}
-      }
+    // guildId is required - only sync for the specific guild provided
+    if (!guildId) {
+      loggers.bot.warn(
+        `No guildId provided for unverified account sync of user ${discordId}; skipping full sync`,
+      );
+      return;
+    }
 
-      // If not in cache, try to fetch from verification guild or first guild
-      if (!member) {
-        // Check if any account has a verification guild ID
-        const verificationGuildId = user.vrchatAccounts.find((acc: { verificationGuildId: string | null }) => acc.verificationGuildId)?.verificationGuildId;
-        
-        if (verificationGuildId) {
-          try {
-            const guild = await bot.guilds.fetch(verificationGuildId).catch(() => null);
-            if (guild) {
-              member = await guild.members.fetch(discordId).catch(() => null);
-            }
-          } catch {
-            // Failed to fetch from verification guild
-          }
+    try {
+      // Fetch the member from the specified guild only
+      let member: unknown = null;
+      try {
+        const targetGuild = await bot.guilds.fetch(guildId).catch(() => null);
+        if (!targetGuild) {
+          loggers.bot.warn(
+            `Failed to fetch guild ${guildId} for unverified account sync of user ${discordId}`,
+          );
+          return;
         }
-        
-        // Fallback to first guild if still not found
-        if (!member) {
-          const guild = bot.guilds.cache.first();
-          if (guild) {
-            try {
-              member = await guild.members.fetch(discordId).catch(() => null);
-            } catch {
-              // User not found
-            }
-          }
+
+        try {
+          member = await targetGuild.members.fetch(discordId);
+        } catch (memberError) {
+          loggers.bot.debug(
+            `Discord user ${discordId} not found in guild ${guildId}; skipping full sync`,
+            memberError,
+          );
+          return;
         }
+      } catch (guildError) {
+        loggers.bot.warn(
+          `Failed to fetch guild ${guildId} for unverified account sync of user ${discordId}`,
+          guildError,
+        );
+        return;
       }
 
       if (!member) {
         loggers.bot.debug(
-          `Discord user ${discordId} not found in any guild; skipping full sync`,
+          `Discord user ${discordId} not found in guild ${guildId}; skipping full sync`,
         );
         return;
       }
@@ -238,25 +238,25 @@ export class DiscordSync {
       const roleIds: string[] = (member as { roles: { cache: { map: (_fn: (_role: unknown) => string) => string[] } } }).roles.cache.map((_role: unknown) => (_role as { id: string }).id);
       if (!roleIds.length) {
         loggers.bot.debug(
-          `Discord user ${discordId} has no roles; skipping full sync`,
+          `Discord user ${discordId} has no roles in guild ${guildId}; skipping full sync`,
         );
         return;
       }
 
-      // Check for eligible mapped roles
-      const mappings = await getDiscordRoleMappings();
+      // Check for eligible mapped roles using the provided guildId
+      const mappings = await getDiscordRoleMappings(guildId);
       const eligible = mappings.filter(
         (m: unknown) => (m as { discordRoleId?: string }).discordRoleId && roleIds.includes((m as { discordRoleId: string }).discordRoleId),
       );
       if (eligible.length === 0) {
         loggers.bot.debug(
-          `Discord user ${discordId} has no eligible mapped roles; skipping full sync`,
+          `Discord user ${discordId} has no eligible mapped roles in guild ${guildId}; skipping full sync`,
         );
         return;
       }
 
-      // Perform full sync and publish
-      await syncAndPublishAfterVerification(discordId, undefined, undefined);
+      // Perform full sync and publish using the provided guildId
+      await syncAndPublishAfterVerification(discordId, undefined, guildId);
     } catch (e) {
       loggers.bot.warn(
         `Failed to perform full sync for unverified user ${discordId}`,
