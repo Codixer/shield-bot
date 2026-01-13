@@ -13,6 +13,7 @@ import { bot, prisma } from "../../main.js";
 
 @Discord()
 @SlashGroup({ name: "dev", description: "Development and debugging commands (Bot Owner only)" })
+@SlashGroup("dev")
 @Guard(BotOwnerGuard)
 export class EvalCommand {
   // Common code snippets for autocomplete
