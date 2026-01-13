@@ -267,20 +267,6 @@ export class VRCAccountManagerButtonHandler {
         where: { id: vrcAccount.id },
       });
 
-      // Send confirmation to user
-      const confirmationMessage = `✅ VRChat account has been deleted${accountTypeBeforeDelete === "MAIN" ? " (was MAIN account)" : ""}.`;
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp({
-          content: confirmationMessage,
-          flags: MessageFlags.Ephemeral,
-        });
-      } else {
-        await interaction.reply({
-          content: confirmationMessage,
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-
       // Update whitelist after account deletion
       try {
         await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, guildId);
@@ -318,6 +304,13 @@ export class VRCAccountManagerButtonHandler {
       }
 
       await this.updateAccountManagerMessage(interaction);
+
+      // Send confirmation to user after UI update
+      const confirmationMessage = `✅ VRChat account has been deleted${accountTypeBeforeDelete === "MAIN" ? " (was MAIN account)" : ""}.`;
+      await interaction.followUp({
+        content: confirmationMessage,
+        flags: MessageFlags.Ephemeral,
+      });
     } catch (error) {
       loggers.bot.error("Error deleting VRChat account", error);
       await interaction.reply({
