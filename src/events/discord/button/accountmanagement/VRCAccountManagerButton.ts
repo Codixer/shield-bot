@@ -467,6 +467,7 @@ export class VRCAccountManagerButtonHandler {
 
     await updateMethod({
       components: [container],
-    });
+      flags: [MessageFlags.IsComponentsV2],
+    });  
   }
 }
