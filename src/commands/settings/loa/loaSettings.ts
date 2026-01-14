@@ -21,6 +21,50 @@ import { loggers } from "../../../utility/logger.js";
 @SlashGroup("loa", "settings")
 @Guard(StaffGuard)
 export class SettingsLOASubGroup {
+  /**
+   * Helper method to update a guild setting with error handling
+   */
+  private async updateGuildSetting(
+    interaction: CommandInteraction,
+    field: string,
+    value: string | number | null,
+    successMessage: string,
+    errorContext: string,
+    errorMessage: string,
+  ): Promise<void> {
+    if (!interaction.guildId) {
+      await interaction.reply({
+        content: "This command can only be used in a server.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
+    try {
+      await prisma.guildSettings.upsert({
+        where: { guildId: interaction.guildId },
+        update: { [field]: value },
+        create: {
+          guildId: interaction.guildId,
+          [field]: value,
+        },
+      });
+
+      await interaction.reply({
+        content: successMessage,
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch (error) {
+      loggers.bot.error(errorContext, error);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: errorMessage,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    }
+  }
+
   @Slash({
     name: "role",
     description: "Set the LOA role for this guild",
@@ -35,37 +79,14 @@ export class SettingsLOASubGroup {
     role: Role,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-
-    try {
-      await prisma.guildSettings.upsert({
-        where: { guildId: interaction.guildId },
-        update: { loaRoleId: role.id },
-        create: {
-          guildId: interaction.guildId,
-          loaRoleId: role.id,
-        },
-      });
-
-      await interaction.reply({
-        content: `✅ LOA role set to: ${role.name} (<@&${role.id}>)`,
-        flags: MessageFlags.Ephemeral,
-      });
-    } catch (error) {
-      loggers.bot.error("Error setting LOA role", error);
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({
-          content: "❌ Failed to set LOA role. Please try again.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-    }
+    await this.updateGuildSetting(
+      interaction,
+      "loaRoleId",
+      role.id,
+      `✅ LOA role set to: ${role.name} (<@&${role.id}>)`,
+      "Error setting LOA role",
+      "❌ Failed to set LOA role. Please try again.",
+    );
   }
 
   @Slash({
@@ -83,37 +104,14 @@ export class SettingsLOASubGroup {
     channel: TextChannel | NewsChannel,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-
-    try {
-      await prisma.guildSettings.upsert({
-        where: { guildId: interaction.guildId },
-        update: { loaNotificationChannelId: channel.id },
-        create: {
-          guildId: interaction.guildId,
-          loaNotificationChannelId: channel.id,
-        },
-      });
-
-      await interaction.reply({
-        content: `✅ LOA notification channel set to: <#${channel.id}>`,
-        flags: MessageFlags.Ephemeral,
-      });
-    } catch (error) {
-      loggers.bot.error("Error setting LOA notification channel", error);
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({
-          content: "❌ Failed to set LOA notification channel. Please try again.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-    }
+    await this.updateGuildSetting(
+      interaction,
+      "loaNotificationChannelId",
+      channel.id,
+      `✅ LOA notification channel set to: <#${channel.id}>`,
+      "Error setting LOA notification channel",
+      "❌ Failed to set LOA notification channel. Please try again.",
+    );
   }
 
   @Slash({
@@ -132,37 +130,14 @@ export class SettingsLOASubGroup {
     days: number,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-
-    try {
-      await prisma.guildSettings.upsert({
-        where: { guildId: interaction.guildId },
-        update: { leaveOfAbsenceCooldownDays: days },
-        create: {
-          guildId: interaction.guildId,
-          leaveOfAbsenceCooldownDays: days,
-        },
-      });
-
-      await interaction.reply({
-        content: `✅ LOA cooldown period set to ${days} day${days !== 1 ? "s" : ""}.`,
-        flags: MessageFlags.Ephemeral,
-      });
-    } catch (error) {
-      loggers.bot.error("Error setting LOA cooldown days", error);
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({
-          content: "❌ Failed to set LOA cooldown period. Please try again.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-    }
+    await this.updateGuildSetting(
+      interaction,
+      "leaveOfAbsenceCooldownDays",
+      days,
+      `✅ LOA cooldown period set to ${days} day${days !== 1 ? "s" : ""}.`,
+      "Error setting LOA cooldown days",
+      "❌ Failed to set LOA cooldown period. Please try again.",
+    );
   }
 
   @Slash({
@@ -181,36 +156,13 @@ export class SettingsLOASubGroup {
     days: number,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
-
-    try {
-      await prisma.guildSettings.upsert({
-        where: { guildId: interaction.guildId },
-        update: { minimumRequestTimeDays: days },
-        create: {
-          guildId: interaction.guildId,
-          minimumRequestTimeDays: days,
-        },
-      });
-
-      await interaction.reply({
-        content: `✅ Minimum LOA request time set to ${days} day${days !== 1 ? "s" : ""}.`,
-        flags: MessageFlags.Ephemeral,
-      });
-    } catch (error) {
-      loggers.bot.error("Error setting minimum LOA request time", error);
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({
-          content: "❌ Failed to set minimum LOA request time. Please try again.",
-          flags: MessageFlags.Ephemeral,
-        });
-      }
-    }
+    await this.updateGuildSetting(
+      interaction,
+      "minimumRequestTimeDays",
+      days,
+      `✅ Minimum LOA request time set to ${days} day${days !== 1 ? "s" : ""}.`,
+      "Error setting minimum LOA request time",
+      "❌ Failed to set minimum LOA request time. Please try again.",
+    );
   }
 }
