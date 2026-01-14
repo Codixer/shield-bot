@@ -24,10 +24,11 @@ export class WhitelistRoleSync {
   // Resolve expected whitelist roles and permissions based on Discord roles
   private async getExpectedFromDiscordRoles(
     discordRoleIds: string[],
+    guildId: string,
   ): Promise<{ roles: string[]; permissions: Set<string> }> {
     const roles: string[] = [];
     const permissions = new Set<string>();
-    const roleMappings = await whitelistManager.getDiscordRoleMappings();
+    const roleMappings = await whitelistManager.getDiscordRoleMappings(guildId);
     for (const mapping of roleMappings) {
       const mappingTyped = mapping as { discordRoleId?: string; permissions?: string };
       if (!mappingTyped.discordRoleId) {continue;}
@@ -98,18 +99,21 @@ export class WhitelistRoleSync {
       }
 
       // Get current and expected state
+      const guildId = newMember.guild.id;
       const currentUser = await whitelistManager.getUserByDiscordId(
         newMember.id,
+        guildId,
       );
       // Get current role assignments by Discord role ID for comparison
+      const whitelistEntry = (currentUser as { whitelistEntries?: Array<{ roleAssignments: Array<{ role: { discordRoleId: string | null; id: number } }> }> })?.whitelistEntries?.[0];
       const currentWhitelistRoles =
-        currentUser?.whitelistEntry?.roleAssignments?.map(
+        whitelistEntry?.roleAssignments?.map(
           (a: { role: { discordRoleId: string | null; id: number } }) => a.role.discordRoleId || String(a.role.id),
         ) || [];
       const {
         roles: expectedWhitelistRoles,
         permissions: expectedPermissions,
-      } = await this.getExpectedFromDiscordRoles(newRoleIds);
+      } = await this.getExpectedFromDiscordRoles(newRoleIds, guildId);
 
       // Compare current whitelist roles with expected roles using sets
       const currentRolesSorted = [...currentWhitelistRoles].sort();
@@ -138,7 +142,7 @@ export class WhitelistRoleSync {
 
       // Get updated whitelist roles after sync
       const updatedWhitelistRoles =
-        await this.getUserWhitelistRoles(newMember.id);
+        await this.getUserWhitelistRoles(newMember.id, guildId);
 
       loggers.bot.info(
         `Successfully updated whitelist for ${newMember.displayName}`,
@@ -148,6 +152,7 @@ export class WhitelistRoleSync {
       try {
         const vrchatInfo = await whitelistManager.getUserByDiscordId(
           newMember.id,
+          guildId,
         );
         const primaryAccount = vrchatInfo?.vrchatAccounts?.[0];
         await sendWhitelistLog(newMember.client, newMember.guild.id, {
@@ -219,14 +224,15 @@ export class WhitelistRoleSync {
       }
 
       // Sync their roles (this will grant access if they have qualifying roles)
+      const guildId = member.guild.id;
       await whitelistManager.syncUserRolesFromDiscord(
         member.id,
         roleIds,
-        member.guild.id,
+        guildId,
       );
 
       // Get updated whitelist roles after sync
-      const updatedWhitelistRoles = await this.getUserWhitelistRoles(member.id);
+      const updatedWhitelistRoles = await this.getUserWhitelistRoles(member.id, guildId);
 
       loggers.bot.info(
         `Successfully processed new member ${member.displayName}`,
@@ -237,6 +243,7 @@ export class WhitelistRoleSync {
         try {
           const vrchatInfo = await whitelistManager.getUserByDiscordId(
             member.id,
+            guildId,
           );
           const primaryAccount = vrchatInfo?.vrchatAccounts?.[0];
           await sendWhitelistLog(member.client, member.guild.id, {
@@ -261,7 +268,7 @@ export class WhitelistRoleSync {
         const username =
           member.displayName || member.user?.username || member.id;
         // Determine permissions user now should have
-        const { permissions } = await this.getExpectedFromDiscordRoles(roleIds);
+        const { permissions } = await this.getExpectedFromDiscordRoles(roleIds, guildId);
         
         // Queue for batched update instead of immediate publish, passing the guild ID
         const msg = this.buildCommitMessage(username, "added", permissions);
@@ -297,17 +304,19 @@ export class WhitelistRoleSync {
         `Member ${memberName} left/kicked/banned - removing from whitelist`,
       );
 
+      const guildId = member.guild.id;
       // Get their whitelist roles before removal for logging
-      const whitelistRoles = await this.getUserWhitelistRoles(member.id);
+      const whitelistRoles = await this.getUserWhitelistRoles(member.id, guildId);
 
       // Always remove from whitelist when they leave the server (includes kicks/bans)
-      await whitelistManager.removeUserFromWhitelistIfNoRoles(member.id);
+      await whitelistManager.removeUserFromWhitelistIfNoRoles(member.id, guildId);
 
       // Send whitelist log message if they had whitelist access
       if (whitelistRoles.length > 0) {
         try {
           const vrchatInfo = await whitelistManager.getUserByDiscordId(
             member.id,
+            guildId,
           );
           const primaryAccount = vrchatInfo?.vrchatAccounts?.[0];
           await sendWhitelistLog(member.client, member.guild.id, {
@@ -362,20 +371,21 @@ export class WhitelistRoleSync {
     try {
       const user = ban.user;
       const userName = user.displayName || user.username || user.id;
+      const guildId = ban.guild.id;
       loggers.bot.info(
         `User ${userName} was banned - ensuring removal from whitelist`,
       );
 
       // Get their whitelist roles before removal for logging
-      const whitelistRoles = await this.getUserWhitelistRoles(user.id);
+      const whitelistRoles = await this.getUserWhitelistRoles(user.id, guildId);
 
       // Ensure banned user is removed from whitelist
-      await whitelistManager.removeUserFromWhitelistIfNoRoles(user.id);
+      await whitelistManager.removeUserFromWhitelistIfNoRoles(user.id, guildId);
 
       // Send whitelist log message if they had whitelist access
       if (whitelistRoles.length > 0) {
         try {
-          const vrchatInfo = await whitelistManager.getUserByDiscordId(user.id);
+          const vrchatInfo = await whitelistManager.getUserByDiscordId(user.id, guildId);
           const primaryAccount = vrchatInfo?.vrchatAccounts?.[0];
           await sendWhitelistLog(ban.client, ban.guild.id, {
             discordId: user.id,
@@ -440,14 +450,20 @@ export class WhitelistRoleSync {
     return user ? user.vrchatAccounts.length > 0 : false;
   }
 
-  private async getUserWhitelistRoles(discordId: string): Promise<string[]> {
+  private async getUserWhitelistRoles(discordId: string, guildId: string): Promise<string[]> {
     try {
       const user = await prisma.user.findUnique({
         where: { discordId },
         include: {
-          whitelistEntry: {
+          whitelistEntries: {
+            where: { guildId },
             include: {
               roleAssignments: {
+                where: {
+                  role: {
+                    guildId: guildId,
+                  },
+                },
                 include: {
                   role: true,
                 },
@@ -459,20 +475,22 @@ export class WhitelistRoleSync {
 
       // Extract VRChat roles from permissions field (comma-separated)
       const roles = new Set<string>();
-      for (const assignment of user?.whitelistEntry?.roleAssignments || []) {
-        if (assignment.role.permissions) {
-          for (const role of String(assignment.role.permissions)
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean)) {
-            roles.add(role);
+      for (const entry of user?.whitelistEntries || []) {
+        for (const assignment of entry.roleAssignments || []) {
+          if (assignment.role.permissions) {
+            for (const role of String(assignment.role.permissions)
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)) {
+              roles.add(role);
+            }
           }
         }
       }
       return Array.from(roles).sort();
     } catch (error) {
       loggers.bot.error(
-        `Failed to get whitelist roles for ${discordId}`,
+        `Failed to get whitelist roles for ${discordId} in guild ${guildId}`,
         error,
       );
       return [];

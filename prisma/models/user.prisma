@@ -7,7 +7,7 @@ model User {
   attendanceStaff        AttendanceStaff[]
   squadMemberships       SquadMember[]
   vrchatAccounts         VRChatAccount[]
-  whitelistEntry         WhitelistEntry?
+  whitelistEntries        WhitelistEntry[]
   voicePatrolTimes       VoicePatrolTime[]
   voicePatrolMonthly     VoicePatrolMonthlyTime[]
   userPreferences        UserPreferences?

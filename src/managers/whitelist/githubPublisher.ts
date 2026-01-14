@@ -243,9 +243,12 @@ export class GitHubPublisher {
    * Get usernames with a specific permission from the whitelist
    * Returns plain text with one username per line
    */
-  private async getUsersByPermission(permission: string): Promise<string> {
+  private async getUsersByPermission(permission: string, guildId: string): Promise<string> {
     try {
       const entries = await prisma.whitelistEntry.findMany({
+        where: {
+          guildId: guildId,
+        },
         select: {
           user: {
             select: {
@@ -265,6 +268,9 @@ export class GitHubPublisher {
           roleAssignments: {
             where: {
               OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+              role: {
+                guildId: guildId,
+              },
             },
             select: {
               role: {
@@ -326,7 +332,7 @@ export class GitHubPublisher {
   /**
    * Generate all rooftop files content
    */
-  async generateRooftopFiles(): Promise<{
+  async generateRooftopFiles(guildId: string): Promise<{
     announcement: string;
     bouncer: string;
     staff: string;
@@ -337,11 +343,11 @@ export class GitHubPublisher {
   }> {
     const [announcement, bouncer, staff, vip, vipplus, announcements, spinthebottle] =
       await Promise.all([
-        this.getUsersByPermission("rooftop_announce"),
-        this.getUsersByPermission("rooftop_bouncer"),
-        this.getUsersByPermission("rooftop_staff"),
-        this.getUsersByPermission("rooftop_vip"),
-        this.getUsersByPermission("rooftop_vipplus"),
+        this.getUsersByPermission("rooftop_announce", guildId),
+        this.getUsersByPermission("rooftop_bouncer", guildId),
+        this.getUsersByPermission("rooftop_staff", guildId),
+        this.getUsersByPermission("rooftop_vip", guildId),
+        this.getUsersByPermission("rooftop_vipplus", guildId),
         (async () => {
           try {
             const announcements = await prisma.announcement.findMany({
@@ -392,8 +398,8 @@ export class GitHubPublisher {
    * Reads settings from database (if guildId provided) or falls back to environment variables.
    */
   async updateRepositoryWithRooftopFiles(
+    guildId: string,
     commitMessage?: string,
-    guildId?: string,
   ): Promise<{
     updated: boolean;
     commitSha?: string;
@@ -425,7 +431,7 @@ export class GitHubPublisher {
     };
 
     // Generate all rooftop file contents
-    const files = await this.generateRooftopFiles();
+    const files = await this.generateRooftopFiles(guildId);
 
     // Step 1: Get latest commit on branch
     const ref = await gh(`/repos/${owner}/${repo}/git/refs/heads/${branch}`);

@@ -52,9 +52,18 @@ export class WhitelistCommands {
     interaction: CommandInteraction,
   ): Promise<void> {
     try {
+      if (!interaction.guildId) {
+        await interaction.reply({
+          content: "❌ This command can only be used in a server.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+      const guildId = interaction.guildId;
+
       // Handle list action
       if (action === "list") {
-        const roleMappings = await whitelistManager.getDiscordRoleMappings();
+        const roleMappings = await whitelistManager.getDiscordRoleMappings(guildId);
 
         if (roleMappings.length === 0) {
           await interaction.reply({
@@ -135,28 +144,23 @@ export class WhitelistCommands {
                 // Get their current whitelist status
                 const userBefore = await whitelistManager.getUserByDiscordId(
                   member.id,
+                  guildId,
                 );
-                const hadAccessBefore = !!userBefore?.whitelistEntry;
+                const hadAccessBefore = !!(userBefore as { whitelistEntries?: unknown[] })?.whitelistEntries && (userBefore as { whitelistEntries: unknown[] }).whitelistEntries.length > 0;
 
                 // Sync their roles (this will remove access if they no longer qualify)
-                if (!interaction.guild) {
-                  await interaction.reply({
-                    content: "❌ This command can only be used in a server.",
-                    flags: MessageFlags.Ephemeral,
-                  });
-                  return;
-                }
                 await whitelistManager.syncUserRolesFromDiscord(
                   member.id,
                   roleIds,
-                  interaction.guild.id,
+                  guildId,
                 );
 
                 // Check their status after sync
                 const userAfter = await whitelistManager.getUserByDiscordId(
                   member.id,
+                  guildId,
                 );
-                const hasAccessAfter = !!userAfter?.whitelistEntry;
+                const hasAccessAfter = !!(userAfter as { whitelistEntries?: unknown[] })?.whitelistEntries && (userAfter as { whitelistEntries: unknown[] }).whitelistEntries.length > 0;
 
                 if (hadAccessBefore !== hasAccessAfter) {
                   accessUpdated++;
@@ -357,12 +361,21 @@ export class WhitelistCommands {
     vrchatUsername: string | null,
     interaction: CommandInteraction,
   ): Promise<void> {
+    if (!interaction.guildId) {
+      await interaction.reply({
+        content: "❌ This command can only be used in a server.",
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+    const guildId = interaction.guildId;
+
     // Handle browse action
     if (action === "browse") {
       try {
         await interaction.deferReply();
 
-        const whitelistEntries = await whitelistManager.getWhitelistUsers();
+        const whitelistEntries = await whitelistManager.getWhitelistUsers(guildId);
 
         if (whitelistEntries.length === 0) {
           await interaction.editReply({
@@ -465,32 +478,26 @@ export class WhitelistCommands {
 
         const roleIds = member.roles.cache.map((role) => role.id);
         const shouldBeWhitelisted =
-          await whitelistManager.shouldUserBeWhitelisted(roleIds);
+          await whitelistManager.shouldUserBeWhitelisted(roleIds, guildId);
 
         if (shouldBeWhitelisted) {
-          if (!interaction.guild) {
-            await interaction.reply({
-              content: "❌ This command can only be used in a server.",
-              flags: MessageFlags.Ephemeral,
-            });
-            return;
-          }
           await whitelistManager.syncUserRolesFromDiscord(
             user.id,
             roleIds,
-            interaction.guild.id,
+            guildId,
           );
 
-          const userInfo = await whitelistManager.getUserByDiscordId(user.id);
+          const userInfo = await whitelistManager.getUserByDiscordId(user.id, guildId);
           const userTyped = userInfo as {
-            whitelistEntry?: {
+            whitelistEntries?: Array<{
               roleAssignments: Array<{ role: { permissions: string | null } }>;
-            } | null;
+            }>;
           } | null;
           
           // Extract permissions from role assignments properly
           const allPermissions = new Set<string>();
-          for (const assignment of userTyped?.whitelistEntry?.roleAssignments || []) {
+          const whitelistEntry = userTyped?.whitelistEntries?.[0];
+          for (const assignment of whitelistEntry?.roleAssignments || []) {
             if (assignment.role.permissions) {
               // Split comma-separated permissions and add to set
               const rolePermissions = assignment.role.permissions
@@ -516,7 +523,7 @@ export class WhitelistCommands {
 
           await interaction.reply({ embeds: [embed] });
         } else {
-          await whitelistManager.removeUserFromWhitelistIfNoRoles(user.id);
+          await whitelistManager.removeUserFromWhitelistIfNoRoles(user.id, guildId);
           await interaction.reply({
             content: `❌ User <@${user.id}> has no Discord roles that map to whitelist permissions.`,
             flags: MessageFlags.Ephemeral,
@@ -547,29 +554,31 @@ export class WhitelistCommands {
         id?: number;
         discordId?: string;
         vrchatAccounts?: Array<{ vrchatUsername?: string | null }>;
-        whitelistEntry?: {
+        whitelistEntries?: Array<{
           roleAssignments: Array<{
             role: { permissions: string | null };
             expiresAt: Date | null;
           }>;
-        } | null;
+        }>;
       } | null = null;
 
       if (targetUser && targetUser.id !== interaction.user.id) {
         // If a specific user is provided, get detailed info
-        const detailedUser = await whitelistManager.getUserByDiscordId(targetUser.id);
+        const detailedUser = await whitelistManager.getUserByDiscordId(targetUser.id, guildId);
 
-        if (!detailedUser || !detailedUser.whitelistEntry) {
+        if (!detailedUser || !(detailedUser as { whitelistEntries?: unknown[] }).whitelistEntries || (detailedUser as { whitelistEntries: unknown[] }).whitelistEntries.length === 0) {
           await interaction.reply({
-            content: `❌ User not found in whitelist.`,
+            content: `❌ User not found in whitelist for this guild.`,
             flags: MessageFlags.Ephemeral,
           });
           return;
         }
 
+        const whitelistEntry = (detailedUser as { whitelistEntries: Array<{ roleAssignments: Array<{ role: { permissions: string | null }; expiresAt: Date | null }>; createdAt: Date }> }).whitelistEntries[0];
+
         // Extract permissions properly with expiry info
         const activeRoles: string[] = [];
-        for (const assignment of detailedUser.whitelistEntry?.roleAssignments || []) {
+        for (const assignment of whitelistEntry?.roleAssignments || []) {
           if (!assignment.expiresAt || assignment.expiresAt > new Date()) {
             if (assignment.role.permissions) {
               const rolePermissions = assignment.role.permissions
@@ -603,7 +612,7 @@ export class WhitelistCommands {
             { name: "VRChat Accounts", value: vrchatAccounts, inline: true },
             {
               name: "Added to Whitelist",
-              value: detailedUser.whitelistEntry?.createdAt?.toDateString() || "Unknown",
+              value: whitelistEntry?.createdAt?.toDateString() || "Unknown",
               inline: true,
             },
             {
@@ -622,7 +631,7 @@ export class WhitelistCommands {
 
       // Default info behavior (basic info)
       if (targetUser) {
-        userInfo = await whitelistManager.getUserByDiscordId(targetUser.id);
+        userInfo = await whitelistManager.getUserByDiscordId(targetUser.id, guildId);
       } else if (vrchatUsername) {
         const searchResults = await searchUsers({
           search: vrchatUsername.trim(),
@@ -631,6 +640,7 @@ export class WhitelistCommands {
         if (searchResults.length > 0) {
           userInfo = await whitelistManager.getUserByVrcUserId(
             searchResults[0].id,
+            guildId,
           );
         }
       }
@@ -663,12 +673,14 @@ export class WhitelistCommands {
         });
       }
 
-      if (userInfo.whitelistEntry) {
+      const whitelistEntries = (userInfo as { whitelistEntries?: Array<{ roleAssignments: Array<{ role: { permissions: string | null }; expiresAt: Date | null }> }> }).whitelistEntries;
+      if (whitelistEntries && whitelistEntries.length > 0) {
+        const whitelistEntry = whitelistEntries[0];
         // Extract permissions from role assignments properly
         const allActivePermissions = new Set<string>();
         const allExpiredPermissions = new Set<string>();
         
-        for (const assignment of userInfo.whitelistEntry.roleAssignments) {
+        for (const assignment of whitelistEntry.roleAssignments) {
           if (assignment.role.permissions) {
             const rolePermissions = assignment.role.permissions
               .split(',')
@@ -722,7 +734,14 @@ export class WhitelistCommands {
   @Slash({ description: "Get whitelist statistics" })
   async stats(interaction: CommandInteraction): Promise<void> {
     try {
-      const stats = await whitelistManager.getStatistics();
+      if (!interaction.guildId) {
+        await interaction.reply({
+          content: "❌ This command can only be used in a server.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
+      const stats = await whitelistManager.getStatistics(interaction.guildId);
 
       const embed = new EmbedBuilder()
         .setTitle("📊 Whitelist Statistics")
@@ -763,23 +782,30 @@ export class WhitelistCommands {
   @Slash({ description: "Generate and download the encoded whitelist" })
   async generate(interaction: CommandInteraction): Promise<void> {
     try {
+      if (!interaction.guildId) {
+        await interaction.reply({
+          content: "❌ This command can only be used in a server.",
+          flags: MessageFlags.Ephemeral,
+        });
+        return;
+      }
       await interaction.deferReply();
 
       const [rawContent, encodedContent] = await Promise.all([
-        whitelistManager.generateWhitelistContent(),
-        whitelistManager.generateEncodedWhitelist(),
+        whitelistManager.generateWhitelistContent(interaction.guildId),
+        whitelistManager.generateEncodedWhitelist(interaction.guildId),
       ]);
 
-      const stats = await whitelistManager.getStatistics();
+      const stats = await whitelistManager.getStatistics(interaction.guildId);
 
       // Try to update the GitHub repository with the new whitelist
       let repoUpdateSuccess = false;
       let repoUpdateError = null;
       try {
         await whitelistManager.publishWhitelist(
+          interaction.guildId,
           `manual generate: latest whitelist`,
-          true, // Force update even if content unchanged
-          interaction.guildId ?? undefined
+          true // Force update even if content unchanged
         );
         repoUpdateSuccess = true;
       } catch (repoError: unknown) {
@@ -885,7 +911,7 @@ export class WhitelistCommands {
         }
 
         const vrcUser = searchResults[0] as { id: string; displayName?: string };
-        const userInfo = await whitelistManager.getUserByVrcUserId(vrcUser.id);
+        const userInfo = await whitelistManager.getUserByVrcUserId(vrcUser.id, guild.id);
         const userInfoTyped = userInfo as { discordId?: string } | null;
 
         if (!userInfoTyped) {
@@ -914,8 +940,8 @@ export class WhitelistCommands {
 
         // Validate this specific user
         const roleIds = member.roles.cache.map((role) => role.id);
-        const userBefore = await whitelistManager.getUserByDiscordId(discordUserId);
-        const hadAccessBefore = !!userBefore?.whitelistEntry;
+        const userBefore = await whitelistManager.getUserByDiscordId(discordUserId, guild.id);
+        const hadAccessBefore = !!(userBefore as { whitelistEntries?: unknown[] })?.whitelistEntries && (userBefore as { whitelistEntries: unknown[] }).whitelistEntries.length > 0;
 
         await whitelistManager.syncUserRolesFromDiscord(
           discordUserId,
@@ -923,15 +949,16 @@ export class WhitelistCommands {
           guild.id,
         );
 
-        const userAfter = await whitelistManager.getUserByDiscordId(discordUserId);
+        const userAfter = await whitelistManager.getUserByDiscordId(discordUserId, guild.id);
         const userAfterTyped = userAfter as {
-          whitelistEntry?: {
+          whitelistEntries?: Array<{
             roleAssignments: Array<{ role: { discordRoleId?: string | null; id: number } }>;
-          } | null;
+          }>;
         } | null;
-        const hasAccessAfter = !!userAfterTyped?.whitelistEntry;
+        const whitelistEntry = userAfterTyped?.whitelistEntries?.[0];
+        const hasAccessAfter = !!whitelistEntry;
         const rolesAfter =
-          userAfterTyped?.whitelistEntry?.roleAssignments?.map((a) => a.role.discordRoleId || String(a.role.id)) ||
+          whitelistEntry?.roleAssignments?.map((a) => a.role.discordRoleId || String(a.role.id)) ||
           [];
 
         const embed = new EmbedBuilder()
@@ -978,8 +1005,8 @@ export class WhitelistCommands {
         const roleIds = member.roles.cache.map((role) => role.id);
 
         // Get their current whitelist status
-        const userBefore = await whitelistManager.getUserByDiscordId(user.id);
-        const hadAccessBefore = !!userBefore?.whitelistEntry;
+        const userBefore = await whitelistManager.getUserByDiscordId(user.id, guild.id);
+        const hadAccessBefore = !!(userBefore as { whitelistEntries?: unknown[] })?.whitelistEntries && (userBefore as { whitelistEntries: unknown[] }).whitelistEntries.length > 0;
 
         // Sync their roles (this will add/remove access as needed)
         await whitelistManager.syncUserRolesFromDiscord(
@@ -989,10 +1016,16 @@ export class WhitelistCommands {
         );
 
         // Check their status after sync
-        const userAfter = await whitelistManager.getUserByDiscordId(user.id);
-        const hasAccessAfter = !!userAfter?.whitelistEntry;
+        const userAfter = await whitelistManager.getUserByDiscordId(user.id, guild.id);
+        const userAfterTyped = userAfter as {
+          whitelistEntries?: Array<{
+            roleAssignments: Array<{ role: { discordRoleId: string | null; id: number } }>;
+          }>;
+        } | null;
+        const hasAccessAfter = !!(userAfterTyped?.whitelistEntries && userAfterTyped.whitelistEntries.length > 0);
+        const whitelistEntry = userAfterTyped?.whitelistEntries?.[0];
         const rolesAfter =
-          userAfter?.whitelistEntry?.roleAssignments?.map((a: { role: { discordRoleId: string | null; id: number } }) => a.role.discordRoleId || String(a.role.id)) ||
+          whitelistEntry?.roleAssignments?.map((a: { role: { discordRoleId: string | null; id: number } }) => a.role.discordRoleId || String(a.role.id)) ||
           [];
 
         const embed = new EmbedBuilder()
@@ -1038,8 +1071,9 @@ export class WhitelistCommands {
             // Get their current whitelist status
             const userBefore = await whitelistManager.getUserByDiscordId(
               member.id,
+              guild.id,
             );
-            const hadAccessBefore = !!userBefore?.whitelistEntry;
+            const hadAccessBefore = !!(userBefore as { whitelistEntries?: unknown[] })?.whitelistEntries && (userBefore as { whitelistEntries: unknown[] }).whitelistEntries.length > 0;
 
             // Sync their roles
             await whitelistManager.syncUserRolesFromDiscord(
@@ -1051,8 +1085,9 @@ export class WhitelistCommands {
             // Check their status after sync
             const userAfter = await whitelistManager.getUserByDiscordId(
               member.id,
+              guild.id,
             );
-            const hasAccessAfter = !!userAfter?.whitelistEntry;
+            const hasAccessAfter = !!(userAfter as { whitelistEntries?: unknown[] })?.whitelistEntries && (userAfter as { whitelistEntries: unknown[] }).whitelistEntries.length > 0;
 
             validated++;
 
@@ -1073,7 +1108,7 @@ export class WhitelistCommands {
         }
 
         // Step 2: Check all whitelisted users and remove those not in the guild
-        const whitelistedUsers = await whitelistManager.getWhitelistUsers();
+        const whitelistedUsers = await whitelistManager.getWhitelistUsers(guild.id);
         let usersNotInGuild = 0;
 
         for (const whitelistEntry of whitelistedUsers) {
@@ -1088,6 +1123,7 @@ export class WhitelistCommands {
               // User has whitelist access but is not in the guild - remove them
               await whitelistManager.removeUserFromWhitelistIfNoRoles(
                 entry.discordId,
+                guild.id,
               );
               usersNotInGuild++;
               accessRevoked++;

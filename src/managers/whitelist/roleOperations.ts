@@ -61,17 +61,38 @@ export class WhitelistRoleOperations {
       throw new Error(`Role with ID "${roleId}" not found`);
     }
 
-    // Ensure user has a whitelist entry
+    const guildId = role.guildId;
+
+    // Ensure user has a whitelist entry for this guild
     await prisma.whitelistEntry.upsert({
-      where: { userId: user.id },
+      where: { 
+        userId_guildId: {
+          userId: user.id,
+          guildId: guildId,
+        },
+      },
       update: {},
-      create: { userId: user.id },
+      create: { userId: user.id, guildId: guildId },
     });
+
+    // Get the whitelist entry for this guild
+    const whitelistEntry = await prisma.whitelistEntry.findUnique({
+      where: { 
+        userId_guildId: {
+          userId: user.id,
+          guildId: guildId,
+        },
+      },
+    });
+
+    if (!whitelistEntry) {
+      throw new Error("Whitelist entry not found after upsert");
+    }
 
     // Check if assignment already exists
     const existingAssignment = await prisma.whitelistRoleAssignment.findFirst({
       where: {
-        whitelist: { userId: user.id },
+        whitelistId: whitelistEntry.id,
         roleId: role.id,
       },
     });
@@ -87,14 +108,6 @@ export class WhitelistRoleOperations {
       });
     } else {
       // Create new assignment
-      const whitelistEntry = await prisma.whitelistEntry.findUnique({
-        where: { userId: user.id },
-      });
-
-      if (!whitelistEntry) {
-        throw new Error("Whitelist entry not found after upsert");
-      }
-
       return await prisma.whitelistRoleAssignment.create({
         data: {
           whitelistId: whitelistEntry.id,
@@ -122,9 +135,23 @@ export class WhitelistRoleOperations {
       });
       if (!role) {return false;}
 
+      const guildId = role.guildId;
+
+      // Find the whitelist entry for this guild
+      const whitelistEntry = await prisma.whitelistEntry.findUnique({
+        where: { 
+          userId_guildId: {
+            userId: user.id,
+            guildId: guildId,
+          },
+        },
+      });
+
+      if (!whitelistEntry) {return false;}
+
       const result = await prisma.whitelistRoleAssignment.deleteMany({
         where: {
-          whitelist: { userId: user.id },
+          whitelistId: whitelistEntry.id,
           roleId: role.id,
         },
       });
@@ -231,11 +258,19 @@ export class WhitelistRoleOperations {
   async assignRoleByVrcUserId(
     vrcUserId: string,
     roleId: number,
-    getUserByVrcUserId: (vrcUserId: string) => Promise<unknown>,
+    getUserByVrcUserId: (vrcUserId: string, guildId: string) => Promise<unknown>,
     assignedBy?: string,
     expiresAt?: Date,
   ): Promise<unknown> {
-    const user = await getUserByVrcUserId(vrcUserId) as { discordId?: string } | null;
+    // Get role to extract guildId
+    const role = await prisma.whitelistRole.findUnique({
+      where: { id: roleId },
+    });
+    if (!role) {
+      throw new Error(`Role with ID "${roleId}" not found`);
+    }
+
+    const user = await getUserByVrcUserId(vrcUserId, role.guildId) as { discordId?: string } | null;
     if (!user || !user.discordId) {
       throw new Error("User not found in database");
     }

@@ -39,40 +39,40 @@ export class WhitelistManager {
   }
 
   // ========== User Operations ==========
-  async getUserByDiscordId(discordId: string) {
-    return this.userOps.getUserByDiscordId(discordId);
+  async getUserByDiscordId(discordId: string, guildId: string) {
+    return this.userOps.getUserByDiscordId(discordId, guildId);
   }
 
-  async getUserByVrcUserId(vrcUserId: string) {
-    return this.userOps.getUserByVrcUserId(vrcUserId);
+  async getUserByVrcUserId(vrcUserId: string, guildId: string) {
+    return this.userOps.getUserByVrcUserId(vrcUserId, guildId);
   }
 
-  async addUserByDiscordId(discordId: string): Promise<unknown> {
-    return this.userOps.addUserByDiscordId(discordId);
+  async addUserByDiscordId(discordId: string, guildId: string): Promise<unknown> {
+    return this.userOps.addUserByDiscordId(discordId, guildId);
   }
 
-  async addUserByVrcUsername(vrchatUsername: string): Promise<unknown> {
-    return this.userOps.addUserByVrcUsername(vrchatUsername);
+  async addUserByVrcUsername(vrchatUsername: string, guildId: string): Promise<unknown> {
+    return this.userOps.addUserByVrcUsername(vrchatUsername, guildId);
   }
 
-  async removeUserByDiscordId(discordId: string): Promise<boolean> {
-    return this.userOps.removeUserByDiscordId(discordId);
+  async removeUserByDiscordId(discordId: string, guildId: string): Promise<boolean> {
+    return this.userOps.removeUserByDiscordId(discordId, guildId);
   }
 
-  async removeUserByVrcUserId(vrcUserId: string): Promise<boolean> {
-    return this.userOps.removeUserByVrcUserId(vrcUserId);
+  async removeUserByVrcUserId(vrcUserId: string, guildId: string): Promise<boolean> {
+    return this.userOps.removeUserByVrcUserId(vrcUserId, guildId);
   }
 
-  async addUserByVrcUserId(vrcUserId: string): Promise<unknown> {
-    return this.userOps.addUserByVrcUserId(vrcUserId);
+  async addUserByVrcUserId(vrcUserId: string, guildId: string): Promise<unknown> {
+    return this.userOps.addUserByVrcUserId(vrcUserId, guildId);
   }
 
-  async removeUserFromWhitelistIfNoRoles(discordId: string): Promise<void> {
-    return this.userOps.removeUserFromWhitelistIfNoRoles(discordId);
+  async removeUserFromWhitelistIfNoRoles(discordId: string, guildId: string): Promise<void> {
+    return this.userOps.removeUserFromWhitelistIfNoRoles(discordId, guildId);
   }
 
-  async getUserWhitelistRoles(discordId: string): Promise<string[]> {
-    return this.userOps.getUserWhitelistRoles(discordId);
+  async getUserWhitelistRoles(discordId: string, guildId: string): Promise<string[]> {
+    return this.userOps.getUserWhitelistRoles(discordId, guildId);
   }
 
   // ========== Role Operations ==========
@@ -134,25 +134,38 @@ export class WhitelistManager {
     assignedBy?: string,
     expiresAt?: Date,
   ): Promise<unknown> {
+    // Get role to extract guildId
+    const role = await prisma.whitelistRole.findUnique({
+      where: { id: roleId },
+    });
+    if (!role) {
+      throw new Error(`Role with ID "${roleId}" not found`);
+    }
+    // Capture guildId once to avoid redundant lookups in the closure
+    const roleGuildId = role.guildId;
+    if (!roleGuildId) {
+      throw new Error(`Role with ID "${roleId}" has no guildId`);
+    }
     return this.roleOps.assignRoleByVrcUserId(
       vrcUserId,
       roleId,
-      (vrcUserId: string) => this.userOps.getUserByVrcUserId(vrcUserId),
+      // Use the captured roleGuildId instead of the passed guildId parameter to avoid redundant DB lookups
+      (_vrcUserId: string, _guildId: string) => this.userOps.getUserByVrcUserId(_vrcUserId, roleGuildId),
       assignedBy,
       expiresAt,
     );
   }
 
   // ========== Whitelist Generation ==========
-  async getWhitelistUsers(guildId?: string): Promise<unknown[]> {
+  async getWhitelistUsers(guildId: string): Promise<unknown[]> {
     return this.generation.getWhitelistUsers(guildId);
   }
 
-  async generateWhitelistContent(guildId?: string): Promise<string> {
+  async generateWhitelistContent(guildId: string): Promise<string> {
     return this.generation.generateWhitelistContent(guildId);
   }
 
-  async generateEncodedWhitelist(guildId?: string): Promise<string> {
+  async generateEncodedWhitelist(guildId: string): Promise<string> {
     return this.generation.generateEncodedWhitelist(guildId);
   }
 
@@ -162,18 +175,22 @@ export class WhitelistManager {
    * Writes both encoded and decoded files in a single commit.
    * Now checks if content changed before publishing to avoid unnecessary commits.
    */
-  async publishWhitelist(commitMessage?: string, force: boolean = false, guildId?: string, affectedGuildIds?: string[]): Promise<{
+  async publishWhitelist(guildId: string, commitMessage?: string, force: boolean = false, affectedGuildIds?: string[]): Promise<{
     updated: boolean;
     commitSha?: string;
     paths?: string[];
     branch?: string;
     reason?: string;
   }> {
-    // Use the first affected guild's settings, or the provided guildId
+    // Use the provided guildId or the first affected guild
     const settingsGuildId = guildId || (affectedGuildIds && affectedGuildIds.length > 0 ? affectedGuildIds[0] : undefined);
+    
+    if (!settingsGuildId) {
+      throw new Error("guildId is required for publishing whitelist");
+    }
 
     // Generate content to check if it changed
-    const currentContent = await this.generation.generateWhitelistContent();
+    const currentContent = await this.generation.generateWhitelistContent(settingsGuildId);
 
     // Skip update if content hasn't changed (unless forced)
     if (!force && this.lastPublishedContent !== null && currentContent === this.lastPublishedContent) {
@@ -183,7 +200,7 @@ export class WhitelistManager {
 
     const [encodedData, decodedData] = await Promise.all([
       this.generation.generateEncodedWhitelist(settingsGuildId),
-      this.generation.generateWhitelistContent(),
+      this.generation.generateWhitelistContent(settingsGuildId),
     ]);
     const result = await this.githubPublisher.updateRepositoryWithWhitelist(
       encodedData,
@@ -308,6 +325,7 @@ export class WhitelistManager {
    */
   private async checkForRooftopPermissionChanges(
     discordIds: string[],
+    guildId: string,
   ): Promise<boolean> {
     try {
       const rooftopPermissions = [
@@ -325,6 +343,7 @@ export class WhitelistManager {
               in: discordIds,
             },
           },
+          guildId: guildId,
         },
         select: {
           roleAssignments: {
@@ -385,27 +404,10 @@ export class WhitelistManager {
     loggers.bot.info(`Processing batched update for ${count} users`);
 
     try {
-      // Generate a meaningful commit message if not provided
-      let message = commitMessage;
-      if (!message || message.trim().length === 0) {
-        if (count === 1) {
-          // Try to get the user's name for single updates
-          try {
-            const user = await this.userOps.getUserByDiscordId(users[0]);
-            const name = (user as { vrchatAccounts?: Array<{ vrchatUsername?: string }> })?.vrchatAccounts?.[0]?.vrchatUsername || users[0];
-            message = `Updated whitelist for ${name}`;
-          } catch {
-            message = `Updated whitelist for 1 user`;
-          }
-        } else {
-          message = `Updated whitelist for ${count} users`;
-        }
-      }
-
       // Determine affected guilds from users' role assignments if not already tracked
       let finalAffectedGuildIds = guildIds;
       if (finalAffectedGuildIds.length === 0) {
-        // Find all guilds that have whitelist roles assigned to these users
+        // Find all guilds that have whitelist entries for these users
         const entries = await prisma.whitelistEntry.findMany({
           where: {
             user: {
@@ -414,28 +416,15 @@ export class WhitelistManager {
               },
             },
           },
-          include: {
-            roleAssignments: {
-              include: {
-                role: {
-                  select: {
-                    guildId: true,
-                  },
-                },
-              },
-            },
+          select: {
+            guildId: true,
           },
+          distinct: ['guildId'],
         });
 
-        const guildIdSet = new Set<string>();
-        for (const entry of entries) {
-          for (const assignment of entry.roleAssignments) {
-            if (assignment.role.guildId) {
-              guildIdSet.add(assignment.role.guildId);
-            }
-          }
-        }
-        finalAffectedGuildIds = Array.from(guildIdSet);
+        finalAffectedGuildIds = entries
+          .map((entry: { guildId: string | null }) => entry.guildId)
+          .filter((id: string | null): id is string => id !== null);
         
         // Only include guilds that actually have whitelist role mappings configured
         // This prevents applying changes to guilds without whitelists
@@ -485,21 +474,49 @@ export class WhitelistManager {
         finalAffectedGuildIds = finalAffectedGuildIds.filter(gid => validGuildIds.has(gid));
       }
 
-      // Use the first affected guild's settings for publishing
-      const settingsGuildId = finalAffectedGuildIds.length > 0 ? finalAffectedGuildIds[0] : undefined;
+      // Generate a meaningful commit message if not provided
+      let message = commitMessage;
+      if (!message || message.trim().length === 0) {
+        if (count === 1 && finalAffectedGuildIds.length > 0) {
+          // Try to get the user's name for single updates
+          try {
+            const user = await this.userOps.getUserByDiscordId(users[0], finalAffectedGuildIds[0]);
+            const name = (user as { vrchatAccounts?: Array<{ vrchatUsername?: string }> })?.vrchatAccounts?.[0]?.vrchatUsername || users[0];
+            message = `Updated whitelist for ${name}`;
+          } catch {
+            message = `Updated whitelist for 1 user`;
+          }
+        } else {
+          message = `Updated whitelist for ${count} users`;
+        }
+      }
 
-      // Publish with content change check, passing affected guild IDs
-      await this.publishWhitelist(message, false, undefined, finalAffectedGuildIds.length > 0 ? finalAffectedGuildIds : undefined);
+      // Publish for each affected guild
+      for (const gid of finalAffectedGuildIds) {
+        await this.publishWhitelist(gid, message, false, [gid]);
+      }
 
       // Check if any rooftop permissions were updated and publish rooftop files if needed
-      const hasRooftopChanges = await this.checkForRooftopPermissionChanges(users);
+      // Check for each affected guild
+      let hasRooftopChanges = false;
+      for (const gid of finalAffectedGuildIds) {
+        const hasChanges = await this.checkForRooftopPermissionChanges(users, gid);
+        if (hasChanges) {
+          hasRooftopChanges = true;
+          break;
+        }
+      }
       if (hasRooftopChanges) {
         loggers.bot.info("Rooftop permissions changed, updating rooftop files");
         try {
-          await this.githubPublisher.updateRepositoryWithRooftopFiles(
-            `chore(rooftop): update rooftop files after whitelist change`,
-            settingsGuildId,
-          );
+          // Use first affected guild for rooftop files
+          const rooftopGuildId = finalAffectedGuildIds.length > 0 ? finalAffectedGuildIds[0] : undefined;
+          if (rooftopGuildId) {
+            await this.githubPublisher.updateRepositoryWithRooftopFiles(
+              rooftopGuildId,
+              `chore(rooftop): update rooftop files after whitelist change`,
+            );
+          }
         } catch (error) {
           loggers.bot.error("Error updating rooftop files", error);
         }
@@ -513,26 +530,37 @@ export class WhitelistManager {
   async syncUserRolesFromDiscord(
     discordId: string,
     discordRoleIds: string[],
-    guildId?: string,
+    guildId: string,
   ): Promise<void> {
     return this.discordSync.syncUserRolesFromDiscord(
       discordId,
       discordRoleIds,
       guildId,
-      (discordId) => this.userOps.removeUserFromWhitelistIfNoRoles(discordId),
+      (discordId, guildId) => this.userOps.removeUserFromWhitelistIfNoRoles(discordId, guildId),
     );
   }
 
-  async ensureUnverifiedAccountAccess(discordId: string): Promise<void> {
+  async ensureUnverifiedAccountAccess(discordId: string, guildId: string): Promise<void> {
     return this.discordSync.ensureUnverifiedAccountAccess(
       discordId,
       (guildId) => this.roleOps.getDiscordRoleMappings(guildId),
-      (discordId, botOverride) => this.syncAndPublishAfterVerification(discordId, botOverride),
+      // Callback fallback: when discordSync.ensureUnverifiedAccountAccess provides a callbackGuildId
+      // (from role mappings), use that value for syncAndPublishAfterVerification; otherwise fall back
+      // to the outer guildId parameter. This ensures we sync with the correct guild context based on
+      // where the role mappings are configured.
+      (discordId, botOverride, callbackGuildId) => {
+        if (callbackGuildId) {
+          return this.syncAndPublishAfterVerification(discordId, callbackGuildId, botOverride);
+        }
+        return this.syncAndPublishAfterVerification(discordId, guildId, botOverride);
+      },
+      guildId,
     );
   }
 
   async syncAndPublishAfterVerification(
     discordId: string,
+    guildId: string,
     botOverride?: unknown,
   ): Promise<void> {
     return this.discordSync.syncAndPublishAfterVerification(
@@ -540,17 +568,18 @@ export class WhitelistManager {
       botOverride ?? bot,
       (guildId) => this.roleOps.getDiscordRoleMappings(guildId),
       (discordId, roleIds, guildId) => this.syncUserRolesFromDiscord(discordId, roleIds, guildId),
-      (discordId) => this.userOps.getUserByDiscordId(discordId),
-      (discordId) => this.userOps.getUserWhitelistRoles(discordId),
+      (discordId, guildId) => this.userOps.getUserByDiscordId(discordId, guildId),
+      (discordId, guildId) => this.userOps.getUserWhitelistRoles(discordId, guildId),
       (discordId, commitMessage, guildId) => this.queueBatchedUpdate(discordId, commitMessage, guildId),
+      guildId,
     );
   }
 
   // ========== Statistics ==========
   /**
-   * Get statistics
+   * Get statistics, optionally filtered by guild
    */
-  async getStatistics(): Promise<{
+  async getStatistics(guildId?: string): Promise<{
     totalUsers: number;
     totalRoles: number;
     totalActiveAssignments: number;
@@ -562,16 +591,30 @@ export class WhitelistManager {
       totalActiveAssignments,
       totalExpiredAssignments,
     ] = await Promise.all([
-      prisma.whitelistEntry.count(),
-      prisma.whitelistRole.count(),
+      prisma.whitelistEntry.count({
+        ...(guildId && { where: { guildId } }),
+      }),
+      prisma.whitelistRole.count({
+        ...(guildId && { where: { guildId } }),
+      }),
       prisma.whitelistRoleAssignment.count({
         where: {
           OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+          ...(guildId && {
+            role: {
+              guildId: guildId,
+            },
+          }),
         },
       }),
       prisma.whitelistRoleAssignment.count({
         where: {
           expiresAt: { lte: new Date() },
+          ...(guildId && {
+            role: {
+              guildId: guildId,
+            },
+          }),
         },
       }),
     ]);
@@ -588,14 +631,14 @@ export class WhitelistManager {
   /**
    * Get all whitelist entries (alias for API compatibility)
    */
-  async getAllWhitelistEntries(): Promise<unknown[]> {
-    return this.getWhitelistUsers();
+  async getAllWhitelistEntries(guildId: string): Promise<unknown[]> {
+    return this.getWhitelistUsers(guildId);
   }
 
   /**
    * Bulk import users from CSV content
    */
-  async bulkImportUsers(csvContent: string): Promise<{
+  async bulkImportUsers(csvContent: string, guildId: string): Promise<{
     imported: number;
     errors: string[];
   }> {
@@ -611,7 +654,7 @@ export class WhitelistManager {
 
       try {
         // Add user to whitelist
-        await this.addUserByVrcUsername(vrchatUsername.trim());
+        await this.addUserByVrcUsername(vrchatUsername.trim(), guildId);
 
         // Assign roles if specified
         if (roleNames) {
