@@ -35,6 +35,11 @@ model GuildSettings {
   // VRChat group settings
   vrcGroupId                 String? // VRChat group ID for group invites and role sync (e.g., grp_xxx)
   botPromotionLogsChannelId  String? // Channel ID for logging VRChat group promotions/demotions
+  // LOA settings
+  loaRoleId                  String? // Discord role ID for LOA
+  loaNotificationChannelId  String? // Channel ID for LOA patrol notifications
+  leaveOfAbsenceCooldownDays Int?    @default(14) // Cooldown period in days after ending LOA early
+  minimumRequestTimeDays     Int?    @default(30) // Minimum LOA duration in days (default: 1 month)
   createdAt                  DateTime @default(now())
   updatedAt                  DateTime @updatedAt
 }

@@ -14,3 +14,12 @@ enum PermissionLevel {
   SHIELD_MEMBER
   USER
 }
+
+enum LeaveOfAbsenceStatus {
+  PENDING
+  APPROVED
+  DENIED
+  ACTIVE
+  ENDED_EARLY
+  EXPIRED
+}
