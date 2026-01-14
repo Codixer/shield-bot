@@ -91,27 +91,29 @@ export class SettingsLOASubGroup {
       return;
     }
 
-    if (channel.type !== ChannelType.GuildText && channel.type !== ChannelType.GuildAnnouncement) {
+    try {
+      await prisma.guildSettings.upsert({
+        where: { guildId: interaction.guildId },
+        update: { loaNotificationChannelId: channel.id },
+        create: {
+          guildId: interaction.guildId,
+          loaNotificationChannelId: channel.id,
+        },
+      });
+
       await interaction.reply({
-        content: "❌ The channel must be a text channel.",
+        content: `✅ LOA notification channel set to: <#${channel.id}>`,
         flags: MessageFlags.Ephemeral,
       });
-      return;
+    } catch (error) {
+      loggers.bot.error("Error setting LOA notification channel", error);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: "❌ Failed to set LOA notification channel. Please try again.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
     }
-
-    await prisma.guildSettings.upsert({
-      where: { guildId: interaction.guildId },
-      update: { loaNotificationChannelId: channel.id },
-      create: {
-        guildId: interaction.guildId,
-        loaNotificationChannelId: channel.id,
-      },
-    });
-
-    await interaction.reply({
-      content: `✅ LOA notification channel set to: <#${channel.id}>`,
-      flags: MessageFlags.Ephemeral,
-    });
   }
 
   @Slash({
