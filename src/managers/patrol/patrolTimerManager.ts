@@ -14,6 +14,7 @@ import {
 } from "discord.js";
 import { prisma } from "../../main.js";
 import { loggers } from "../../utility/logger.js";
+import { loaManager } from "../../main.js";
 
 const MONTH_NAMES = [
   "January",
@@ -127,6 +128,8 @@ export class PatrolTimerManager {
       promotionMinHours?: number | null;
       promotionRecruitRoleId?: string | null;
       patrolLogChannelId?: string | null;
+      loaNotificationChannelId?: string | null;
+      staffRoleIds?: unknown;
     };
   }
 
@@ -205,7 +208,10 @@ export class PatrolTimerManager {
       // If joining a tracked channel, start tracking
       if (nowTracked && !wasTracked) {
         if (joinedChannelId) {
-          this.startTracking(guildId, member, joinedChannelId);
+          // Check for LOA before starting tracking
+          void this.checkLOAAndStartTracking(guild, guildId, member, joinedChannelId, settings).catch((err) =>
+            loggers.patrol.error("Error in checkLOAAndStartTracking", err),
+          );
         }
       }
     } catch (err) {
@@ -247,8 +253,8 @@ export class PatrolTimerManager {
     
     guildMap.delete(member.id);
     
-    // Don't persist time if user is paused
-    if (this.isUserPaused(guildId, member.id)) {
+    // Don't persist time if user is paused or on LOA
+    if (await this.isUserPausedOrOnLOA(guildId, member.id)) {
       // Delete persisted session
       await prisma.activeVoicePatrolSession
         .deleteMany({
@@ -361,8 +367,9 @@ export class PatrolTimerManager {
     const now = Date.now();
     const arr: Array<{ userId: string; ms: number; channelId: string }> = [];
     for (const tu of guildMap.values()) {
-      // Show 0ms if paused
-      const ms = this.isUserPaused(guildId, tu.userId) 
+      // Show 0ms if paused or on LOA
+      const isPausedOrOnLOA = this.isUserPaused(guildId, tu.userId) || await this.isUserPausedOrOnLOA(guildId, tu.userId);
+      const ms = isPausedOrOnLOA 
         ? 0 
         : now - tu.startedAt.getTime();
       arr.push({
@@ -391,8 +398,8 @@ export class PatrolTimerManager {
     }
     if (guildMap) {
       for (const tu of guildMap.values()) {
-        // Only add delta if user is not paused
-        if (!this.isUserPaused(guildId, tu.userId)) {
+        // Only add delta if user is not paused or on LOA
+        if (!this.isUserPaused(guildId, tu.userId) && !(await this.isUserPausedOrOnLOA(guildId, tu.userId))) {
           const delta = now - tu.startedAt.getTime();
           if (delta > 0) {byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;}
         }
@@ -450,8 +457,8 @@ export class PatrolTimerManager {
 
     if (guildMap) {
       for (const tu of guildMap.values()) {
-        // Only add delta if user is not paused
-        if (!this.isUserPaused(guildId, tu.userId)) {
+        // Only add delta if user is not paused or on LOA
+        if (!this.isUserPaused(guildId, tu.userId) && !(await this.isUserPausedOrOnLOA(guildId, tu.userId))) {
           const startMs = Math.max(tu.startedAt.getTime(), monthStart);
           const delta = Math.max(0, nowMs - startMs);
           if (delta > 0) {byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;}
@@ -504,7 +511,7 @@ export class PatrolTimerManager {
         
         for (const tu of guildMap.values()) {
           // Only add delta if user is not paused
-          if (!this.isUserPaused(guildId, tu.userId)) {
+          if (!this.isUserPaused(guildId, tu.userId) && !(await this.isUserPausedOrOnLOA(guildId, tu.userId))) {
             const startMs = Math.max(tu.startedAt.getTime(), monthStart);
             const delta = Math.max(0, nowMs - startMs);
             if (delta > 0) {
@@ -540,11 +547,11 @@ export class PatrolTimerManager {
     });
     let base = row?.totalMs ? Number(row.totalMs) : 0;
 
-    // Add live delta for current month if user is currently tracked and not paused
+    // Add live delta for current month if user is currently tracked and not paused or on LOA
     const now = new Date();
     const isCurrentMonth =
       now.getUTCFullYear() === year && now.getUTCMonth() + 1 === month;
-    if (isCurrentMonth && !this.isUserPaused(guildId, userId)) {
+    if (isCurrentMonth && !this.isUserPaused(guildId, userId) && !(await this.isUserPausedOrOnLOA(guildId, userId))) {
       const guildMap = this.tracked.get(guildId);
       const tu = guildMap?.get(userId);
       if (tu) {
@@ -575,11 +582,11 @@ export class PatrolTimerManager {
       total += Number(row.totalMs);
     }
 
-    // Add live delta for current month if user is currently tracked and not paused
+    // Add live delta for current month if user is currently tracked and not paused or on LOA
     const now = new Date();
     const currentYear = now.getUTCFullYear();
     const currentMonth = now.getUTCMonth() + 1;
-    if (year === currentYear && !this.isUserPaused(guildId, userId)) {
+    if (year === currentYear && !this.isUserPaused(guildId, userId) && !(await this.isUserPausedOrOnLOA(guildId, userId))) {
       const guildMap = this.tracked.get(guildId);
       const tu = guildMap?.get(userId);
       if (tu) {
@@ -618,8 +625,8 @@ export class PatrolTimerManager {
       for (const tu of guildMap.values()) {
         if (tu.channelId !== channelId) {continue;} // only add deltas for this channel
         if (!ids.includes(tu.userId)) {continue;}
-        // Only add delta if user is not paused
-        if (!this.isUserPaused(guild.id, tu.userId)) {
+        // Only add delta if user is not paused or on LOA
+        if (!this.isUserPaused(guild.id, tu.userId) && !(await this.isUserPausedOrOnLOA(guild.id, tu.userId))) {
           const delta = now - tu.startedAt.getTime();
           if (delta > 0) {byUser[tu.userId] = (byUser[tu.userId] ?? 0) + delta;}
         }
@@ -685,8 +692,8 @@ export class PatrolTimerManager {
       where: { guildId_userId: { guildId, userId } },
     });
     let base = row?.totalMs ? Number(row.totalMs) : 0;
-    // Add live delta if user is not paused
-    if (!this.isUserPaused(guildId, userId)) {
+    // Add live delta if user is not paused or on LOA
+    if (!this.isUserPaused(guildId, userId) && !(await this.isUserPausedOrOnLOA(guildId, userId))) {
       const guildMap = this.tracked.get(guildId);
       const tu = guildMap?.get(userId);
       if (tu) {
@@ -772,11 +779,30 @@ export class PatrolTimerManager {
 
   /**
    * Check if a user is paused (either individually or guild-wide).
+   * Note: This is synchronous and only checks the manual pause state.
+   * For LOA checks, use isUserPausedOrOnLOA (async).
    */
   isUserPaused(guildId: string, userId: string): boolean {
     if (this.pausedGuilds.has(guildId)) {return true;}
     const paused = this.pausedUsers.get(guildId);
     return paused ? paused.has(userId) : false;
+  }
+
+  /**
+   * Check if a user is paused or on LOA (async version for LOA checks).
+   */
+  private async isUserPausedOrOnLOA(guildId: string, userId: string): Promise<boolean> {
+    // Check manual pause first (synchronous)
+    if (this.isUserPaused(guildId, userId)) {return true;}
+    
+    // Check for active LOA (async)
+    try {
+      const loa = await loaManager.getActiveLOA(guildId, userId);
+      return loa !== null && !loa.notificationsPaused;
+    } catch (error) {
+      loggers.patrol.error(`Error checking LOA for user ${userId} in guild ${guildId}`, error);
+      return false; // On error, don't pause (fail open)
+    }
   }
 
   /**
@@ -1309,6 +1335,162 @@ export class PatrolTimerManager {
         });
       }
       curStart = new Date(segmentEndMs);
+    }
+  }
+
+  /**
+   * Check if user is on LOA and notify staff if they join patrol
+   */
+  /**
+   * Check for LOA, notify staff if needed, and start tracking only if not on LOA.
+   */
+  private async checkLOAAndStartTracking(
+    guild: Guild,
+    guildId: string,
+    member: GuildMember,
+    channelId: string,
+    settings: Awaited<ReturnType<typeof this.getSettings>>,
+  ): Promise<void> {
+    // Check if user is manually paused first
+    // If manually paused, don't start tracking and don't trigger LOA alerts/DMs
+    if (this.isUserPaused(guildId, member.id)) {
+      // User is manually paused - don't start tracking, don't alert staff, don't DM user
+      return;
+    }
+    
+    // Check if user is on LOA (only if not manually paused)
+    const loa = await loaManager.getActiveLOA(guildId, member.id);
+    const isOnLOA = loa !== null;
+    
+    if (isOnLOA) {
+      // User is on LOA - notify staff but don't start tracking
+      await this.checkLOAAndNotify(guild, guildId, member.id, channelId, settings);
+      
+      // Inform user that their time won't be tracked (unless notifications are paused)
+      if (loa && !loa.notificationsPaused) {
+        await this.notifyUserAboutLOATracking(member.id);
+      }
+      return;
+    }
+    
+    // User is not on LOA and not manually paused - start tracking normally
+    this.startTracking(guildId, member, channelId);
+  }
+
+  /**
+   * Send a DM to the user informing them that their time won't be tracked during LOA.
+   */
+  private async notifyUserAboutLOATracking(userId: string): Promise<void> {
+    try {
+      const user = await this.client.users.fetch(userId);
+      const embed = new EmbedBuilder()
+        .setTitle("⚠️ LOA Time Tracking Paused")
+        .setDescription(
+          "You've joined a patrol channel while on Leave of Absence. Your patrol time **will not be tracked** during your LOA period.",
+        )
+        .addFields({
+          name: "Want to Resume Tracking?",
+          value: "If you'd like to end your LOA early and resume time tracking, please refer back to your original LOA request message and click the **\"End Early\"** button.",
+        })
+        .setColor(Colors.Orange)
+        .setTimestamp();
+
+      await user.send({ embeds: [embed] });
+      loggers.bot.info(`Sent LOA tracking notification to user ${userId}`);
+    } catch (error) {
+      // User may have DMs disabled, which is fine - just log it
+      loggers.bot.debug(`Could not DM user ${userId} about LOA tracking pause: ${error}`);
+    }
+  }
+
+  private async checkLOAAndNotify(
+    guild: Guild,
+    guildId: string,
+    userId: string,
+    channelId: string,
+    settings: Awaited<ReturnType<typeof this.getSettings>>,
+  ): Promise<void> {
+    try {
+      const loa = await loaManager.getActiveLOA(guildId, userId);
+
+      if (!loa || loa.notificationsPaused) {
+        return; // No active LOA or notifications paused
+      }
+
+      // Use settings passed in (from handleVoiceStateUpdate which already called getSettings)
+      if (!settings?.loaNotificationChannelId) {
+        loggers.bot.debug(`LOA notification channel not configured for guild ${guildId}`);
+        return;
+      }
+
+      // Validate and coerce staff role IDs with runtime check
+      let staffRoleIds: string[] = [];
+      if (settings.staffRoleIds !== null && settings.staffRoleIds !== undefined) {
+        if (Array.isArray(settings.staffRoleIds)) {
+          // Filter and coerce to strings, only accepting primitive values
+          staffRoleIds = settings.staffRoleIds
+            .filter((item: unknown) => item !== null && item !== undefined && (typeof item === "string" || typeof item === "number" || typeof item === "boolean"))
+            .map((item: unknown) => String(item));
+        } else {
+          loggers.patrol.warn(
+            `Expected staffRoleIds to be an array for guild ${guildId}, got ${typeof settings.staffRoleIds}. Using empty array.`,
+          );
+        }
+      }
+
+      if (staffRoleIds.length === 0) {
+        loggers.bot.debug(`No staff roles configured for guild ${guildId}`);
+        return;
+      }
+
+      // Get notification channel (use passed-in guild object)
+      const channel = await guild.channels.fetch(settings.loaNotificationChannelId);
+
+      if (!channel || !channel.isTextBased()) {
+        loggers.bot.warn(`Invalid LOA notification channel ${settings.loaNotificationChannelId} for guild ${guildId}`);
+        return;
+      }
+
+      // Build staff mention
+      const staffMentions = staffRoleIds.map((roleId) => `<@&${roleId}>`).join(" ");
+
+      // Get channel name for display
+      const patrolChannel = guild.channels.cache.get(channelId);
+      const channelName = patrolChannel?.name || "Unknown Channel";
+
+      // Create embed
+      const embed = new EmbedBuilder()
+        .setTitle("⚠️ LOA Alert")
+        .setDescription(`A user on Leave of Absence has joined a patrol channel.`)
+        .addFields(
+          {
+            name: "User",
+            value: `<@${userId}>`,
+            inline: true,
+          },
+          {
+            name: "Channel",
+            value: `<#${channelId}> (${channelName})`,
+            inline: true,
+          },
+          {
+            name: "Status",
+            value: "Time tracking is paused for this user",
+            inline: false,
+          },
+        )
+        .setColor(Colors.Orange)
+        .setTimestamp();
+
+      // Send notification
+      await channel.send({
+        content: `${staffMentions}`,
+        embeds: [embed],
+      });
+
+      loggers.bot.info(`Sent LOA notification for user ${userId} joining patrol in guild ${guildId}`);
+    } catch (error) {
+      loggers.bot.error("Error checking LOA and notifying staff", error);
     }
   }
 }

@@ -1,0 +1,27 @@
+model LeaveOfAbsence {
+  id                 Int       @id @default(autoincrement())
+  userId             Int
+  guildId            String
+  requestedAt        DateTime  @default(now())
+  startDate          DateTime
+  endDate            DateTime
+  reason             String
+  status             LeaveOfAbsenceStatus @default(PENDING)
+  approvedBy         String? // Discord ID of staff who approved
+  deniedBy           String? // Discord ID of staff who denied
+  denialReason       String? // Optional reason for denial
+  endedEarlyAt       DateTime? // When user ended early
+  notificationsPaused Boolean  @default(false)
+  cooldownEndDate    DateTime? // 2 weeks from endedEarlyAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([guildId])
+  @@index([userId])
+  @@index([status])
+  @@index([endDate])
+  @@index([guildId, userId, status])
+  @@map("leave_of_absences")
+}
