@@ -527,7 +527,7 @@ export class WhitelistCommands {
 
           await interaction.reply({ embeds: [embed] });
         } else {
-          await whitelistManager.removeUserFromWhitelistIfNoRoles(user.id);
+          await whitelistManager.removeUserFromWhitelistIfNoRoles(user.id, guildId);
           await interaction.reply({
             content: `❌ User <@${user.id}> has no Discord roles that map to whitelist permissions.`,
             flags: MessageFlags.Ephemeral,
@@ -807,9 +807,9 @@ export class WhitelistCommands {
       let repoUpdateError = null;
       try {
         await whitelistManager.publishWhitelist(
+          interaction.guildId,
           `manual generate: latest whitelist`,
-          true, // Force update even if content unchanged
-          interaction.guildId
+          true // Force update even if content unchanged
         );
         repoUpdateSuccess = true;
       } catch (repoError: unknown) {

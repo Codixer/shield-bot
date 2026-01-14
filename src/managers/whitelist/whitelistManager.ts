@@ -169,7 +169,7 @@ export class WhitelistManager {
    * Writes both encoded and decoded files in a single commit.
    * Now checks if content changed before publishing to avoid unnecessary commits.
    */
-  async publishWhitelist(commitMessage?: string, force: boolean = false, guildId: string, affectedGuildIds?: string[]): Promise<{
+  async publishWhitelist(guildId: string, commitMessage?: string, force: boolean = false, affectedGuildIds?: string[]): Promise<{
     updated: boolean;
     commitSha?: string;
     paths?: string[];
@@ -398,23 +398,6 @@ export class WhitelistManager {
     loggers.bot.info(`Processing batched update for ${count} users`);
 
     try {
-      // Generate a meaningful commit message if not provided
-      let message = commitMessage;
-      if (!message || message.trim().length === 0) {
-        if (count === 1 && finalAffectedGuildIds.length > 0) {
-          // Try to get the user's name for single updates
-          try {
-            const user = await this.userOps.getUserByDiscordId(users[0], finalAffectedGuildIds[0]);
-            const name = (user as { vrchatAccounts?: Array<{ vrchatUsername?: string }> })?.vrchatAccounts?.[0]?.vrchatUsername || users[0];
-            message = `Updated whitelist for ${name}`;
-          } catch {
-            message = `Updated whitelist for 1 user`;
-          }
-        } else {
-          message = `Updated whitelist for ${count} users`;
-        }
-      }
-
       // Determine affected guilds from users' role assignments if not already tracked
       let finalAffectedGuildIds = guildIds;
       if (finalAffectedGuildIds.length === 0) {
@@ -485,9 +468,26 @@ export class WhitelistManager {
         finalAffectedGuildIds = finalAffectedGuildIds.filter(gid => validGuildIds.has(gid));
       }
 
+      // Generate a meaningful commit message if not provided
+      let message = commitMessage;
+      if (!message || message.trim().length === 0) {
+        if (count === 1 && finalAffectedGuildIds.length > 0) {
+          // Try to get the user's name for single updates
+          try {
+            const user = await this.userOps.getUserByDiscordId(users[0], finalAffectedGuildIds[0]);
+            const name = (user as { vrchatAccounts?: Array<{ vrchatUsername?: string }> })?.vrchatAccounts?.[0]?.vrchatUsername || users[0];
+            message = `Updated whitelist for ${name}`;
+          } catch {
+            message = `Updated whitelist for 1 user`;
+          }
+        } else {
+          message = `Updated whitelist for ${count} users`;
+        }
+      }
+
       // Publish for each affected guild
       for (const gid of finalAffectedGuildIds) {
-        await this.publishWhitelist(message, false, gid, [gid]);
+        await this.publishWhitelist(gid, message, false, [gid]);
       }
 
       // Check if any rooftop permissions were updated and publish rooftop files if needed
@@ -507,8 +507,8 @@ export class WhitelistManager {
           const rooftopGuildId = finalAffectedGuildIds.length > 0 ? finalAffectedGuildIds[0] : undefined;
           if (rooftopGuildId) {
             await this.githubPublisher.updateRepositoryWithRooftopFiles(
-              `chore(rooftop): update rooftop files after whitelist change`,
               rooftopGuildId,
+              `chore(rooftop): update rooftop files after whitelist change`,
             );
           }
         } catch (error) {
@@ -538,15 +538,20 @@ export class WhitelistManager {
     return this.discordSync.ensureUnverifiedAccountAccess(
       discordId,
       (guildId) => this.roleOps.getDiscordRoleMappings(guildId),
-      (discordId, botOverride, guildId) => this.syncAndPublishAfterVerification(discordId, botOverride, guildId),
+      (discordId, botOverride, callbackGuildId) => {
+        if (callbackGuildId) {
+          return this.syncAndPublishAfterVerification(discordId, callbackGuildId, botOverride);
+        }
+        return this.syncAndPublishAfterVerification(discordId, guildId, botOverride);
+      },
       guildId,
     );
   }
 
   async syncAndPublishAfterVerification(
     discordId: string,
-    botOverride?: unknown,
     guildId: string,
+    botOverride?: unknown,
   ): Promise<void> {
     return this.discordSync.syncAndPublishAfterVerification(
       discordId,

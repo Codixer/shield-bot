@@ -398,8 +398,8 @@ export class GitHubPublisher {
    * Reads settings from database (if guildId provided) or falls back to environment variables.
    */
   async updateRepositoryWithRooftopFiles(
-    commitMessage?: string,
     guildId: string,
+    commitMessage?: string,
   ): Promise<{
     updated: boolean;
     commitSha?: string;

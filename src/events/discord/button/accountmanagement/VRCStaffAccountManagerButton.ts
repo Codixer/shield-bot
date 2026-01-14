@@ -150,7 +150,7 @@ export class VRCStaffAccountManagerButtonHandler {
 
     // Update whitelist after status change
     try {
-      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, undefined, guildId);
+      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, guildId, undefined);
       
       // Send whitelist log for status change
       if (interaction.guild) {
@@ -198,7 +198,7 @@ export class VRCStaffAccountManagerButtonHandler {
 
     // Update whitelist after status change
     try {
-      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, undefined, guildId);
+      await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, guildId, undefined);
       
       // Send whitelist log for status change
       if (interaction.guild) {
@@ -266,7 +266,7 @@ export class VRCStaffAccountManagerButtonHandler {
 
       // Update whitelist after account deletion
       try {
-        await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, undefined, guildId);
+        await whitelistManager.syncAndPublishAfterVerification(targetDiscordId, guildId, undefined);
         
         // Send whitelist log - check if user still has roles after deletion
         if (interaction.guild) {

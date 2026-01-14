@@ -133,7 +133,7 @@ export class VRCAccountManagerButtonHandler {
     // Update whitelist after status change
     const discordId = interaction.user.id;
     try {
-      await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, guildId);
+      await whitelistManager.syncAndPublishAfterVerification(discordId, guildId, undefined);
       
       // Send whitelist log for status change
       if (interaction.guild) {
@@ -196,7 +196,7 @@ export class VRCAccountManagerButtonHandler {
     // Update whitelist after status change
     const discordId = interaction.user.id;
     try {
-      await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, guildId);
+      await whitelistManager.syncAndPublishAfterVerification(discordId, guildId, undefined);
       
       // Send whitelist log for status change
       if (interaction.guild) {
@@ -279,7 +279,7 @@ export class VRCAccountManagerButtonHandler {
 
       // Update whitelist after account deletion
       try {
-        await whitelistManager.syncAndPublishAfterVerification(discordId, undefined, guildId);
+        await whitelistManager.syncAndPublishAfterVerification(discordId, guildId, undefined);
         
         // Send whitelist log - check if user still has roles after deletion
         if (interaction.guild) {

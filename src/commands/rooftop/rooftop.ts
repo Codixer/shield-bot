@@ -23,8 +23,16 @@ export class RooftopCommands {
   async forceUpdate(interaction: CommandInteraction): Promise<void> {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+    if (!interaction.guildId) {
+      await interaction.editReply({
+        content: "❌ This command can only be used in a server.",
+      });
+      return;
+    }
+
     try {
       const result = await this.githubPublisher.updateRepositoryWithRooftopFiles(
+        interaction.guildId,
         `chore(rooftop): force update rooftop files`,
       );
 
@@ -58,6 +66,13 @@ export class RooftopCommands {
   ): Promise<void> {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+    if (!interaction.guildId) {
+      await interaction.editReply({
+        content: "❌ This command can only be used in a server.",
+      });
+      return;
+    }
+
     try {
       if (!content || content.trim().length === 0) {
         await interaction.editReply({
@@ -76,6 +91,7 @@ export class RooftopCommands {
       // Update GitHub files after adding announcement
       try {
         await this.githubPublisher.updateRepositoryWithRooftopFiles(
+          interaction.guildId,
           `chore(rooftop): add announcement`,
         );
       } catch (error) {
@@ -106,6 +122,13 @@ export class RooftopCommands {
   ): Promise<void> {
     await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
+    if (!interaction.guildId) {
+      await interaction.editReply({
+        content: "❌ This command can only be used in a server.",
+      });
+      return;
+    }
+
     try {
       if (!content || content.trim().length === 0) {
         await interaction.editReply({
@@ -124,6 +147,7 @@ export class RooftopCommands {
       // Update GitHub files after adding response
       try {
         await this.githubPublisher.updateRepositoryWithRooftopFiles(
+          interaction.guildId,
           `chore(rooftop): add spin the bottle response`,
         );
       } catch (error) {

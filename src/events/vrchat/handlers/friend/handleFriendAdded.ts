@@ -86,7 +86,7 @@ export async function handleFriendAdd(content: unknown) {
         try {
             // For verified accounts, sync and publish with roles
             if (vrchatUsername && verificationGuildId) { // If username was fetched, it was verified
-                await whitelistManager.syncAndPublishAfterVerification(user.discordId, undefined, verificationGuildId);
+                await whitelistManager.syncAndPublishAfterVerification(user.discordId, verificationGuildId, undefined);
                 
                 // Send whitelist verification log to the guild where verification was started
                 if (bot && bot.guilds && vrcAccount.verificationGuildId) {
