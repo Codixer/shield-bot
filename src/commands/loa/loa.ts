@@ -44,16 +44,12 @@ export class LOACommands {
     reason: string,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
+    // GuildGuard ensures guildId is present
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const guildId = interaction.guildId!;
 
     // Check cooldown first (fast check, can reply immediately if error)
-    const cooldown = await loaManager.checkCooldown(interaction.guildId, interaction.user.id);
+    const cooldown = await loaManager.checkCooldown(guildId, interaction.user.id);
     if (cooldown.inCooldown && cooldown.cooldownEndDate) {
       const cooldownEnd = cooldown.cooldownEndDate.toLocaleString();
       await interaction.reply({
@@ -68,7 +64,7 @@ export class LOACommands {
 
     // Request LOA
     const result = await loaManager.requestLOA(
-      interaction.guildId,
+      guildId,
       interaction.user.id,
       time,
       reason,
@@ -146,27 +142,24 @@ export class LOACommands {
     user: User,
     interaction: CommandInteraction,
   ) {
-    if (!interaction.guildId) {
-      await interaction.reply({
-        content: "This command can only be used in a server.",
-        flags: MessageFlags.Ephemeral,
-      });
-      return;
-    }
+    // GuildGuard ensures guildId is present
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const guildId = interaction.guildId!;
 
-    const result = await loaManager.removeCooldown(interaction.guildId, user.id);
+    // Defer reply to avoid timeout during potentially slow operation
+    await interaction.deferReply({ ephemeral: true });
+
+    const result = await loaManager.removeCooldown(guildId, user.id);
 
     if (!result.success) {
-      await interaction.reply({
+      await interaction.editReply({
         content: `❌ Failed to remove cooldown: ${result.error}`,
-        flags: MessageFlags.Ephemeral,
       });
       return;
     }
 
-    await interaction.reply({
+    await interaction.editReply({
       content: `✅ Removed LOA cooldown for <@${user.id}>. They can now request a new LOA immediately.`,
-      flags: MessageFlags.Ephemeral,
     });
   }
 }

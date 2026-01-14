@@ -2,7 +2,6 @@ import { Client } from "discord.js";
 import * as cron from "node-cron";
 import { loggers } from "../../utility/logger.js";
 import { loaManager } from "../../main.js";
-import { prisma } from "../../main.js";
 
 /**
  * Check for expired LOAs and remove roles
@@ -27,16 +26,9 @@ export async function checkLOAExpiration(client: Client): Promise<void> {
     // Process each expired LOA
     for (const loa of expiredLOAs) {
       try {
-        // Remove LOA role first
-        const result = await loaManager.removeLOARole(loa.guildId, loa.user.discordId);
+        const result = await loaManager.expireLOA(loa.id);
 
         if (result.success) {
-          // Only update status after successful role removal
-          await prisma.leaveOfAbsence.update({
-            where: { id: loa.id },
-            data: { status: "EXPIRED" },
-          });
-
           loggers.schedules.info(
             `Expired LOA ${loa.id} for user ${loa.user.discordId} in guild ${loa.guildId}`,
           );
@@ -47,12 +39,12 @@ export async function checkLOAExpiration(client: Client): Promise<void> {
             await user.send({
               content: `⏰ Your LOA has expired and the LOA role has been removed.`,
             });
-          } catch (error) {
+          } catch (_error) {
             loggers.bot.debug(`Could not DM user ${loa.user.discordId} about LOA expiration`);
           }
         } else {
           loggers.schedules.warn(
-            `Failed to remove LOA role for user ${loa.user.discordId}: ${result.error}. LOA status not updated.`,
+            `Failed to expire LOA ${loa.id} for user ${loa.user.discordId}: ${result.error}`,
           );
         }
       } catch (error) {

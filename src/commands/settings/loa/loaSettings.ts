@@ -10,6 +10,7 @@ import {
 } from "discord.js";
 import { StaffGuard } from "../../../utility/guards.js";
 import { prisma } from "../../../main.js";
+import { loggers } from "../../../utility/logger.js";
 
 @Discord()
 @SlashGroup({
@@ -42,19 +43,29 @@ export class SettingsLOASubGroup {
       return;
     }
 
-    await prisma.guildSettings.upsert({
-      where: { guildId: interaction.guildId },
-      update: { loaRoleId: role.id },
-      create: {
-        guildId: interaction.guildId,
-        loaRoleId: role.id,
-      },
-    });
+    try {
+      await prisma.guildSettings.upsert({
+        where: { guildId: interaction.guildId },
+        update: { loaRoleId: role.id },
+        create: {
+          guildId: interaction.guildId,
+          loaRoleId: role.id,
+        },
+      });
 
-    await interaction.reply({
-      content: `✅ LOA role set to: ${role.name} (<@&${role.id}>)`,
-      flags: MessageFlags.Ephemeral,
-    });
+      await interaction.reply({
+        content: `✅ LOA role set to: ${role.name} (<@&${role.id}>)`,
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch (error) {
+      loggers.bot.error("Error setting LOA role", error);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: "❌ Failed to set LOA role. Please try again.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    }
   }
 
   @Slash({
@@ -66,6 +77,7 @@ export class SettingsLOASubGroup {
       name: "channel",
       description: "The channel where staff will be notified when users on LOA join patrol",
       type: ApplicationCommandOptionType.Channel,
+      channelTypes: [ChannelType.GuildText, ChannelType.GuildAnnouncement],
       required: true,
     })
     channel: TextChannel | NewsChannel,
@@ -126,19 +138,29 @@ export class SettingsLOASubGroup {
       return;
     }
 
-    await prisma.guildSettings.upsert({
-      where: { guildId: interaction.guildId },
-      update: { leaveOfAbsenceCooldownDays: days },
-      create: {
-        guildId: interaction.guildId,
-        leaveOfAbsenceCooldownDays: days,
-      },
-    });
+    try {
+      await prisma.guildSettings.upsert({
+        where: { guildId: interaction.guildId },
+        update: { leaveOfAbsenceCooldownDays: days },
+        create: {
+          guildId: interaction.guildId,
+          leaveOfAbsenceCooldownDays: days,
+        },
+      });
 
-    await interaction.reply({
-      content: `✅ LOA cooldown period set to ${days} day${days !== 1 ? "s" : ""}.`,
-      flags: MessageFlags.Ephemeral,
-    });
+      await interaction.reply({
+        content: `✅ LOA cooldown period set to ${days} day${days !== 1 ? "s" : ""}.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch (error) {
+      loggers.bot.error("Error setting LOA cooldown days", error);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: "❌ Failed to set LOA cooldown period. Please try again.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    }
   }
 
   @Slash({
@@ -165,18 +187,28 @@ export class SettingsLOASubGroup {
       return;
     }
 
-    await prisma.guildSettings.upsert({
-      where: { guildId: interaction.guildId },
-      update: { minimumRequestTimeDays: days },
-      create: {
-        guildId: interaction.guildId,
-        minimumRequestTimeDays: days,
-      },
-    });
+    try {
+      await prisma.guildSettings.upsert({
+        where: { guildId: interaction.guildId },
+        update: { minimumRequestTimeDays: days },
+        create: {
+          guildId: interaction.guildId,
+          minimumRequestTimeDays: days,
+        },
+      });
 
-    await interaction.reply({
-      content: `✅ Minimum LOA request time set to ${days} day${days !== 1 ? "s" : ""}.`,
-      flags: MessageFlags.Ephemeral,
-    });
+      await interaction.reply({
+        content: `✅ Minimum LOA request time set to ${days} day${days !== 1 ? "s" : ""}.`,
+        flags: MessageFlags.Ephemeral,
+      });
+    } catch (error) {
+      loggers.bot.error("Error setting minimum LOA request time", error);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({
+          content: "❌ Failed to set minimum LOA request time. Please try again.",
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    }
   }
 }

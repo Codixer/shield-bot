@@ -790,15 +790,16 @@ export class PatrolTimerManager {
 
   /**
    * Check if a user is paused or on LOA (async version for LOA checks).
+   * Note: notificationsPaused controls only alerts, not tracking. Any active LOA pauses tracking.
    */
   private async isUserPausedOrOnLOA(guildId: string, userId: string): Promise<boolean> {
     // Check manual pause first (synchronous)
     if (this.isUserPaused(guildId, userId)) {return true;}
     
-    // Check for active LOA (async)
+    // Check for active LOA (async) - any active LOA pauses tracking
     try {
       const loa = await loaManager.getActiveLOA(guildId, userId);
-      return loa !== null && !loa.notificationsPaused;
+      return loa !== null;
     } catch (error) {
       loggers.patrol.error(`Error checking LOA for user ${userId} in guild ${guildId}`, error);
       return false; // On error, don't pause (fail open)
@@ -1339,9 +1340,6 @@ export class PatrolTimerManager {
   }
 
   /**
-   * Check if user is on LOA and notify staff if they join patrol
-   */
-  /**
    * Check for LOA, notify staff if needed, and start tracking only if not on LOA.
    */
   private async checkLOAAndStartTracking(
@@ -1396,10 +1394,10 @@ export class PatrolTimerManager {
         .setTimestamp();
 
       await user.send({ embeds: [embed] });
-      loggers.bot.info(`Sent LOA tracking notification to user ${userId}`);
+      loggers.patrol.info(`Sent LOA tracking notification to user ${userId}`);
     } catch (error) {
       // User may have DMs disabled, which is fine - just log it
-      loggers.bot.debug(`Could not DM user ${userId} about LOA tracking pause: ${error}`);
+      loggers.patrol.debug(`Could not DM user ${userId} about LOA tracking pause: ${error}`);
     }
   }
 
@@ -1419,7 +1417,7 @@ export class PatrolTimerManager {
 
       // Use settings passed in (from handleVoiceStateUpdate which already called getSettings)
       if (!settings?.loaNotificationChannelId) {
-        loggers.bot.debug(`LOA notification channel not configured for guild ${guildId}`);
+        loggers.patrol.debug(`LOA notification channel not configured for guild ${guildId}`);
         return;
       }
 
@@ -1439,7 +1437,7 @@ export class PatrolTimerManager {
       }
 
       if (staffRoleIds.length === 0) {
-        loggers.bot.debug(`No staff roles configured for guild ${guildId}`);
+        loggers.patrol.debug(`No staff roles configured for guild ${guildId}`);
         return;
       }
 
@@ -1447,7 +1445,7 @@ export class PatrolTimerManager {
       const channel = await guild.channels.fetch(settings.loaNotificationChannelId);
 
       if (!channel || !channel.isTextBased()) {
-        loggers.bot.warn(`Invalid LOA notification channel ${settings.loaNotificationChannelId} for guild ${guildId}`);
+        loggers.patrol.warn(`Invalid LOA notification channel ${settings.loaNotificationChannelId} for guild ${guildId}`);
         return;
       }
 
@@ -1488,9 +1486,9 @@ export class PatrolTimerManager {
         embeds: [embed],
       });
 
-      loggers.bot.info(`Sent LOA notification for user ${userId} joining patrol in guild ${guildId}`);
+      loggers.patrol.info(`Sent LOA notification for user ${userId} joining patrol in guild ${guildId}`);
     } catch (error) {
-      loggers.bot.error("Error checking LOA and notifying staff", error);
+      loggers.patrol.error("Error checking LOA and notifying staff", error);
     }
   }
 }

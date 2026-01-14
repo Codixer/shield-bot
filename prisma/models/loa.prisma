@@ -12,7 +12,7 @@ model LeaveOfAbsence {
   denialReason       String? // Optional reason for denial
   endedEarlyAt       DateTime? // When user ended early
   notificationsPaused Boolean  @default(false)
-  cooldownEndDate    DateTime? // 2 weeks from endedEarlyAt
+  cooldownEndDate    DateTime? // Configurable cooldown period from endedEarlyAt (duration derived from guild.leaveOfAbsenceCooldownDays)
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 

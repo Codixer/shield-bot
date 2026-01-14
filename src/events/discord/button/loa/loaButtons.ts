@@ -94,7 +94,7 @@ export class LOAButtonHandlers {
       const components: ActionRowBuilder<ButtonBuilder>[] = [];
       if (loa.status === "ACTIVE") {
         const endEarlyButton = new ButtonBuilder()
-          .setCustomId(`loa-end-early:${loa.id}`)
+          .setCustomId(`loa:end-early:${loa.id}`)
           .setLabel("End Early")
           .setStyle(ButtonStyle.Danger);
 
@@ -230,7 +230,7 @@ export class LOAButtonHandlers {
     }
   }
 
-  @ButtonComponent({ id: /^loa-end-early:(\d+)(?::(\d+))?(?::(confirm|cancel))?$/ })
+  @ButtonComponent({ id: /^loa:end-early:(\d+)(?::(\d+))?(?::(confirm|cancel))?$/ })
   async handleEndEarly(interaction: ButtonInteraction) {
     if (!interaction.guildId) {
       await interaction.reply({
@@ -241,9 +241,9 @@ export class LOAButtonHandlers {
     }
 
     const parts = interaction.customId.split(":");
-    const loaId = parseInt(parts[1], 10);
-    const originalMessageId = parts[2]; // Message ID of the original LOA message (if present)
-    const action = parts[3]; // "confirm", "cancel", or undefined
+    const loaId = parseInt(parts[2], 10);
+    const originalMessageId = parts[3]; // Message ID of the original LOA message (if present)
+    const action = parts[4]; // "confirm", "cancel", or undefined
     
     // If this is the initial button press (not confirmation), store the original message ID
     const currentOriginalMessageId = action === undefined ? interaction.message.id : originalMessageId;
@@ -265,26 +265,13 @@ export class LOAButtonHandlers {
 
       const isOwner = loa.user.discordId === interaction.user.id;
       
-      // If not owner, check if user is staff
+      // Only owners can end their LOA early (staff bypass removed to prevent confirm dialog for non-owners)
       if (!isOwner) {
-        const member = await interaction.guild?.members.fetch(interaction.user.id);
-        const settings = await prisma.guildSettings.findUnique({
-          where: { guildId: interaction.guildId },
+        await interaction.reply({
+          content: "❌ Only the LOA owner can end their LOA early.",
+          flags: MessageFlags.Ephemeral,
         });
-        
-        let isStaff = false;
-        if (settings?.staffRoleIds && Array.isArray(settings.staffRoleIds)) {
-          const staffRoleIds = settings.staffRoleIds as string[];
-          isStaff = member?.roles.cache.some((role) => staffRoleIds.includes(role.id)) || false;
-        }
-
-        if (!isStaff) {
-          await interaction.reply({
-            content: "❌ You don't have permission to end this LOA.",
-            flags: MessageFlags.Ephemeral,
-          });
-          return;
-        }
+        return;
       }
     } catch (error) {
       loggers.bot.error("Error checking LOA authorization", error);
@@ -379,9 +366,11 @@ export class LOAButtonHandlers {
           loggers.bot.debug("Could not update original LOA message", error);
         }
 
-        const cooldownEnd = loa.cooldownEndDate?.toLocaleString() || "N/A";
+        const cooldownEnd = loa.cooldownEndDate
+          ? `<t:${Math.floor(loa.cooldownEndDate.getTime() / 1000)}:F>`
+          : "N/A";
         await interaction.update({
-          content: `✅ Your LOA has been ended early. You are now in a 2-week cooldown period until ${cooldownEnd}. You cannot request a new LOA until then.`,
+          content: `✅ Your LOA has been ended early. You are now in a cooldown period until ${cooldownEnd}. You cannot request a new LOA until then.`,
           components: [],
           embeds: [],
         });
@@ -406,12 +395,12 @@ export class LOAButtonHandlers {
       .setColor(Colors.Orange);
 
     const confirmButton = new ButtonBuilder()
-      .setCustomId(`loa-end-early:${loaId}:${currentOriginalMessageId}:confirm`)
+      .setCustomId(`loa:end-early:${loaId}:${currentOriginalMessageId}:confirm`)
       .setLabel("Yes, End Early")
       .setStyle(ButtonStyle.Danger);
 
     const cancelButton = new ButtonBuilder()
-      .setCustomId(`loa-end-early:${loaId}:${currentOriginalMessageId}:cancel`)
+      .setCustomId(`loa:end-early:${loaId}:${currentOriginalMessageId}:cancel`)
       .setLabel("Cancel")
       .setStyle(ButtonStyle.Secondary);
 

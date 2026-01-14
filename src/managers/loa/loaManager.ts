@@ -49,6 +49,16 @@ export class LOAManager {
       const startDate = new Date();
       const endDate = parseResult.endDate;
 
+      // Check cooldown before accepting new LOA
+      const cooldown = await this.checkCooldown(guildId, discordId);
+      if (cooldown.inCooldown && cooldown.cooldownEndDate) {
+        const cooldownEnd = `<t:${Math.floor(cooldown.cooldownEndDate.getTime() / 1000)}:F>`;
+        return {
+          success: false,
+          error: `You are in a cooldown period until ${cooldownEnd}. You cannot request a new LOA until then.`,
+        };
+      }
+
       // Validate minimum request time
       const settings = await prisma.guildSettings.findUnique({
         where: { guildId },
@@ -556,6 +566,42 @@ export class LOAManager {
   }
 
   /**
+   * Expire an LOA (remove role and update status to EXPIRED)
+   */
+  async expireLOA(loaId: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      const loa = await prisma.leaveOfAbsence.findUnique({
+        where: { id: loaId },
+        include: { user: true },
+      });
+
+      if (!loa) {
+        return { success: false, error: "LOA not found" };
+      }
+
+      // Remove LOA role first
+      const removeResult = await this.removeLOARole(loa.guildId, loa.user.discordId);
+      if (!removeResult.success) {
+        return { success: false, error: removeResult.error || "Failed to remove LOA role" };
+      }
+
+      // Update status to EXPIRED in a transaction
+      await prisma.leaveOfAbsence.update({
+        where: { id: loaId },
+        data: { status: "EXPIRED" },
+      });
+
+      return { success: true };
+    } catch (error) {
+      loggers.bot.error(`Error expiring LOA ${loaId}`, error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  }
+
+  /**
    * Activate approved LOAs that have reached their start date
    */
   async activateApprovedLOAs(): Promise<void> {
@@ -573,12 +619,17 @@ export class LOAManager {
     });
 
     for (const loa of loas) {
-      await prisma.leaveOfAbsence.update({
-        where: { id: loa.id },
-        data: { status: "ACTIVE" },
-      });
+      try {
+        await prisma.leaveOfAbsence.update({
+          where: { id: loa.id },
+          data: { status: "ACTIVE" },
+        });
 
-      await this.assignLOARole(loa.guildId, loa.user.discordId);
+        await this.assignLOARole(loa.guildId, loa.user.discordId);
+      } catch (error) {
+        loggers.bot.error(`Error activating LOA ${loa.id} for user ${loa.user.discordId} in guild ${loa.guildId}`, error);
+        // Continue to next LOA instead of stopping
+      }
     }
   }
 }
