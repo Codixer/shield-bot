@@ -1484,6 +1484,7 @@ export class PatrolTimerManager {
       await channel.send({
         content: `${staffMentions}`,
         embeds: [embed],
+        allowedMentions: {},
       });
 
       loggers.patrol.info(`Sent LOA notification for user ${userId} joining patrol in guild ${guildId}`);
