@@ -119,19 +119,6 @@ export class VRChatVerifyManagerButtonHandler {
         data: { accountType: "MAIN" },
       });
 
-      // Update whitelist after verification
-      if (!interaction.guildId) {
-        return;
-      }
-      try {
-        await whitelistManager.syncAndPublishAfterVerification(discordId, interaction.guildId, undefined);
-      } catch (error) {
-        loggers.bot.error(
-          `Failed to sync whitelist for ${discordId}`,
-          error,
-        );
-      }
-
       // Get user info for display
       let userInfo = null;
       try {
@@ -152,6 +139,18 @@ export class VRChatVerifyManagerButtonHandler {
         embeds: [embed],
         components: [],
       });
+
+      // Update whitelist after verification (only if guildId is available)
+      if (interaction.guildId) {
+        try {
+          await whitelistManager.syncAndPublishAfterVerification(discordId, interaction.guildId, undefined);
+        } catch (error) {
+          loggers.bot.error(
+            `Failed to sync whitelist for ${discordId}`,
+            error,
+          );
+        }
+      }
     } catch (error) {
       loggers.bot.error("Error setting main account", error);
       await interaction.reply({
@@ -191,19 +190,6 @@ export class VRChatVerifyManagerButtonHandler {
         data: { accountType: "ALT" },
       });
 
-      // Update whitelist after verification
-      if (!interaction.guildId) {
-        return;
-      }
-      try {
-        await whitelistManager.syncAndPublishAfterVerification(discordId, interaction.guildId, undefined);
-      } catch (error) {
-        loggers.bot.error(
-          `Failed to sync whitelist for ${discordId}`,
-          error,
-        );
-      }
-
       // Get user info for display
       let userInfo = null;
       try {
@@ -224,6 +210,18 @@ export class VRChatVerifyManagerButtonHandler {
         embeds: [embed],
         components: [],
       });
+
+      // Update whitelist after verification (only if guildId is available)
+      if (interaction.guildId) {
+        try {
+          await whitelistManager.syncAndPublishAfterVerification(discordId, interaction.guildId, undefined);
+        } catch (error) {
+          loggers.bot.error(
+            `Failed to sync whitelist for ${discordId}`,
+            error,
+          );
+        }
+      }
     } catch (error) {
       loggers.bot.error("Error setting alt account", error);
       await interaction.reply({

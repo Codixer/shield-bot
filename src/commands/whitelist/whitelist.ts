@@ -142,10 +142,6 @@ export class WhitelistCommands {
                 const roleIds = member.roles.cache.map((role) => role.id);
 
                 // Get their current whitelist status
-                const guildId = interaction.guild?.id;
-                if (!guildId) {
-                  continue;
-                }
                 const userBefore = await whitelistManager.getUserByDiscordId(
                   member.id,
                   guildId,

@@ -141,10 +141,16 @@ export class WhitelistManager {
     if (!role) {
       throw new Error(`Role with ID "${roleId}" not found`);
     }
+    // Capture guildId once to avoid redundant lookups in the closure
+    const roleGuildId = role.guildId;
+    if (!roleGuildId) {
+      throw new Error(`Role with ID "${roleId}" has no guildId`);
+    }
     return this.roleOps.assignRoleByVrcUserId(
       vrcUserId,
       roleId,
-      (vrcUserId: string, guildId: string) => this.userOps.getUserByVrcUserId(vrcUserId, guildId),
+      // Use the captured roleGuildId instead of the passed guildId parameter to avoid redundant DB lookups
+      (_vrcUserId: string, _guildId: string) => this.userOps.getUserByVrcUserId(_vrcUserId, roleGuildId),
       assignedBy,
       expiresAt,
     );
@@ -538,6 +544,10 @@ export class WhitelistManager {
     return this.discordSync.ensureUnverifiedAccountAccess(
       discordId,
       (guildId) => this.roleOps.getDiscordRoleMappings(guildId),
+      // Callback fallback: when discordSync.ensureUnverifiedAccountAccess provides a callbackGuildId
+      // (from role mappings), use that value for syncAndPublishAfterVerification; otherwise fall back
+      // to the outer guildId parameter. This ensures we sync with the correct guild context based on
+      // where the role mappings are configured.
       (discordId, botOverride, callbackGuildId) => {
         if (callbackGuildId) {
           return this.syncAndPublishAfterVerification(discordId, callbackGuildId, botOverride);
