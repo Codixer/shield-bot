@@ -12,6 +12,7 @@ import bodyParser from "@koa/bodyparser";
 import { PrismaClient } from "./generated/prisma/client.js";
 import { PatrolTimerManager } from "./managers/patrol/patrolTimerManager.js";
 import { LOAManager } from "./managers/loa/loaManager.js";
+import { RoleTrackingManager } from "./managers/roleTracking/roleTrackingManager.js";
 import {
   isLoggedInAndVerified,
   loginAndGetCurrentUser,
@@ -64,6 +65,9 @@ export const patrolTimer = new PatrolTimerManager(bot);
 
 // Global LOA manager singleton
 export const loaManager = new LOAManager(bot);
+
+// Global role tracking manager singleton
+export const roleTrackingManager = new RoleTrackingManager(bot, patrolTimer);
 
 bot.rest.on("rateLimited", (info) => {
   loggers.bot.warn("Rate limit hit!", {
