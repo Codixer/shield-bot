@@ -170,18 +170,7 @@ export async function BotOwnerGuard(
   if (interaction.user.id === botOwnerId) {
     return next();
   }
-
-  // Also check if user has DEV_GUARD role (for additional bot owners)
-  if (interaction.guildId && interaction.guild) {
-    const member = interaction.member as GuildMember;
-    if (
-      member &&
-      (await userHasPermission(member, PermissionFlags.DEV_GUARD))
-    ) {
-      return next();
-    }
-  }
-
+  
   return respondWithError(
     interaction,
     "This command is restricted to the bot owner.",
