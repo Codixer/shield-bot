@@ -1,6 +1,6 @@
 # Shield Bot
 
-A comprehensive Discord bot built with Discord.js v14 and DiscordX framework, featuring VRChat API integration for community management, verification, attendance tracking, patrol systems, and whitelist management.
+A comprehensive Discord bot built with Discord.js v14 and DiscordX framework, featuring VRChat API integration for community management, verification, attendance tracking, patrol systems, whitelist management, and leave of absence (LOA) handling.
 
 ## 🌟 Features
 
@@ -11,6 +11,8 @@ A comprehensive Discord bot built with Discord.js v14 and DiscordX framework, fe
 - **Group Management**: VRChat group role synchronization with Discord roles
 - **Whitelist System**: Role-based VRChat world access control with permission management
 - **WebSocket Integration**: Real-time event processing from VRChat API
+- **Avatar World Invites**: Automated avatar world invitation system
+- **Backup & Dispatch Requests**: Request backup or log dispatch to VRChat instances
 
 ### Attendance System
 - **Event Management**: Create and manage attendance events with host/co-host support
@@ -18,17 +20,29 @@ A comprehensive Discord bot built with Discord.js v14 and DiscordX framework, fe
 - **Late Tracking**: Track late arrivals and early departures
 - **Staff Management**: Separate staff tracking for events
 - **Autofill**: Automated attendance population from voice channels
+- **Attendance Export**: Generate copyable attendance text for events
 
 ### Patrol System
 - **Voice Time Tracking**: Automatic tracking of time spent in patrol voice channels
 - **Monthly Aggregation**: Aggregated monthly statistics for patrol hours
 - **Promotion Notifications**: Automated notifications when users reach promotion thresholds
 - **Session Persistence**: Patrol sessions survive bot restarts
+- **Leaderboard**: Top patrol time rankings
+- **Admin Management**: Wipe, adjust, pause, and unpause patrol data
+
+### Leave of Absence (LOA) System
+- **LOA Requests**: Request leave of absence with duration and reason
+- **Approval Workflow**: Staff approval/denial system with button interactions
+- **Cooldown Management**: Configurable cooldown periods between LOA requests
+- **Automatic Expiration**: Scheduled expiration handling for active LOAs
+- **Staff Controls**: Remove cooldowns and manage LOA settings
 
 ### User Management
 - **Multi-Account Support**: Link multiple VRChat accounts to Discord profiles
 - **Permission Levels**: Hierarchical permission system (Bot Owner, Dev Guard, Staff, Trainer, Host, Shield Member, User)
 - **Role Verification**: Automated role assignment based on VRChat group membership
+- **Group Invites**: Request invites to VRChat groups
+- **Role Synchronization**: Sync Discord roles to VRChat group roles
 
 ### API Server
 - **Whitelist API**: RESTful endpoints for whitelist management
@@ -176,28 +190,66 @@ shield-bot/
 │   └── schema.prisma     # Main Prisma configuration
 ├── src/
 │   ├── api/              # REST API endpoints
+│   │   ├── home.ts       # API home/health check
+│   │   └── vrchat/
+│   │       └── whitelist/ # Whitelist API endpoints
 │   ├── commands/         # Discord slash commands
 │   │   ├── attendance/   # Attendance management commands
+│   │   ├── dev/          # Developer commands (eval, etc.)
+│   │   ├── loa/          # Leave of absence commands
 │   │   ├── patrol/       # Patrol system commands
+│   │   ├── rooftop/      # Rooftop commands
 │   │   ├── settings/     # Bot configuration commands
+│   │   │   ├── attendance/ # Attendance settings
+│   │   │   ├── group/     # VRChat group settings
+│   │   │   ├── loa/       # LOA settings
+│   │   │   ├── patrol/    # Patrol settings
+│   │   │   ├── roles/     # Role management
+│   │   │   ├── vrchat/    # VRChat settings
+│   │   │   └── whitelist/ # Whitelist settings
 │   │   ├── user/         # User management commands
 │   │   ├── verification/ # Verification commands
 │   │   ├── vrchat/       # VRChat integration commands
 │   │   └── whitelist/    # Whitelist management commands
+│   ├── config/           # Configuration files
+│   │   ├── constants.ts  # Application constants
+│   │   ├── discord.ts   # Discord configuration
+│   │   ├── env.ts        # Environment variable handling
+│   │   └── env.test.ts   # Test environment config
 │   ├── events/           # Event handlers
+│   │   ├── discord/      # Discord event handlers
+│   │   │   ├── button/   # Button interaction handlers
+│   │   │   ├── role/     # Role update handlers
+│   │   │   ├── selectmenu/ # Select menu handlers
+│   │   │   └── voice/    # Voice channel handlers
 │   │   └── vrchat/       # VRChat WebSocket event handlers
+│   │       └── handlers/ # Modular event handlers
 │   ├── managers/         # Business logic managers
 │   │   ├── attendance/   # Attendance system manager
+│   │   ├── calendarSync/ # Calendar synchronization
 │   │   ├── groupRoleSync/# VRChat group role sync
+│   │   ├── loa/          # LOA manager
 │   │   ├── messages/     # Message management
 │   │   ├── patrol/       # Patrol timer manager
+│   │   ├── verification/ # Verification interaction manager
 │   │   └── whitelist/    # Whitelist manager
 │   ├── schedules/        # Cron job schedules
+│   │   ├── loa/          # LOA expiration schedules
+│   │   └── patrol/       # Patrol top schedules
 │   ├── utility/          # Utility functions and helpers
+│   │   ├── cloudflare/   # Cloudflare cache utilities
+│   │   ├── vrchat/       # VRChat API wrappers
+│   │   ├── encryption.ts # Encryption utilities
+│   │   ├── errors.ts     # Error handling
 │   │   ├── guards.ts     # Permission guards
-│   │   └── vrchat/       # VRChat API wrappers
+│   │   ├── logger.ts     # Logging utilities
+│   │   ├── permissionUtils.ts # Permission utilities
+│   │   └── timeParser.ts # Time parsing utilities
 │   └── main.ts           # Application entry point
+├── scripts/              # Build and utility scripts
+│   └── copy-prisma.js    # Prisma schema copy script
 ├── .env.example          # Environment variables template
+├── COMMANDS.md           # Detailed command documentation
 ├── package.json          # Dependencies and scripts
 └── tsconfig.json         # TypeScript configuration
 ```
@@ -206,11 +258,12 @@ shield-bot/
 
 - **Framework**: [DiscordX](https://discordx.js.org/) - Modern Discord.js framework with decorators
 - **Discord**: [Discord.js v14](https://discord.js.org/) - Discord API library
-- **Database**: [Prisma ORM](https://www.prisma.io/) with MySQL
-- **VRChat API**: [vrchat npm package](https://www.npmjs.com/package/vrchat)
+- **Database**: [Prisma ORM](https://www.prisma.io/) with MySQL/MariaDB
+- **VRChat API**: [vrc-ts](https://www.npmjs.com/package/vrc-ts) - VRChat TypeScript SDK
 - **API Server**: [Koa](https://koajs.com/) - Web framework
 - **Language**: TypeScript with ESM modules
 - **Task Scheduling**: [node-cron](https://www.npmjs.com/package/node-cron)
+- **Testing**: [Vitest](https://vitest.dev/) - Unit testing framework
 
 ### Key Components
 
@@ -235,12 +288,16 @@ Custom guards protect commands with permission checks:
 - `VRChatLoginGuard`: Ensures VRChat API is authenticated
 - `StaffGuard`: Requires staff role
 - `DevGuardAndStaffGuard`: Requires dev guard or staff role
+- `GuildGuard`: Ensures command is run in a guild
 
 #### Managers
 Singleton pattern managers handle complex business logic:
 - **WhitelistManager**: Manages VRChat world access permissions
 - **PatrolTimerManager**: Tracks voice channel time
 - **InviteMessageManager**: Syncs dynamic Discord invites
+- **LOAManager**: Handles leave of absence requests and approvals
+- **AttendanceManager**: Manages attendance events and squads
+- **GroupRoleSyncManager**: Synchronizes VRChat group roles with Discord
 
 #### Database Models
 Key models include:
@@ -249,51 +306,68 @@ Key models include:
 - **WhitelistEntry**: Whitelist permissions with role assignments
 - **AttendanceEvent**: Event tracking with squad organization
 - **VoicePatrolTime**: Voice channel time tracking
+- **LeaveOfAbsence**: LOA requests with status and dates
 - **GuildSettings**: Per-guild configuration
 
 ## 📚 Commands
 
 ### Verification Commands
-- `/verify account` - Start VRChat account verification
-- `/verify management list` - List verified accounts
-- `/verify management remove` - Remove verified account
-
-### Whitelist Commands
-- `/whitelist add` - Add user to whitelist
-- `/whitelist remove` - Remove user from whitelist
-- `/whitelist list` - View whitelist entries
-- `/whitelist setuprole` - Configure role-based permissions
-
-### Attendance Commands
-- `/attendance create` - Create new attendance event
-- `/attendance select` - Select squad for attendance
-- `/attendance lead` - Mark as squad leader
-- `/attendance late` - Mark member as late
-- `/attendance left` - Mark member as left
-- `/attendance delete` - Delete attendance event
-
-### Patrol Commands
-- `/patrol stats` - View patrol time statistics
-- `/patrol leaderboard` - View patrol leaderboard
-
-### Settings Commands
-- `/settings group` - Configure VRChat group settings
-- `/settings roles` - Configure Discord role mappings
-- `/settings attendance` - Configure attendance settings
-- `/settings patrol` - Configure patrol settings
-- `/settings vrchat` - Configure VRChat integration
-- `/settings whitelist` - Configure whitelist settings
-
-### VRChat Commands
-- `/vrchat requests pending` - View pending friend requests
-- `/vrchat requests accept` - Accept friend request
-- `/vrchat requests reject` - Reject friend request
-- `/vrchat status` - View VRChat bot status
+- `/verify account` - Start VRChat account verification (link Discord to VRChat)
+- `/verify manage [user]` - Manage MAIN/ALT status for verified accounts (staff can manage any user)
 
 ### User Commands
-- `/user group roles` - View user's VRChat group roles
-- `/user group promote` - Promote user in VRChat group
-- `/user group demote` - Demote user in VRChat group
+- `/user permission [user]` - Check user's permission level or list all permission levels
+- `/user group join` - Request invite to SHIELD VRChat group
+- `/user group syncme` - Sync Discord roles to VRChat group roles
+
+### Attendance Commands
+- `/attendance event <action>` - Manage events: create/list/select/delete
+- `/attendance member <action>` - Manage squad members: add/remove/move/split
+- `/attendance status` - Manage member status: mark late/left/unleft
+- `/attendance role` - Manage roles: set lead/staff/cohost, remove lead
+- `/attendance paste [event_id]` - Generate copyable attendance text
+- `/attendance autofill` - Auto-fill attendance from voice channels
+
+### Patrol Commands
+- `/patrol current` - Show currently tracked users in voice channels
+- `/patrol top [limit]` - Show top users by patrol time
+- `/patrol time [user]` - Check patrol time (own or others if staff)
+- `/patrol manage <action>` - Admin: wipe/adjust/pause/unpause patrol data
+
+### Leave of Absence Commands
+- `/loa request` - Request a leave of absence with duration and reason
+- `/loa remove-cooldown [user]` - Remove LOA cooldown for a user (Staff)
+
+### Whitelist Commands (Staff)
+- `/whitelist role <action>` - Manage role mappings: setup/remove/list
+- `/whitelist user <action>` - User operations: info/sync/browse
+- `/whitelist generate` - Generate and publish whitelist to GitHub
+- `/whitelist validate [user]` - Validate and cleanup whitelist access
+- `/whitelist stats` - View whitelist statistics
+
+### VRChat Commands
+- `/vrchat status [show_history]` - Check VRChat service status/incidents
+- `/vrchat request <type>` - Request backup or log dispatch (backup/dispatch, world link required for dispatch)
+- `/vrchat avatar-invite` - Send avatar world invite message (Staff)
+
+### Settings Commands (Staff)
+- `/settings roles add/remove/status` - Manage Discord role to permission mappings
+- `/settings group set-group-id/view-group-id/clear-group-id` - VRChat group ID management
+- `/settings group set-promotion-logs/view-promotion-logs` - Promotion log channels
+- `/settings group role map/unmap/list` - Map Discord roles to VRChat group roles
+- `/settings group rolesync` - Manually sync user's Discord to VRChat roles
+- `/settings group bulkrolesync` - Sync all verified users' roles
+- `/settings patrol setup-category` - Set tracked voice category for patrol
+- `/settings patrol promotion set-channel/set-role/set-hours/view/reset/check/check-all` - Promotion system config
+- `/settings attendance add-channel/remove-channel` - Manage enrolled attendance channels
+- `/settings whitelist set-log-channel/remove-log-channel` - Whitelist log channels
+- `/settings vrchat set-avatar-world/remove-avatar-world` - Avatar world ID config
+- `/settings loa` - Configure LOA system settings
+
+### Dev Commands (Bot Owner)
+- `/eval <code>` - Evaluate JavaScript code for debugging
+
+For detailed command documentation, see [COMMANDS.md](COMMANDS.md).
 
 ## 🔧 Development
 
@@ -335,6 +409,19 @@ The project uses Prettier for code formatting:
 npx prettier --write .
 ```
 
+### Testing
+
+```bash
+# Run tests
+yarn test
+
+# Run tests with UI
+yarn test:ui
+
+# Run tests with coverage
+yarn test:coverage
+```
+
 ### Adding New Commands
 
 1. Create a new file in `src/commands/[category]/`
@@ -343,6 +430,7 @@ npx prettier --write .
 ```typescript
 import { Discord, Slash, SlashOption, Guard } from "discordx";
 import { CommandInteraction } from "discord.js";
+import { StaffGuard } from "../../utility/guards.js";
 
 @Discord()
 export class MyCommand {
